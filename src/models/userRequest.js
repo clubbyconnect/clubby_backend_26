@@ -9,5 +9,6 @@ const userRequestSchema = new Schema({
     updatedAt: { type: Date, default: Date.now }
   });
   
-  const userRequest = mongoose.model('FriendRequest', userRequestSchema);
-  
+const userRequest = mongoose.model('userRequest', userRequestSchema);
+
+module.exports = userRequest;

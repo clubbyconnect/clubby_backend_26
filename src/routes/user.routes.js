@@ -35,7 +35,7 @@ router.post("/verifyOtp",verifyOtp);
 router.post("/logout",verifyJWT,logout);
 router.post("/resetPassword",resetPassword);
 router.post("/uploadAvatar",verifyJWT ,upload.single('avatar'),uploadAvatar);
-router.post("/createPost",verifyJWT,createPost);
+router.post("/createPost",verifyJWT,upload.single('productImage') ,createPost);
 
 //App data
 router.post("/fetchallcategory",verifyJWT,fetchallcategory);

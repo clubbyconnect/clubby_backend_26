@@ -27,7 +27,7 @@ const userSchema = new Schema(
     },
     avatar: {
       type: String,
-      default : null
+      default : "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721114085/fk9iazynubn9toe8yrrq.png"
     },
     isVerified: {
       type: String,

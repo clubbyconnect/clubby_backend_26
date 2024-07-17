@@ -18,15 +18,23 @@ const postSchema = new mongoose.Schema({
     type: Number, 
     required: true 
   },
-  categoryId: {
+  quantity:{
+    type: Number, 
+    required: true 
+  },
+  category: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Category",
     required: true,
   },
-  subcategoryId: {
+  subcategory: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Subcategory",
+    ref: "Category",
     required: true,
+  },
+  subsubcategory: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Category',
   },
   productImage: { 
     type: String, 

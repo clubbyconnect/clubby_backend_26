@@ -404,47 +404,66 @@ exports.uploadAvatar = async (req, res) => {
 //-------------------------------------------Pending..!!!......................................
 exports.createPost = async (req, res) => {
   try {
-    const { title, description, price, subcategory, location } = req.body;
-
+    const { userId, title,description, price,quantity,category, subcategory, subsubcategory} = req.body;
+   
     if (
-      [title, description, price, subcategory].some(
+      [title, description, price, quantity, category, subcategory].some(
         (field) => field?.trim() === ""
       )
     ) {
-      return res.status(400).json({ error: "All fields are required" });
+      return res.status(400).json({ error: "pls fill required fields" });
     }
-    const id = await subCategory.findOne({ name: subcategory });
-    console.log(id);
+    const productImageLocalPath = req.file?.path;
+    if (!productImageLocalPath) return res.status(400).json({ message: "Product Image is requierd" });
 
-    const createdPost = post.create({
+    const productImage = await uploadOnCloudinary(productImageLocalPath);
+
+    const categoryid = await categoryModel.findOne({ name: category });
+    const subcategoryid = await categoryModel.findOne({ name: category });
+    const subsubcategoryid = await categoryModel.findOne({ name: subsubcategory });
+
+    const postData = {
       userId: req.User._id,
       title,
       description,
       price,
-      categoryId: id.categoryId,
-      subcategoryId: id._id,
-      productImage: "https://example.com/images/leatherjacket.jpg",
-    });
+      quantity,
+      category: categoryid._id,
+      subcategory: subcategoryid._id,
+      productImage : productImage.url
+    };
+    
+    if (subsubcategory && subsubcategoryid) {
+      postData.subsubcategory = subsubcategoryid._id;
+    }
+    
+    const createdPost = post.create(postData);
+    return res.status(200).json({ messaage: "Post created"});
 
-    return res.status(200).json({ messaage: "Post created", createdPost });
   } catch (error) {
     console.log(error);
     new ErrorHandler("Unable to create Post. Server error!", 500, res);
   }
 };
 
-//------------------------------------------User Request---------------------------------------
+//------------------------------------------User Request----Pending..!!!-----------------------------------------
 exports.sendUserRequest = async (req, res) => {
   try {
-    const { requesterId, recipientId } = req.body;
-
+    const requesterId = req.User._id;
+  
+    const recipientUser = await User.findOne({ email: "bhavin@gmail.com" });
+    if (!recipientUser) {
+      return res.status(404).json({ message: 'Recipient user not found' });
+    }
+    
+    const recipientId = recipientUser._id;
     const requester = await User.findById(requesterId);
     const recipient = await User.findById(recipientId);
     if (!requester || !recipient) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const existingRequest = await FriendRequest.findOne({
+    const existingRequest = await userRequest.findOne({
       requester: requesterId,
       recipient: recipientId,
     });
@@ -453,23 +472,34 @@ exports.sendUserRequest = async (req, res) => {
       return res.status(400).json({ message: 'Friend request already sent' });
     }
 
-    const friendRequest = new FriendRequest({
+    const friendRequest = await userRequest.create({
       requester: requesterId,
       recipient: recipientId,
     });
 
     await friendRequest.save();
-    res.status(200).json({ message: 'Friend request sent', friendRequest });
+    res.status(200).json({ message: 'Friend request sent' });
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: 'Error sending friend request', error });
   }
 };
 
 exports.acceptUserRequest = async (req, res) => {
   try {
-    const { requestId } = req.body;
+    //const { requestId } = req.body;
+    const requesterId = req.User._id;
+    const request = await userRequest.findOne({requester : requesterId});
+    const requestId = request._id
 
-    const friendRequest = await FriendRequest.findById(requestId);
+    const recipientUser = await User.findOne({ email: "bhavin@gmail.com" });
+    if (!recipientUser) {
+      return res.status(404).json({ message: 'Recipient user not found' });
+    }
+    
+    const recipientId = recipientUser._id;
+
+    const friendRequest = await userRequest.findById(requestId);
     if (!friendRequest) {
       return res.status(404).json({ message: 'Friend request not found' });
     }
@@ -477,7 +507,7 @@ exports.acceptUserRequest = async (req, res) => {
     friendRequest.status = 'accepted';
     friendRequest.updatedAt = Date.now();
     await friendRequest.save();
-    res.status(200).json({ message: 'Friend request accepted', friendRequest });
+    res.status(200).json({ message: 'Friend request accepted'});
   } catch (error) {
     res.status(500).json({ message: 'Error accepting friend request', error });
   }
@@ -485,9 +515,12 @@ exports.acceptUserRequest = async (req, res) => {
 
 exports.declineUserRequest = async (req, res) => {
   try {
-    const { requestId } = req.body;
+    //const { requestId } = req.body;
+    const requesterId = req.User._id;
+    const request = await userRequest.findOne({requester : requesterId});
+    const requestId = request._id
 
-    const friendRequest = await FriendRequest.findById(requestId);
+    const friendRequest = await userRequest.findById(requestId);
     if (!friendRequest) {
       return res.status(404).json({ message: 'Friend request not found' });
     }
@@ -495,9 +528,59 @@ exports.declineUserRequest = async (req, res) => {
     friendRequest.status = 'declined';
     friendRequest.updatedAt = Date.now();
     await friendRequest.save();
-    res.status(200).json({ message: 'Friend request declined', friendRequest });
+    res.status(200).json({ message: 'Friend request declined'});
   } catch (error) {
     res.status(500).json({ message: 'Error declining friend request', error });
   }
 };
+
+
+
+//---------------------------------------------------------------------extra content-------------------------------------------------------------
+
+
+// exports.acceptFriendRequest = async (req, res) => {
+//   try {
+//     const { requestId } = req.body;
+//     const userId = req.User._id;
+
+//     // Find the friend request
+//     const friendRequest = await userRequest.findById(requestId);
+//     if (!friendRequest) {
+//       return res.status(404).json({ message: 'Friend request not found' });
+//     }
+
+//     // Add both users to the group
+//     const requester = await User.findById(friendRequest.requester);
+//     const recipient = await User.findById(friendRequest.recipient);
+//     if (!requester || !recipient) {
+//       return res.status(404).json({ message: 'User not found' });
+//     }
+
+//     // Assuming a default group or you can create a new group for each pair
+//     const groupName = `Group_${requester._id}_${recipient._id}`;
+//     let group = await Group.findOne({ name: groupName });
+
+//     if (!group) {
+//       group = new Group({ name: groupName, members: [requester._id, recipient._id] });
+//     } else {
+//       group.members.push(requester._id, recipient._id);
+//     }
+
+//     await group.save();
+
+//     // Update the friend request status to accepted
+//     friendRequest.status = 'accepted';
+//     await friendRequest.save();
+
+//     res.status(200).json({ message: 'Friend request accepted', group });
+//   } catch (error) {
+//     console.log(error);
+//     res.status(500).json({ message: 'Error accepting friend request', error });
+//   }
+// };
+
+
+
+
 

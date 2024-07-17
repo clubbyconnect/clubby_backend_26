@@ -3,10 +3,6 @@ const User = require("../models/user.js");
 const categoryModel = require("../models/categorySchema.js");
 
 // controllers-----------------------------------
-
-
-//----------------------------------------New-------------------------------------
-
 exports.fetchallcategory = async (req, res) => {
   try {
     const allcategory = await categoryModel.aggregate([

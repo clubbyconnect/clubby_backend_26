@@ -3,6 +3,28 @@ const User = require("../models/user.js");
 const post = require("../models/post.js");
 const chatRoom = require("../models/chatRoom.js");
 const categoryModel = require("../models/categorySchema.js")
+const initializeChatSocket = require('../sockets/chat.js'); 
+const io = initializeChatSocket(); 
+
+
+exports.chat = async (req, res) => {
+  try {
+    const groupId =2
+    const userId =3
+
+    io.emit('joinGroup', { groupId, userId });
+    
+    return res.status(200).json({ message: 'Message sent via API' });
+  } catch (error) {
+    console.log(error);
+    new ErrorHandler("Unable to create ChatRoomID. Server error!", 500, res);
+  }
+};
+
+
+
+
+
 
 //functions
 const deleteCategoryRecursive = async (categoryId) => {
@@ -73,29 +95,6 @@ exports.deleteCategory = async (req, res, next) => {
   }
 };
 
-//--------------------------------Chat--------------------------------------
-exports.createChatRoomID = async (req, res) => {
-  try {
-    //const {roomId, groupName, members} = req.body;
-    const roomId = "00000000000000000"
-    const groupName = "dumyGroup"
-    const members = ["nikhil" , "udayy" ]
-
-    const newChatRoom = await chatRoom.create({
-      roomId: roomId,
-      groupName: groupName,
-      members: members,
-    });
-    
-    const savedChatRoom = await newChatRoom.save();
-
-    if (savedChatRoom) return res.status(200).json({ message: "ChatRoomID created" });
-  } catch (error) {
-    console.log(error);
-    new ErrorHandler("Unable to create ChatRoomID. Server error!", 500, res);
-  }
-};
-
 exports.findCategoryWithSubcategories = async (req, res) => {
   try {
     const { categoryName } = req.body;
@@ -139,6 +138,13 @@ exports.findCategoryWithSubcategories = async (req, res) => {
     return res.status(500).json({ message: "Unable to fetch category and subcategories. Server error!" });
   }
 };
+
+
+
+
+
+
+
 
 
 

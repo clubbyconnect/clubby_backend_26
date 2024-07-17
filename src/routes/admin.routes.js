@@ -1,23 +1,19 @@
 const express = require('express');
 const router = express.Router();
-
-const { createChatRoomID,
+const { 
      createCategory,
      addSubcategory,
      deleteCategory,
-     findCategoryWithSubcategories
+     findCategoryWithSubcategories,
+     chat
     } = require('../controllers/admin.controllers.js');
 
 //admin
-
-
-router.post("/createChatRoomID",createChatRoomID);
-
-
 router.post("/createCategory",createCategory);
 router.post("/addSubcategory",addSubcategory);
 router.post("/deleteCategory",deleteCategory);
 router.post("/findCategoryWithSubcategories",findCategoryWithSubcategories);
+router.post("/chat",chat);
 
 
 module.exports = router;
