@@ -33,6 +33,14 @@ const userSchema = new Schema(
       type: String,
       default : false
     },
+    location : {
+      type: String,
+      default : "Delhi"
+    },
+    gender : {
+      type: String,
+      default : "male"
+    },
     MobileNo: {
       type: String,
       default : null

@@ -22,6 +22,26 @@ const postSchema = new mongoose.Schema({
     type: Number, 
     required: true 
   },
+  productLink:{
+    type: String, 
+    required: true 
+  },
+  location:{
+    type: Number, 
+    required: true 
+  },
+  NumberOfclubMenber:{
+    type: Number, 
+    required: true 
+  },
+  clubType:{
+    type: String, 
+    required: false 
+  },
+  OfferType:{
+    type: String, 
+    required: false 
+  },
   category: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Category",
@@ -38,7 +58,7 @@ const postSchema = new mongoose.Schema({
   },
   productImage: { 
     type: String, 
-    required: true 
+    default : "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721192873/zhcbblypjd3qg4gohafv.png"
   },
   createdAt: { 
     type: Date, 

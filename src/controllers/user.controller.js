@@ -8,7 +8,7 @@ const { appleAuth } = require("apple-auth");
 const post = require("../models/post.js");
 const categoryModel = require("../models/categorySchema.js");
 const uploadOnCloudinary = require("../utils/cloudinary.js");
-const userRequest = require("../models/userRequest.js")
+const userRequest = require("../models/userRequest.js");
 
 // OAuth 2.0 Configuration-----------------------------------
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -52,12 +52,10 @@ exports.signUp = async (req, res) => {
 
     if (existingUser) {
       if (!(existingUser.googleAuthId === null)) {
-        return res
-          .status(409)
-          .json({
-            error:
-              "You are already registerd with Google Email-id pls sign In with google",
-          });
+        return res.status(409).json({
+          error:
+            "You are already registerd with Google Email-id pls sign In with google",
+        });
       }
       return res
         .status(409)
@@ -343,11 +341,9 @@ exports.resetPassword = async (req, res) => {
 
     if (user?.email === contact) {
       if (!(user.googleAuthId === null)) {
-        return res
-          .status(409)
-          .json({
-            error: "You are registerd with Google id you can not resetPassword",
-          });
+        return res.status(409).json({
+          error: "You are registerd with Google id you can not resetPassword",
+        });
       }
     }
 
@@ -404,23 +400,50 @@ exports.uploadAvatar = async (req, res) => {
 //-------------------------------------------Pending..!!!......................................
 exports.createPost = async (req, res) => {
   try {
-    const { userId, title,description, price,quantity,category, subcategory, subsubcategory} = req.body;
-   
+    const {
+      userId,
+      title,
+      description,
+      price,
+      quantity,
+      productLink,
+      location,
+      NumberOfclubMenber,
+      clubType,
+      OfferType,
+      category,
+      subcategory,
+      subsubcategory,
+    } = req.body;
+
     if (
-      [title, description, price, quantity, category, subcategory].some(
-        (field) => field?.trim() === ""
-      )
+      [
+        title,
+        description,
+        price,
+        quantity,
+        category,
+        subcategory,
+        productLink,
+        location,
+        NumberOfclubMenber,
+        clubType,
+        OfferType,
+      ].some((field) => field?.trim() === "")
     ) {
       return res.status(400).json({ error: "pls fill required fields" });
     }
     const productImageLocalPath = req.file?.path;
-    if (!productImageLocalPath) return res.status(400).json({ message: "Product Image is requierd" });
+    if (!productImageLocalPath)
+      return res.status(400).json({ message: "Product Image is requierd" });
 
     const productImage = await uploadOnCloudinary(productImageLocalPath);
 
     const categoryid = await categoryModel.findOne({ name: category });
     const subcategoryid = await categoryModel.findOne({ name: category });
-    const subsubcategoryid = await categoryModel.findOne({ name: subsubcategory });
+    const subsubcategoryid = await categoryModel.findOne({
+      name: subsubcategory,
+    });
 
     const postData = {
       userId: req.User._id,
@@ -428,18 +451,24 @@ exports.createPost = async (req, res) => {
       description,
       price,
       quantity,
+      category,
+      subcategory,
+      productLink,
+      location,
+      NumberOfclubMenber,
+      clubType,
+      OfferType,
       category: categoryid._id,
       subcategory: subcategoryid._id,
-      productImage : productImage.url
+      productImage: productImage.url,
     };
-    
+
     if (subsubcategory && subsubcategoryid) {
       postData.subsubcategory = subsubcategoryid._id;
     }
-    
-    const createdPost = post.create(postData);
-    return res.status(200).json({ messaage: "Post created"});
 
+    const createdPost = post.create(postData);
+    return res.status(200).json({ messaage: "Post created" });
   } catch (error) {
     console.log(error);
     new ErrorHandler("Unable to create Post. Server error!", 500, res);
@@ -450,17 +479,17 @@ exports.createPost = async (req, res) => {
 exports.sendUserRequest = async (req, res) => {
   try {
     const requesterId = req.User._id;
-  
+
     const recipientUser = await User.findOne({ email: "bhavin@gmail.com" });
     if (!recipientUser) {
-      return res.status(404).json({ message: 'Recipient user not found' });
+      return res.status(404).json({ message: "Recipient user not found" });
     }
-    
+
     const recipientId = recipientUser._id;
     const requester = await User.findById(requesterId);
     const recipient = await User.findById(recipientId);
     if (!requester || !recipient) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     const existingRequest = await userRequest.findOne({
@@ -469,7 +498,7 @@ exports.sendUserRequest = async (req, res) => {
     });
 
     if (existingRequest) {
-      return res.status(400).json({ message: 'Friend request already sent' });
+      return res.status(400).json({ message: "Friend request already sent" });
     }
 
     const friendRequest = await userRequest.create({
@@ -478,10 +507,10 @@ exports.sendUserRequest = async (req, res) => {
     });
 
     await friendRequest.save();
-    res.status(200).json({ message: 'Friend request sent' });
+    res.status(200).json({ message: "Friend request sent" });
   } catch (error) {
     console.log(error);
-    res.status(500).json({ message: 'Error sending friend request', error });
+    res.status(500).json({ message: "Error sending friend request", error });
   }
 };
 
@@ -489,27 +518,27 @@ exports.acceptUserRequest = async (req, res) => {
   try {
     //const { requestId } = req.body;
     const requesterId = req.User._id;
-    const request = await userRequest.findOne({requester : requesterId});
-    const requestId = request._id
+    const request = await userRequest.findOne({ requester: requesterId });
+    const requestId = request._id;
 
     const recipientUser = await User.findOne({ email: "bhavin@gmail.com" });
     if (!recipientUser) {
-      return res.status(404).json({ message: 'Recipient user not found' });
+      return res.status(404).json({ message: "Recipient user not found" });
     }
-    
+
     const recipientId = recipientUser._id;
 
     const friendRequest = await userRequest.findById(requestId);
     if (!friendRequest) {
-      return res.status(404).json({ message: 'Friend request not found' });
+      return res.status(404).json({ message: "Friend request not found" });
     }
 
-    friendRequest.status = 'accepted';
+    friendRequest.status = "accepted";
     friendRequest.updatedAt = Date.now();
     await friendRequest.save();
-    res.status(200).json({ message: 'Friend request accepted'});
+    res.status(200).json({ message: "Friend request accepted" });
   } catch (error) {
-    res.status(500).json({ message: 'Error accepting friend request', error });
+    res.status(500).json({ message: "Error accepting friend request", error });
   }
 };
 
@@ -517,27 +546,24 @@ exports.declineUserRequest = async (req, res) => {
   try {
     //const { requestId } = req.body;
     const requesterId = req.User._id;
-    const request = await userRequest.findOne({requester : requesterId});
-    const requestId = request._id
+    const request = await userRequest.findOne({ requester: requesterId });
+    const requestId = request._id;
 
     const friendRequest = await userRequest.findById(requestId);
     if (!friendRequest) {
-      return res.status(404).json({ message: 'Friend request not found' });
+      return res.status(404).json({ message: "Friend request not found" });
     }
 
-    friendRequest.status = 'declined';
+    friendRequest.status = "declined";
     friendRequest.updatedAt = Date.now();
     await friendRequest.save();
-    res.status(200).json({ message: 'Friend request declined'});
+    res.status(200).json({ message: "Friend request declined" });
   } catch (error) {
-    res.status(500).json({ message: 'Error declining friend request', error });
+    res.status(500).json({ message: "Error declining friend request", error });
   }
 };
 
-
-
 //---------------------------------------------------------------------extra content-------------------------------------------------------------
-
 
 // exports.acceptFriendRequest = async (req, res) => {
 //   try {
@@ -579,8 +605,3 @@ exports.declineUserRequest = async (req, res) => {
 //     res.status(500).json({ message: 'Error accepting friend request', error });
 //   }
 // };
-
-
-
-
-
