@@ -16,14 +16,10 @@ exports.chat = async (req, res) => {
     
     return res.status(200).json({ message: 'Message sent via API' });
   } catch (error) {
-    console.log(error)
+    console.log(error);
     new ErrorHandler("Unable to create ChatRoomID. Server error!", 500, res);
   }
 };
-
-
-
-
 
 
 //functions
