@@ -10,6 +10,7 @@
   "description": "",
   "dependencies": {
     "apple-auth": "^1.0.9",
+    "axios": "^1.7.2",
     "bcrypt": "^5.1.1",
     "cloudinary": "^2.2.0",
     "cookie-parser": "^1.4.6",

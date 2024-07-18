@@ -9,6 +9,12 @@ const post = require("../models/post.js");
 const categoryModel = require("../models/categorySchema.js");
 const uploadOnCloudinary = require("../utils/cloudinary.js");
 const userRequest = require("../models/userRequest.js");
+const axios = require('axios');
+
+
+// Fast2SMS Configuration-----------------------------------
+const fast2SMSapiKey = process.env.FAST2SMS_API_KEY
+const fast2SMSurl = process.env.FAST2SMS_URL
 
 // OAuth 2.0 Configuration-----------------------------------
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -234,14 +240,14 @@ exports.sendOtp = async (req, res) => {
         .json({ error: "Email or phone number is required" });
     }
 
-    const user = await User.findOne({
-      $or: [{ email: contact }, { phoneNumber: contact }],
-    });
+    // const user = await User.findOne({
+    //   $or: [{ email: contact }, { phoneNumber: contact }],
+    // });
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-    if (user?.email === contact) {
+    // if (!user) {
+    //   return res.status(404).json({ error: "User not found" });
+    // }user?.email === contact
+    if (false) {
       try {
         const email = contact;
         let otp;
@@ -258,7 +264,7 @@ exports.sendOtp = async (req, res) => {
         const otpPayload = { email, otp };
         console.log("OTP Body", otpPayload);
         const otpBody = await OTP.create(otpPayload);
-
+        
         return res.status(200).json({
           success: true,
           message: `OTP Sent Successfully`,
@@ -269,9 +275,51 @@ exports.sendOtp = async (req, res) => {
         new ErrorHandler("something went wrong while Genrating OTP", 500, res);
       }
     } else {
+      const PhoneNumber = contact;
+        let otp;
+        let result;
+        do {
+          otp = otpGenerator.generate(6, {
+            upperCaseAlphabets: false,
+            lowerCaseAlphabets: false,
+            specialChars: false,
+          });
+          result = await OTP.findOne({ otp });
+        } while (result);
+
+        const otpPayload = { mobileNumber :PhoneNumber , otp };
+        console.log("OTP Body.............", otpPayload);
+        const otpBody = await OTP.create(otpPayload);
+        const message = `Your OTP is ${otp}`;
+       
+        const response = await axios.post(
+          fast2SMSurl,
+          {
+            route: 'v3',
+            sender_id: 'TXTIND',
+            message,
+            language: 'english',
+            flash: 0,
+            numbers: PhoneNumber,
+          },
+          {
+            headers: {
+              authorization: fast2SMSapiKey,
+              'Content-Type': 'application/json'
+            }
+          }
+        )
+
+        console.log("..........................>>>>>>>>",response);
+
+        return res.status(200).json({
+          success: true,
+          message: `OTP Sent Successfully`,
+          otp,
+        });
     }
   } catch (error) {
-    console.log(error);
+    console.log("............",error);
     new ErrorHandler("An error occurred during OTP generation", 500, res);
   }
 };
@@ -562,6 +610,32 @@ exports.declineUserRequest = async (req, res) => {
     res.status(500).json({ message: "Error declining friend request", error });
   }
 };
+
+exports.addPhoneNumber = async (req, res) => {
+  try {
+
+  } catch (error) {
+    console.log(error);
+    new ErrorHandler("Unable to logout. Server error!", 500, res);
+  }
+};
+exports.UpdateUserDetails = async (req, res) => {
+  try {
+
+  } catch (error) {
+    console.log(error);
+    new ErrorHandler("Unable to logout. Server error!", 500, res);
+  }
+};
+exports.logout = async (req, res) => {
+  try {
+
+  } catch (error) {
+    console.log(error);
+    new ErrorHandler("Unable to logout. Server error!", 500, res);
+  }
+};
+
 
 //---------------------------------------------------------------------extra content-------------------------------------------------------------
 
