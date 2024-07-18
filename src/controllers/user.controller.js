@@ -423,8 +423,9 @@ exports.createPost = async (req, res) => {
     }
 
     const createdPost = await post.create(postData);
-    if(!createdPost._id) return res.status(401).json({ messaage: "errro" });
-
+    if(!createdPost._id) return res.status(401).json({ messaage: "unabel to create post" });
+    
+    return res.status(401).json({ messaage: "Post created Sucessfully" });
   } catch (error) {
     handleValidationError(error ,res)
   }
