@@ -559,6 +559,8 @@ exports.UpdateDetails = async (req, res) => {
   }
 };
 
+
+//--------------------------------------------------------------------------------------------------------
 exports.UpdateEmail = async (req, res) => {
   try {
 

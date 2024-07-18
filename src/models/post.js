@@ -31,6 +31,7 @@ const postSchema = new mongoose.Schema({
   productLink:{
     type: String, 
     required: [true, 'Product link is required'],
+    match: [/^(http|https):\/\/[^ "]+$/, "Product link must be a valid URL"],
   },
   location:{
     type: String, 
@@ -85,44 +86,5 @@ const postSchema = new mongoose.Schema({
 
 const Post = mongoose.model("Post", postSchema);
 module.exports = Post;
-
-
-
-// [
-//   {
-//     "userId": "john.doe@example.com",
-//     "title": "iPhone 13 for Sale",
-//     "description": "Brand new iPhone 13, 128GB, Black color. Never used.",
-//     "price": 799,
-//     "categoryId": "Electronics",
-//     "subcategoryId": "Mobile Phones",
-//     "productImage": "https://example.com/images/iphone13.jpg",
-//     "createdAt": "2024-07-09T12:30:00Z",
-//     "updatedAt": "2024-07-09T12:30:00Z"
-//   },
-//   {
-//     "userId": "jane.smith@example.com",
-//     "title": "Men's Leather Jacket",
-//     "description": "Genuine leather jacket, size M, black color. Lightly used.",
-//     "price": 150,
-//     "categoryId": "Fashion",
-//     "subcategoryId": "Men's Clothing",
-//     "productImage": "https://example.com/images/leatherjacket.jpg",
-//     "createdAt": "2024-07-09T12:35:00Z",
-//     "updatedAt": "2024-07-09T12:35:00Z"
-//   }
-// ]
-
-// const post1 = new Post({
-//   userId: user1._id,
-//   title: 'iPhone 13 for Sale',
-//   description: 'Brand new iPhone 13, 128GB, Black color. Never used.',
-//   price: 799,
-//   categoryId: category1._id,
-//   subcategoryId: subcategory1._id,
-//   productImage: 'https://example.com/images/iphone13.jpg',
-//   createdAt: new Date('2024-07-09T12:30:00Z'),
-//   updatedAt: new Date('2024-07-09T12:30:00Z')
-// });
 
 

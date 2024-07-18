@@ -24,6 +24,7 @@ const userSchema = new Schema(
     },
     googleAuthId: {
       type: String,
+      trim: true,
       default : null
     },
     firstName: {
@@ -65,7 +66,8 @@ const userSchema = new Schema(
     location : {
       type: String,
       trim: true,
-      maxlength: [100, "Location cannot exceed 100 characters"],
+      minlength: [3, "Location must be at least 3 characters long"],
+      maxlength: [50, "Location cannot exceed 50 characters"],
       default : null
     },
     avatar: {
