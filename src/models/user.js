@@ -25,6 +25,26 @@ const userSchema = new Schema(
       type: String,
       default : null
     },
+    firstName: {
+      type: String,
+      default : null
+    },
+    lastname: {
+      type: String,
+      default : null
+    },
+    gender : {
+      type: String,
+      default : null
+    },
+    MobileNo: {
+      type: String,
+      default : null
+    },
+    location : {
+      type: String,
+      default : null
+    },
     avatar: {
       type: String,
       default : "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721114085/fk9iazynubn9toe8yrrq.png"
@@ -32,18 +52,6 @@ const userSchema = new Schema(
     isVerified: {
       type: String,
       default : false
-    },
-    location : {
-      type: String,
-      default : "Delhi"
-    },
-    gender : {
-      type: String,
-      default : "male"
-    },
-    MobileNo: {
-      type: String,
-      default : null
     },
     refreshToken: {
       type: String,

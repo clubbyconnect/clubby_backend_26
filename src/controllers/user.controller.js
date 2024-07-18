@@ -40,64 +40,78 @@ const generateAccessAndRefreshTokens = async (userId) => {
     };
   }
 };
+const generateUniqueOtp = async () => {
+  let otp;
+  let result;
+  do {
+    otp = otpGenerator.generate(6, {
+      upperCaseAlphabets: false,
+      lowerCaseAlphabets: false,
+      specialChars: false,
+    });
+    result = await OTP.findOne({ otp });
+  } while (result);
+  return otp;
+};
+const sendSms = async (phoneNumber, message) => {
+  const response = await axios.post(
+    fast2SMSurl,
+    {
+      route: 'v3',
+      sender_id: 'TXTIND',
+      message,
+      language: 'english',
+      flash: 0,
+      numbers: phoneNumber,
+    },
+    {
+      headers: {
+        authorization: fast2SMSapiKey,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+};
 
 // controllers-----------------------------------
 exports.signUp = async (req, res) => {
   try {
     const { email, confirmPassword, password } = req.body;
 
-    if (
-      [confirmPassword, email, password].some((field) => field?.trim() === "")
-    ) {
+    if ([confirmPassword, email, password].some((field) => field?.trim() === "")) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    if (password !== confirmPassword)
+    if (password !== confirmPassword) {
       return res.status(400).json({ error: "Passwords do not match" });
-    const existingUser = await User.findOne({ email });
-
-    if (existingUser) {
-      if (!(existingUser.googleAuthId === null)) {
-        return res.status(409).json({
-          error:
-            "You are already registerd with Google Email-id pls sign In with google",
-        });
-      }
-      return res
-        .status(409)
-        .json({ error: "User with this email already exists" });
     }
 
-    const newUser = await User.create({
-      email,
-      password,
-    });
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      const googleAuthError = "You are already registered with Google Email-id, please sign in with Google";
+      const userExistsError = "User with this email already exists";
 
-    const user = await User.findById(newUser._id).select(
-      "-password -refreshToken"
-    );
+      return res.status(409).json({
+        error: existingUser.googleAuthId !== null ? googleAuthError : userExistsError,
+      });
+    }
+
+    const newUser = await User.create({ email, password });
+    const user = await User.findById(newUser._id).select("-password -refreshToken");
 
     if (!user) {
-      return res
-        .status(500)
-        .json({ error: "Something went wrong while registering the user" });
+      return res.status(500).json({ error: "Something went wrong while registering the user" });
     }
-
-    return res
-      .status(200)
-      .json({ message: "User registered successfully", data: user });
+    return res.status(200).json({ message: "User registered successfully", data: user });
   } catch (error) {
-    console.log(error);
-    new ErrorHandler("An error occurred during sign up", 500, res);
+    console.error(error);
+    return new ErrorHandler("An error occurred during sign up", 500, res);
   }
 };
 
 exports.googleAuth = async (req, res) => {
-  console.log();
   try {
     const { token } = req.body;
-    console.log(token);
-
     const result = await client.verifyIdToken({
       idToken: token,
       audience: process.env.GOOGLE_CLIENT_ID,
@@ -105,48 +119,29 @@ exports.googleAuth = async (req, res) => {
 
     const googleAuthId = result.payload.sub;
     const email = result.payload.email;
-    const existingUser = await User.findOne({ googleAuthId });
+    let user = await User.findOne({ googleAuthId });
 
-    if (!existingUser) {
+    if (!user) {
       const newUser = await User.create({ email, googleAuthId });
-      const user = await User.findById(newUser._id).select(
-        "-password -refreshToken"
-      );
-      console.log("...............", user);
-      const { accessToken, refreshToken } =
-        await generateAccessAndRefreshTokens(user._id);
-      const loggedInUser = await User.findById(user._id).select(
-        "-password -refreshToken"
-      );
-      const options = {
-        httpOnly: true,
-        secure: true,
-      };
-      return res
-        .status(200)
-        .cookie("accessToken", accessToken, options)
-        .cookie("refreshToken", refreshToken, options)
-        .json({
-          message: "User Created and signed in successfully",
-          data: loggedInUser,
-        });
+      user = await User.findById(newUser._id).select("-password -refreshToken");
     }
 
-    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
-      existingUser._id
-    );
-    const loggedInUser = await User.findById(existingUser._id).select(
-      "-password -refreshToken"
-    );
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
+
     const options = {
       httpOnly: true,
       secure: true,
     };
+
     return res
       .status(200)
       .cookie("accessToken", accessToken, options)
       .cookie("refreshToken", refreshToken, options)
-      .json({ message: "User signed in successfully", data: loggedInUser });
+      .json({
+        message: user ? "User signed in successfully" : "User Created and signed in successfully",
+        data: loggedInUser,
+      });
   } catch (error) {
     console.log(error);
     new ErrorHandler("An error occurred", 500, res);
@@ -190,41 +185,30 @@ exports.facebookAuth = async (req, res) => {
 exports.signIn = async (req, res) => {
   try {
     const { email, password } = req.body;
-
     if (!email || !password) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
     const user = await User.findOne({ email });
-
     if (!user) {
       return res.status(409).json({ error: "User does not exist" });
     }
 
     const isPasswordValid = await user.isPasswordCorrect(password);
-
     if (!isPasswordValid) {
       return res.status(401).json({ error: "Invalid user credentials" });
     }
 
-    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
-      user._id
-    );
-
-    const loggedInUser = await User.findById(user._id).select(
-      "-password -refreshToken"
-    );
-
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
     const options = {
       httpOnly: true,
       secure: true,
     };
 
-    return res
-      .status(200)
-      .cookie("accessToken", accessToken, options)
-      .cookie("refreshToken", refreshToken, options)
-      .json({ message: "User signed in successfully", data: loggedInUser });
+    res.cookie("accessToken", accessToken, options);
+    res.cookie("refreshToken", refreshToken, options);
+    return res.status(200).json({ message: "User signed in successfully", data: loggedInUser });
   } catch (error) {
     new ErrorHandler("An error occurred during sign in", 500, res);
   }
@@ -235,91 +219,31 @@ exports.sendOtp = async (req, res) => {
     const { contact } = req.body;
 
     if (!contact || contact.trim() === "") {
-      return res
-        .status(400)
-        .json({ error: "Email or phone number is required" });
+      return res.status(400).json({ error: "Email or phone number is required" });
     }
 
-    // const user = await User.findOne({
-    //   $or: [{ email: contact }, { phoneNumber: contact }],
-    // });
+    const user = await User.findOne({
+      $or: [{ email: contact }, { phoneNumber: contact }],
+    });
 
-    // if (!user) {
-    //   return res.status(404).json({ error: "User not found" });
-    // }user?.email === contact
-    if (false) {
-      try {
-        const email = contact;
-        let otp;
-        let result;
-        do {
-          otp = otpGenerator.generate(6, {
-            upperCaseAlphabets: false,
-            lowerCaseAlphabets: false,
-            specialChars: false,
-          });
-          result = await OTP.findOne({ otp });
-        } while (result);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const isEmail = user.email === contact;
+    const otp = await generateUniqueOtp();
 
-        const otpPayload = { email, otp };
-        console.log("OTP Body", otpPayload);
-        const otpBody = await OTP.create(otpPayload);
-        
-        return res.status(200).json({
-          success: true,
-          message: `OTP Sent Successfully`,
-          otp,
-        });
-      } catch (error) {
-        console.log(error.message);
-        new ErrorHandler("something went wrong while Genrating OTP", 500, res);
-      }
+    const otpPayload = isEmail ? { email: contact, otp } : { mobileNumber: contact, otp };
+    await OTP.create(otpPayload);
+
+    if (isEmail) {
+      return res.status(200).json({ success: true, message: "OTP Sent Successfully", otp });
     } else {
-      const PhoneNumber = contact;
-        let otp;
-        let result;
-        do {
-          otp = otpGenerator.generate(6, {
-            upperCaseAlphabets: false,
-            lowerCaseAlphabets: false,
-            specialChars: false,
-          });
-          result = await OTP.findOne({ otp });
-        } while (result);
-
-        const otpPayload = { mobileNumber :PhoneNumber , otp };
-        console.log("OTP Body.............", otpPayload);
-        const otpBody = await OTP.create(otpPayload);
-        const message = `Your OTP is ${otp}`;
-       
-        const response = await axios.post(
-          fast2SMSurl,
-          {
-            route: 'v3',
-            sender_id: 'TXTIND',
-            message,
-            language: 'english',
-            flash: 0,
-            numbers: PhoneNumber,
-          },
-          {
-            headers: {
-              authorization: fast2SMSapiKey,
-              'Content-Type': 'application/json'
-            }
-          }
-        )
-
-        console.log("..........................>>>>>>>>",response);
-
-        return res.status(200).json({
-          success: true,
-          message: `OTP Sent Successfully`,
-          otp,
-        });
+      const message = `Your OTP is ${otp}`;
+      await sendSms(contact, message);
+      return res.status(200).json({ success: true, message: "OTP Sent Successfully", otp });
     }
   } catch (error) {
-    console.log("............",error);
+    console.error(error.message);
     new ErrorHandler("An error occurred during OTP generation", 500, res);
   }
 };
@@ -327,25 +251,26 @@ exports.sendOtp = async (req, res) => {
 exports.verifyOtp = async (req, res) => {
   try {
     const { contact, otp } = req.body;
-
     if (!contact || !otp) {
-      return res.status(400).json({ error: "Email and OTP are required" });
+      return res.status(400).json({ error: "Contact and OTP are required" });
     }
 
     const user = await User.findOne({
       $or: [{ email: contact }, { phoneNumber: contact }],
     });
 
-    if (user?.email === contact) {
-      const otpRecord = await OTP.findOne({ email: contact, otp });
-      if (otpRecord)
-        return res.status(200).json({ message: "OTP verified successfully" });
-    } else {
-      const otpRecord = await OTP.findOne({ phoneNumber: contact, otp });
-      if (otpRecord)
-        return res.status(200).json({ message: "OTP verified successfully" });
+    if (!user) {
+      return res.status(400).json({ error: "Invalid OTP" });
     }
-    return res.status(400).json({ error: "invalid OTP" });
+
+    const query = user.email === contact ? { email: contact, otp } : { phoneNumber: contact, otp };
+    const otpRecord = await OTP.findOne(query);
+
+    if (otpRecord) {
+      return res.status(200).json({ message: "OTP verified successfully" });
+    } else {
+      return res.status(400).json({ error: "Invalid OTP" });
+    }
   } catch (error) {
     new ErrorHandler("An error occurred during sign in", 500, res);
   }
@@ -360,12 +285,12 @@ exports.logout = async (req, res) => {
       { new: true }
     );
 
-    const options = { httpOnly: true, secure: true };
+    const cookieOptions = { httpOnly: true, secure: true };
 
     return res
       .status(200)
-      .clearCookie("accessToken", options)
-      .clearCookie("refreshToken", options)
+      .clearCookie("accessToken", cookieOptions)
+      .clearCookie("refreshToken", cookieOptions)
       .json({ message: "User logged out successfully" });
   } catch (error) {
     console.log(error);
@@ -378,70 +303,56 @@ exports.resetPassword = async (req, res) => {
     const { contact, confirmPassword, newPassword } = req.body;
 
     if (!contact || contact.trim() === "") {
-      return res
-        .status(400)
-        .json({ error: "Email or phone number is required" });
+      return res.status(400).json({ error: "Email or phone number is required" });
     }
-
     const user = await User.findOne({
       $or: [{ email: contact }, { phoneNumber: contact }],
     });
-
-    if (user?.email === contact) {
-      if (!(user.googleAuthId === null)) {
-        return res.status(409).json({
-          error: "You are registerd with Google id you can not resetPassword",
-        });
-      }
-    }
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    console.log(user);
+    if (user.googleAuthId !== null) {
+      return res.status(409).json({
+        error: "You are registered with Google ID and cannot reset your password",
+      });
+    }
 
     if (newPassword !== confirmPassword) {
       return res.status(400).json({ error: "Passwords do not match" });
     }
-
     user.password = newPassword;
     await user.save({ validateBeforeSave: false });
-
     return res.status(200).json({ message: "Password changed successfully" });
   } catch (error) {
-    console.log(error);
-    new ErrorHandler("Unable to Reset password. Server error!", 500, res);
+    console.error("Error resetting password:", error);
+    return res.status(500).json({ error: "Unable to reset password. Server error!" });
   }
 };
 
 exports.uploadAvatar = async (req, res) => {
   try {
     const avatarLocalPath = req.file?.path;
-
-    if (!avatarLocalPath)
-      return res.status(400).json({ message: "Profile Picture is requierd" });
+    if (!avatarLocalPath) {
+      return res.status(400).json({ message: "Profile picture is required" });
+    }
 
     const avatar = await uploadOnCloudinary(avatarLocalPath);
-    if (!avatar)
-      return res
-        .status(200)
-        .json({ message: "unabel to uploada profile photo" });
+    if (!avatar) {
+      return res.status(500).json({ message: "Unable to upload profile photo" });
+    }
 
     const user = await User.findByIdAndUpdate(
       req.User?._id,
-      {
-        $set: {
-          avatar: avatar.url,
-        },
-      },
+      { $set: { avatar: avatar.url } },
       { new: true }
     ).select("-password");
 
-    return res.status(200).json({ message: "Avtar uploded sucessfully" });
+    return res.status(200).json({ message: "Avatar uploaded successfully" });
   } catch (error) {
-    console.log(error);
-    new ErrorHandler("Unable to upload Avatar. Server error!", 500, res);
+    console.error(error);
+    return res.status(500).json({ message: "Unable to upload avatar. Server error!" });
   }
 };
 
@@ -449,7 +360,6 @@ exports.uploadAvatar = async (req, res) => {
 exports.createPost = async (req, res) => {
   try {
     const {
-      userId,
       title,
       description,
       price,
@@ -611,7 +521,49 @@ exports.declineUserRequest = async (req, res) => {
   }
 };
 
-exports.addPhoneNumber = async (req, res) => {
+exports.UpdateDetails = async (req, res) => {
+  try {
+    const { firstName, lastName, gender, password } = req.body;
+    const userId = req.user._id; 
+
+    let updateDetails = await User.findById(userId);
+
+    if (password) {
+      const isPasswordValid = await updateDetails.isPasswordCorrect(password);
+      if (isPasswordValid) {
+        updateDetails.password = password;
+      } else {
+        return res.status(400).json({ message: "Invalid password" });
+      }
+    }
+
+    const avatarLocalPath = req.file?.path;
+    if (avatarLocalPath) {
+      const avatar = await uploadOnCloudinary(avatarLocalPath);
+      if (!avatar) {
+        return res.status(400).json({ message: "Unable to upload avatar" });
+      }
+      updateDetails.avatar = avatar.secure_url;
+    }
+
+    if (firstName) updateDetails.firstName = firstName.trim();
+    if (lastName) updateDetails.lastName = lastName.trim();
+    if (gender) updateDetails.gender = gender.trim();
+
+    updateDetails = await updateDetails.save();
+
+    return res.status(200).json({
+      message: "User details updated successfully",
+      user: updateDetails 
+    });
+
+  } catch (error) {
+    console.log(error);
+    new ErrorHandler("Unable to update user details. Server error!", 500, res);
+  }
+};
+
+exports.UpdateEmail = async (req, res) => {
   try {
 
   } catch (error) {
@@ -619,7 +571,7 @@ exports.addPhoneNumber = async (req, res) => {
     new ErrorHandler("Unable to logout. Server error!", 500, res);
   }
 };
-exports.UpdateUserDetails = async (req, res) => {
+exports.updateMobileNumber = async (req, res) => {
   try {
 
   } catch (error) {
@@ -627,14 +579,40 @@ exports.UpdateUserDetails = async (req, res) => {
     new ErrorHandler("Unable to logout. Server error!", 500, res);
   }
 };
-exports.logout = async (req, res) => {
-  try {
 
-  } catch (error) {
-    console.log(error);
-    new ErrorHandler("Unable to logout. Server error!", 500, res);
-  }
-};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 //---------------------------------------------------------------------extra content-------------------------------------------------------------
@@ -679,3 +657,4 @@ exports.logout = async (req, res) => {
 //     res.status(500).json({ message: 'Error accepting friend request', error });
 //   }
 // };
+
