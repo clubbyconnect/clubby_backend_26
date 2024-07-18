@@ -19,7 +19,8 @@ const userSchema = new Schema(
     },
     password: {
       type: String,
-      required: true
+      required: [true, "Password is required"],
+      minlength: [8, "Password should be at least 8 characters long"],
     },
     googleAuthId: {
       type: String,
@@ -27,27 +28,50 @@ const userSchema = new Schema(
     },
     firstName: {
       type: String,
+      trim: true,
+      minlength: [2, "First name must be at least 2 characters long"],
+      maxlength: [50, "First name cannot exceed 50 characters"],
+      match: [/^[a-zA-Z\s]+$/, "First name can only contain letters and spaces"],
+      default: null,
+
       default : null
     },
     lastname: {
       type: String,
+      trim: true,
+      minlength: [2, "First name must be at least 2 characters long"],
+      maxlength: [50, "First name cannot exceed 50 characters"],
+      match: [/^[a-zA-Z\s]+$/, "First name can only contain letters and spaces"],
+      default: null,
+
       default : null
     },
     gender : {
       type: String,
+      enum: {
+        values: ['Male', 'Female', 'Other'],
+        message: "Gender must be either 'Male', 'Female' or 'Other'",
+      },
       default : null
     },
     MobileNo: {
       type: String,
+      match: [
+        /^[6-9]\d{9}$/,
+        "Please enter a valid Indian mobile number (10 digits, starting with 6-9)",
+      ],
       default : null
     },
     location : {
       type: String,
+      trim: true,
+      maxlength: [100, "Location cannot exceed 100 characters"],
       default : null
     },
     avatar: {
       type: String,
-      default : "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721114085/fk9iazynubn9toe8yrrq.png"
+      default : "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721114085/fk9iazynubn9toe8yrrq.png",
+      match: [/^(http|https):\/\/[^ "]+$/, "Avatar must be a valid URL"],
     },
     isVerified: {
       type: String,

@@ -8,8 +8,9 @@ const { appleAuth } = require("apple-auth");
 const post = require("../models/post.js");
 const categoryModel = require("../models/categorySchema.js");
 const uploadOnCloudinary = require("../utils/cloudinary.js");
-const userRequest = require("../models/userRequest.js");
+const clubRequest = require("../models/clubRequest.js");
 const axios = require('axios');
+const handleValidationError = require("../utils/mongooseErrorHandler.js")
 
 
 // Fast2SMS Configuration-----------------------------------
@@ -104,8 +105,7 @@ exports.signUp = async (req, res) => {
     }
     return res.status(200).json({ message: "User registered successfully", data: user });
   } catch (error) {
-    console.error(error);
-    return new ErrorHandler("An error occurred during sign up", 500, res);
+    handleValidationError(error ,res)
   }
 };
 
@@ -356,7 +356,6 @@ exports.uploadAvatar = async (req, res) => {
   }
 };
 
-//-------------------------------------------Pending..!!!......................................
 exports.createPost = async (req, res) => {
   try {
     const {
@@ -434,7 +433,7 @@ exports.createPost = async (req, res) => {
 };
 
 //------------------------------------------User Request----Pending..!!!-----------------------------------------
-exports.sendUserRequest = async (req, res) => {
+exports.sendClubRequest = async (req, res) => {
   try {
     const requesterId = req.User._id;
 
@@ -472,7 +471,7 @@ exports.sendUserRequest = async (req, res) => {
   }
 };
 
-exports.acceptUserRequest = async (req, res) => {
+exports.acceptClubRequest = async (req, res) => {
   try {
     //const { requestId } = req.body;
     const requesterId = req.User._id;
@@ -500,7 +499,7 @@ exports.acceptUserRequest = async (req, res) => {
   }
 };
 
-exports.declineUserRequest = async (req, res) => {
+exports.declineClubRequest = async (req, res) => {
   try {
     //const { requestId } = req.body;
     const requesterId = req.User._id;
@@ -520,7 +519,7 @@ exports.declineUserRequest = async (req, res) => {
     res.status(500).json({ message: "Error declining friend request", error });
   }
 };
-
+//-----------------update Controllers
 exports.UpdateDetails = async (req, res) => {
   try {
     const { firstName, lastName, gender, password } = req.body;
@@ -571,11 +570,17 @@ exports.UpdateEmail = async (req, res) => {
     new ErrorHandler("Unable to logout. Server error!", 500, res);
   }
 };
+
 exports.updateMobileNumber = async (req, res) => {
   try {
 
   } catch (error) {
-    console.log(error);
+    if (error.name === 'ValidationError') {
+      const errors = Object.keys(error.errors).map(key => ({
+      message: error.errors[key].message
+    }));
+    return new ErrorHandler(`${errors[0].message}`, 500, res);
+  }
     new ErrorHandler("Unable to logout. Server error!", 500, res);
   }
 };

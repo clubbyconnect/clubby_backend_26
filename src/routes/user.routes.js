@@ -15,13 +15,12 @@ const { signUp,
     resetPassword,
     uploadAvatar,
     createPost,
-    sendUserRequest,
-    acceptUserRequest,
-    declineUserRequest
+    sendClubRequest,
+    acceptClubRequest,
+    declineClubRequest
 } = require('../controllers/user.controller.js');
 const { fetchallcategory,
     fetchsubcategory,
-    fetchSubCategoryProduct 
 } = require('../controllers/data.controller.js');
 
 //user
@@ -41,10 +40,10 @@ router.post("/createPost",verifyJWT,upload.single('productImage') ,createPost);
 router.post("/fetchallcategory",verifyJWT,fetchallcategory);
 router.post("/fetchsubcategory",verifyJWT,fetchsubcategory);
 
-//userRequest
-router.post("/sendUserRequest",verifyJWT,sendUserRequest);
-router.post("/acceptUserRequest",verifyJWT,acceptUserRequest);
-router.post("/declineUserRequest",verifyJWT,declineUserRequest);
+//clubRequest
+router.post("/sendClubRequest",verifyJWT,sendClubRequest);
+router.post("/acceptClubRequest",verifyJWT,acceptClubRequest);
+router.post("/declineClubRequest",verifyJWT,declineClubRequest);
 
 
 

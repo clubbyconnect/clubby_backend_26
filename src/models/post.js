@@ -8,39 +8,59 @@ const postSchema = new mongoose.Schema({
   },
   title: { 
     type: String, 
-    required: true 
+    required: [true, 'Title is required'],
+    minlength: [5, 'Title must be at least 5 characters long'],
+    maxlength: [100, 'Title must be less than 100 characters']
   },
   description: { 
     type: String, 
-    required: true 
+    required: [true, 'Description is required'],
+    minlength: [10, 'Description must be at least 10 characters long'],
+    maxlength: [1000, 'Description must be less than 1000 characters'] 
   },
   price: { 
     type: Number, 
-    required: true 
+    type: Number,
+    required: [true, 'Price is required'],
+    min: [0, 'Price must be a positive number']
   },
   quantity:{
-    type: Number, 
-    required: true 
+    type: Number,
+    required: [true, 'Quantity is required'],
+    min: [1, 'Quantity must be at least 1'] 
   },
   productLink:{
     type: String, 
-    required: true 
+    required: [true, 'Product link is required'],
+    validate: {
+      validator: function (v) {
+        return /^(ftp|http|https):\/\/[^ "]+$/.test(v);
+      },
+      message: 'Invalid product link'
+    }
   },
   location:{
     type: String, 
-    required: true 
+    required: [true, 'Location is required']
   },
   NumberOfclubMenber:{
-    type: Number, 
-    required: true 
+    type: Number,
+    required: [true, 'Number of club members is required'],
+    min: [1, 'Number of club members must be at least 1'] 
   },
   clubType:{
-    type: String, 
-    required: false 
+    type: String,
+    enum: {
+      values: ['Male', 'Female', 'Other'],
+      message: 'Club type must be Male, Female, or Other'
+    }
   },
   OfferType:{
-    type: String, 
-    required: false 
+    type: String,
+    enum: {
+      values: ['Male', 'Female', 'Other'],
+      message: 'Offer type must be Male, Female, or Other'
+    }
   },
   category: {
     type: mongoose.Schema.Types.ObjectId,
