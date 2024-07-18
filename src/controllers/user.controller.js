@@ -210,7 +210,7 @@ exports.signIn = async (req, res) => {
     res.cookie("refreshToken", refreshToken, options);
     return res.status(200).json({ message: "User signed in successfully", data: loggedInUser });
   } catch (error) {
-    new ErrorHandler("An error occurred during sign in", 500, res);
+    handleValidationError(error ,res)
   }
 };
 
@@ -243,8 +243,7 @@ exports.sendOtp = async (req, res) => {
       return res.status(200).json({ success: true, message: "OTP Sent Successfully", otp });
     }
   } catch (error) {
-    console.error(error.message);
-    new ErrorHandler("An error occurred during OTP generation", 500, res);
+    handleValidationError(error ,res)
   }
 };
 
@@ -326,8 +325,7 @@ exports.resetPassword = async (req, res) => {
     await user.save({ validateBeforeSave: false });
     return res.status(200).json({ message: "Password changed successfully" });
   } catch (error) {
-    console.error("Error resetting password:", error);
-    return res.status(500).json({ error: "Unable to reset password. Server error!" });
+    handleValidationError(error ,res)
   }
 };
 
@@ -424,11 +422,11 @@ exports.createPost = async (req, res) => {
       postData.subsubcategory = subsubcategoryid._id;
     }
 
-    const createdPost = post.create(postData);
-    return res.status(200).json({ messaage: "Post created" });
+    const createdPost = await post.create(postData);
+    if(!createdPost._id) return res.status(401).json({ messaage: "errro" });
+
   } catch (error) {
-    console.log(error);
-    new ErrorHandler("Unable to create Post. Server error!", 500, res);
+    handleValidationError(error ,res)
   }
 };
 
@@ -557,8 +555,7 @@ exports.UpdateDetails = async (req, res) => {
     });
 
   } catch (error) {
-    console.log(error);
-    new ErrorHandler("Unable to update user details. Server error!", 500, res);
+    handleValidationError(error ,res)
   }
 };
 

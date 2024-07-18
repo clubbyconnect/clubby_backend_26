@@ -58,7 +58,7 @@ const userSchema = new Schema(
       type: String,
       match: [
         /^[6-9]\d{9}$/,
-        "Please enter a valid Indian mobile number (10 digits, starting with 6-9)",
+        "Please enter a valid 10 digits Indian mobile number",
       ],
       default : null
     },

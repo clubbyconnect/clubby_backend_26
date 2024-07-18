@@ -9,8 +9,8 @@ const postSchema = new mongoose.Schema({
   title: { 
     type: String, 
     required: [true, 'Title is required'],
-    minlength: [5, 'Title must be at least 5 characters long'],
-    maxlength: [100, 'Title must be less than 100 characters']
+    minlength: [3, 'Title must be at least 3 characters long'],
+    maxlength: [70, 'Title must be less than 70 characters']
   },
   description: { 
     type: String, 
@@ -20,9 +20,8 @@ const postSchema = new mongoose.Schema({
   },
   price: { 
     type: Number, 
-    type: Number,
     required: [true, 'Price is required'],
-    min: [0, 'Price must be a positive number']
+    min: [1, 'Price must be grater then 1 rupee']
   },
   quantity:{
     type: Number,
@@ -32,12 +31,6 @@ const postSchema = new mongoose.Schema({
   productLink:{
     type: String, 
     required: [true, 'Product link is required'],
-    validate: {
-      validator: function (v) {
-        return /^(ftp|http|https):\/\/[^ "]+$/.test(v);
-      },
-      message: 'Invalid product link'
-    }
   },
   location:{
     type: String, 
@@ -51,15 +44,15 @@ const postSchema = new mongoose.Schema({
   clubType:{
     type: String,
     enum: {
-      values: ['Male', 'Female', 'Other'],
-      message: 'Club type must be Male, Female, or Other'
+      values: ['Online', 'Offline'],
+      message: 'Club type must be Online or Offline'
     }
   },
   OfferType:{
     type: String,
     enum: {
-      values: ['Male', 'Female', 'Other'],
-      message: 'Offer type must be Male, Female, or Other'
+      values: ['Discounts', 'Cashback', 'Buy One, Get One' ,'Bundle Deals','Referral Discounts',],
+      message: 'Offer type must be Discounts, Cashback, Buy One-Get One , Bundle Deals , Referral Discounts'
     }
   },
   category: {

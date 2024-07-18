@@ -3,10 +3,19 @@ const mailSender = require('../utils/mailSender.js')
 
 const OTPSchema = new mongoose.Schema({
     email: {
-		type: String,
+	type: String,
+    trim: true,
+    match: [
+        /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
+        "Please enter a valid email address",
+      ]
 	},
     mobileNumber: {
 		type: String,
+		match: [
+			/^[6-9]\d{9}$/,
+			"Please enter a valid 10 digits Indian mobile number",
+		  ],
 	},
 	otp: {
 		type: String,
