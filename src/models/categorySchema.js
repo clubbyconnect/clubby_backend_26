@@ -11,7 +11,7 @@ const categorySchema = new mongoose.Schema({
   },
   image: {
     type: String, 
-    default: null,
+    default: "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721381426/default%20images/y9yzagqvwgeyk2g1o0bj.png",
     trim: true 
   },
   subcategories: [
