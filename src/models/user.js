@@ -15,7 +15,7 @@ const userSchema = new Schema(
       match: [/^[a-zA-Z\s]+$/, "First name can only contain letters and spaces"],
       default: null,
     },
-    lastname: {
+    lastName: {
       type: String,
       trim: true,
       minlength: [2, "First name must be at least 2 characters long"],
