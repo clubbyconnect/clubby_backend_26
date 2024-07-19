@@ -239,11 +239,11 @@ exports.sendOtp = async (req, res) => {
     await OTP.create(otpPayload);
 
     if (isEmail) {
-      return res.status(200).json({ success: true, message: "OTP Sent Successfully", otp });
+      return res.status(200).json({ success: true, message: "OTP Sent Successfully"});
     } else {
       const message = `Your OTP is ${otp}`;
       await sendSms(contact, message);
-      return res.status(200).json({ success: true, message: "OTP Sent Successfully", otp });
+      return res.status(200).json({ success: true, message: "OTP Sent Successfully"});
     }
   } catch (error) {
     handleValidationError(error ,res)
