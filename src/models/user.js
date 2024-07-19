@@ -196,6 +196,10 @@ userSchema.methods.generateRefreshToken = function () {
 
 //spam security Restrictions Functions
 userSchema.pre('save', async function (next) {
+
+  if (this.isNew) {
+    return next();
+  }
   const now = new Date();
   const minChangeInterval = 30 * 24 * 60 * 60 * 1000;
 
