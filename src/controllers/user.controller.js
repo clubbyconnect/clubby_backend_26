@@ -25,7 +25,7 @@ const fb = new Facebook({
 });
 
 //Exclude Fields in Response--------------------------------------------
-const excludeField = "-password -refreshToken -homelocationChangeCount -lastHomelocationChange -emailChangeCount -lastEmailChange -mobileNoChangeCount -lastMobileNoChange -googleAuthId -blockedUsers -reportCount -refreshToken"
+const excludeField = "-password -refreshToken -UserRating -homelocationChangeCount -lastHomelocationChange -emailChangeCount -lastEmailChange -mobileNoChangeCount -lastMobileNoChange -googleAuthId -blockedUsers -reportCount -refreshToken"
 
 //Custom Methods-----------------------------------
 const generateAccessAndRefreshTokens = async (userId) => {
