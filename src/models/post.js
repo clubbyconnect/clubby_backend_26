@@ -56,6 +56,9 @@ const postSchema = new mongoose.Schema({
       message: 'Offer type must be Discounts, Cashback, Buy One-Get One , Bundle Deals , Referral Discounts'
     }
   },
+  dealValidityPeriod:{
+    type: String,
+  },
   category: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Category",

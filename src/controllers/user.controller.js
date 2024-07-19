@@ -519,10 +519,10 @@ exports.declineClubRequest = async (req, res) => {
   }
 };
 //-----------------update Controllers
-exports.UpdateDetails = async (req, res) => {
+exports.UpdateUserDetails = async (req, res) => {
   try {
-    const { firstName, lastName, gender, password } = req.body;
-    const userId = req.user._id; 
+    const { firstName, lastName, gender, password ,email } = req.body;
+    const userId = req.User._id; 
 
     let updateDetails = await User.findById(userId);
 
@@ -547,6 +547,8 @@ exports.UpdateDetails = async (req, res) => {
     if (firstName) updateDetails.firstName = firstName.trim();
     if (lastName) updateDetails.lastName = lastName.trim();
     if (gender) updateDetails.gender = gender.trim();
+    if (email) updateDetails.email = email.trim();
+
 
     updateDetails = await updateDetails.save();
 
@@ -556,6 +558,7 @@ exports.UpdateDetails = async (req, res) => {
     });
 
   } catch (error) {
+    console.log(error);
     handleValidationError(error ,res)
   }
 };
