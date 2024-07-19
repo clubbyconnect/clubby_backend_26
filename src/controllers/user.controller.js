@@ -24,6 +24,9 @@ const fb = new Facebook({
   secret: process.env.FACEBOOK_APP_SECRET,
 });
 
+//Exclude Fields in Response--------------------------------------------
+const excludeField = "-password -refreshToken -homelocationChangeCount -lastHomelocationChange -emailChangeCount -lastEmailChange -mobileNoChangeCount -lastMobileNoChange -googleAuthId -blockedUsers -reportCount -refreshToken"
+
 //Custom Methods-----------------------------------
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
@@ -98,7 +101,7 @@ exports.signUp = async (req, res) => {
     }
 
     const newUser = await User.create({ email, password });
-    const user = await User.findById(newUser._id).select("-password -refreshToken");
+    const user = await User.findById(newUser._id).select("email");  
 
     if (!user) {
       return res.status(500).json({ error: "Something went wrong while registering the user" });
@@ -200,7 +203,7 @@ exports.signIn = async (req, res) => {
     }
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
-    const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
+    const loggedInUser = await User.findById(user._id).select(`${excludeField}`);
     const options = {
       httpOnly: true,
       secure: true,
@@ -345,9 +348,9 @@ exports.uploadAvatar = async (req, res) => {
       req.User?._id,
       { $set: { avatar: avatar.url } },
       { new: true }
-    ).select("-password");
+    ).select(`${excludeField}`);
 
-    return res.status(200).json({ message: "Avatar uploaded successfully" });
+    return res.status(200).json({ message: "Avatar uploaded successfully" ,data:user });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: "Unable to upload avatar. Server error!" });
@@ -551,10 +554,11 @@ exports.UpdateUserDetails = async (req, res) => {
 
 
     updateDetails = await updateDetails.save();
+    let updateUser = await User.findById(userId).select(`${excludeField}`);
 
     return res.status(200).json({
       message: "User details updated successfully",
-      user: updateDetails 
+      data: updateUser 
     });
 
   } catch (error) {
