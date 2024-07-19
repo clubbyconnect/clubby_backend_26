@@ -77,6 +77,43 @@ const postSchema = new mongoose.Schema({
     type: String, 
     default : "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721192873/zhcbblypjd3qg4gohafv.png"
   },
+  clubSatus: {
+    type: String,
+    enum: ['Pending', 'created'],
+    default: 'Pending'
+  },
+  reportCount: {
+    type: Number,
+    default: 0
+  },
+  reportedBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  reportMessage: [{
+    type: String,
+    required: [true, 'Report message is required.'],
+    validate: [
+      {
+        validator: function(v) {
+          return v.trim().length > 0;
+        },
+        message: 'Report message cannot be empty.'
+      },
+      {
+        validator: function(v) {
+          return v.length >= 10;
+        },
+        message: 'Report message must be at least 10 characters long.'
+      },
+      {
+        validator: function(v) {
+          return v.length <= 300;
+        },
+        message: 'Report message cannot be longer than 300 characters.'
+      }
+    ]
+  }],
   createdAt: { 
     type: Date, 
     default: Date.now
