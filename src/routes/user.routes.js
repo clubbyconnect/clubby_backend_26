@@ -18,7 +18,8 @@ const { signUp,
     sendClubRequest,
     acceptClubRequest,
     declineClubRequest,
-    UpdateUserDetails
+    UpdateUserDetails,
+    fetchHistory
 } = require('../controllers/user.controller.js');
 const { fetchallcategory,
     fetchsubcategory,
@@ -37,6 +38,7 @@ router.post("/resetPassword",resetPassword);
 router.post("/uploadAvatar",verifyJWT ,upload.single('avatar'),uploadAvatar);
 router.post("/createPost",verifyJWT,upload.single('productImage') ,createPost);
 router.post("/UpdateUserDetails",verifyJWT,upload.single('avatar') ,UpdateUserDetails);
+router.post("/fetchHistory",fetchHistory);
 
 //App data
 router.post("/fetchallcategory",verifyJWT,fetchallcategory);

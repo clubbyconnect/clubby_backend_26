@@ -7,14 +7,13 @@ const messageSchema = new mongoose.Schema({
   },
   sender: {
     type: mongoose.Schema.Types.ObjectId, 
-    ref: 'User',
+    ref: 'user',
     required: true,
   },
   receivers: [{
     receiver: {
       type: mongoose.Schema.Types.ObjectId,  
-      ref: 'User',
-      required: true,
+      ref: 'user',
     },
     isRead: {
       type: Boolean,
@@ -34,7 +33,8 @@ const chatRoomSchema = new mongoose.Schema({
     required: true,
   },
   members: [{
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'user',
     required: true,
   }],
   messages: [messageSchema],

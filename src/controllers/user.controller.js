@@ -665,3 +665,17 @@ exports.declineClubRequest = async (req, res) => {
   }
 };
 
+exports.fetchHistory = async (req, res) => {
+  try {
+    const { roomId } = req.body;
+    const groupChat = await chatRoom.findOne({roomId})
+    if (groupChat) {
+      res.json(groupChat.messages);
+    } else {
+      res.status(404).json({ message: 'Room not found' });
+    }
+  } catch (error) {
+    console.log(error);
+    new ErrorHandler("Unable to logout. Server error!", 500, res);
+  }
+};
