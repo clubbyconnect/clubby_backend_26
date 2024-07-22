@@ -1,16 +1,18 @@
-const ErrorHandler = require("../utils/ErrorHandler.js");
-const User = require("../models/user.js");
-const OTP = require("../models/otp.js");
 const otpGenerator = require("otp-generator");
+const axios = require("axios");
 const { OAuth2Client } = require("google-auth-library");
 const Facebook = require("facebook-node-sdk");
 const { appleAuth } = require("apple-auth");
+const ErrorHandler = require("../utils/ErrorHandler.js");
+const uploadOnCloudinary = require("../utils/cloudinary.js");
+const handleValidationError = require("../utils/mongooseErrorHandler.js");
+const User = require("../models/user.js");
+const OTP = require("../models/otp.js");
 const post = require("../models/post.js");
 const categoryModel = require("../models/categorySchema.js");
-const uploadOnCloudinary = require("../utils/cloudinary.js");
 const clubRequest = require("../models/clubRequest.js");
-const axios = require("axios");
-const handleValidationError = require("../utils/mongooseErrorHandler.js");
+const {chatRoom} = require("../models/chatRoom.js")
+
 
 // Fast2SMS Configuration-----------------------------------
 const fast2SMSapiKey = process.env.FAST2SMS_API_KEY;
@@ -525,7 +527,6 @@ exports.sendClubRequest = async (req, res) => {
   try {
     const { postId } = req.body
     const requesterId = req.User._id;
-    //postId = "669df8d76aa6d05e12291940";
 
     const postData = await post.findById(postId);
     if (!postData) {
@@ -575,8 +576,6 @@ exports.acceptClubRequest = async (req, res) => {
     const { requesterId, postId } = req.body;
 
     const recipientId = req.User._id;
-    //postId = "669df8d76aa6d05e12291940";
-    //requesterId = "669defbe9dba6cc174c04f0a";
     const postData = await post.findById(postId);
     if (!postData) {
       return res.status(404).json({ message: "Post Not Found" });
@@ -603,12 +602,22 @@ exports.acceptClubRequest = async (req, res) => {
     } else {
       return res.status(400).json({ message: "Pending Request Not Found" });
     }
+    // creating Group
+    const group = await chatRoom.findOne({ roomId: postData._id });
+    if (!group) {
+      const group = await chatRoom.create({roomId: postData._id , groupName: postData.title , members: [recipientId, requesterId] });
+    } else {
+      group.members.push(requesterId);
+    }
 
     pendingRequest.status = "accepted";
     pendingRequest.updatedAt = Date.now();
     await pendingRequest.save();
-    return res.status(200).json({ message: "club request accepted" });
+    await group.save();
+
+    return res.status(200).json({ message: "club request accepted Added in Club chat" });
   } catch (error) {
+    console.log(error);
     return res.status(500).json({ message: "Error accepting friend request", error });
   }
 };
