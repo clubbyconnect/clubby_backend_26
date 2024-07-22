@@ -4,6 +4,7 @@ const Schema = mongoose.Schema;
 const clubRequestSchema = new Schema({
     requester: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    postId: { type: mongoose.Schema.Types.ObjectId, ref: 'post', required: true },
     status: { type: String, enum: ['pending', 'accepted', 'declined'], default: 'pending' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }

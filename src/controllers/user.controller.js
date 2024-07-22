@@ -9,13 +9,12 @@ const post = require("../models/post.js");
 const categoryModel = require("../models/categorySchema.js");
 const uploadOnCloudinary = require("../utils/cloudinary.js");
 const clubRequest = require("../models/clubRequest.js");
-const axios = require('axios');
-const handleValidationError = require("../utils/mongooseErrorHandler.js")
-
+const axios = require("axios");
+const handleValidationError = require("../utils/mongooseErrorHandler.js");
 
 // Fast2SMS Configuration-----------------------------------
-const fast2SMSapiKey = process.env.FAST2SMS_API_KEY
-const fast2SMSurl = process.env.FAST2SMS_URL
+const fast2SMSapiKey = process.env.FAST2SMS_API_KEY;
+const fast2SMSurl = process.env.FAST2SMS_URL;
 
 // OAuth 2.0 Configuration-----------------------------------
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -25,7 +24,8 @@ const fb = new Facebook({
 });
 
 //Exclude Fields in Response--------------------------------------------
-const excludeField = "-password -refreshToken -UserRating -homelocationChangeCount -lastHomelocationChange -emailChangeCount -lastEmailChange -mobileNoChangeCount -lastMobileNoChange -googleAuthId -blockedUsers -reportCount -refreshToken"
+const excludeField =
+  "-password -refreshToken -UserRating -homelocationChangeCount -lastHomelocationChange -emailChangeCount -lastEmailChange -mobileNoChangeCount -lastMobileNoChange -googleAuthId -blockedUsers -reportCount -refreshToken";
 
 //Custom Methods-----------------------------------
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -61,18 +61,18 @@ const sendSms = async (phoneNumber, message) => {
   const response = await axios.post(
     fast2SMSurl,
     {
-      route: 'v3',
-      sender_id: 'TXTIND',
+      route: "v3",
+      sender_id: "TXTIND",
       message,
-      language: 'english',
+      language: "english",
       flash: 0,
       numbers: phoneNumber,
     },
     {
       headers: {
         authorization: fast2SMSapiKey,
-        'Content-Type': 'application/json'
-      }
+        "Content-Type": "application/json",
+      },
     }
   );
 };
@@ -82,7 +82,9 @@ exports.signUp = async (req, res) => {
   try {
     const { email, confirmPassword, password } = req.body;
 
-    if ([confirmPassword, email, password].some((field) => field?.trim() === "")) {
+    if (
+      [confirmPassword, email, password].some((field) => field?.trim() === "")
+    ) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
@@ -92,23 +94,31 @@ exports.signUp = async (req, res) => {
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      const googleAuthError = "You are already registered with Google Email-id, please sign in with Google";
+      const googleAuthError =
+        "You are already registered with Google Email-id, please sign in with Google";
       const userExistsError = "User with this email already exists";
 
       return res.status(409).json({
-        error: existingUser.googleAuthId !== null ? googleAuthError : userExistsError,
+        error:
+          existingUser.googleAuthId !== null
+            ? googleAuthError
+            : userExistsError,
       });
     }
 
     const newUser = await User.create({ email, password });
-    const user = await User.findById(newUser._id).select("email");  
+    const user = await User.findById(newUser._id).select("email");
 
     if (!user) {
-      return res.status(500).json({ error: "Something went wrong while registering the user" });
+      return res
+        .status(500)
+        .json({ error: "Something went wrong while registering the user" });
     }
-    return res.status(200).json({ message: "User registered successfully", data: user });
+    return res
+      .status(200)
+      .json({ message: "User registered successfully", data: user });
   } catch (error) {
-    handleValidationError(error ,res)
+    handleValidationError(error, res);
   }
 };
 
@@ -129,8 +139,12 @@ exports.googleAuth = async (req, res) => {
       user = await User.findById(newUser._id).select("-password -refreshToken");
     }
 
-    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
-    const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+      user._id
+    );
+    const loggedInUser = await User.findById(user._id).select(
+      "-password -refreshToken"
+    );
 
     const options = {
       httpOnly: true,
@@ -142,7 +156,9 @@ exports.googleAuth = async (req, res) => {
       .cookie("accessToken", accessToken, options)
       .cookie("refreshToken", refreshToken, options)
       .json({
-        message: user ? "User signed in successfully" : "User Created and signed in successfully",
+        message: user
+          ? "User signed in successfully"
+          : "User Created and signed in successfully",
         data: loggedInUser,
       });
   } catch (error) {
@@ -202,8 +218,12 @@ exports.signIn = async (req, res) => {
       return res.status(401).json({ error: "Invalid user credentials" });
     }
 
-    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
-    const loggedInUser = await User.findById(user._id).select(`${excludeField}`);
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+      user._id
+    );
+    const loggedInUser = await User.findById(user._id).select(
+      `${excludeField}`
+    );
     const options = {
       httpOnly: true,
       secure: true,
@@ -211,9 +231,11 @@ exports.signIn = async (req, res) => {
 
     res.cookie("accessToken", accessToken, options);
     res.cookie("refreshToken", refreshToken, options);
-    return res.status(200).json({ message: "User signed in successfully", data: loggedInUser });
+    return res
+      .status(200)
+      .json({ message: "User signed in successfully", data: loggedInUser });
   } catch (error) {
-    handleValidationError(error ,res)
+    handleValidationError(error, res);
   }
 };
 
@@ -222,7 +244,9 @@ exports.sendOtp = async (req, res) => {
     const { contact } = req.body;
 
     if (!contact || contact.trim() === "") {
-      return res.status(400).json({ error: "Email or phone number is required" });
+      return res
+        .status(400)
+        .json({ error: "Email or phone number is required" });
     }
 
     const user = await User.findOne({
@@ -235,18 +259,24 @@ exports.sendOtp = async (req, res) => {
     const isEmail = user.email === contact;
     const otp = await generateUniqueOtp();
 
-    const otpPayload = isEmail ? { email: contact, otp } : { mobileNumber: contact, otp };
+    const otpPayload = isEmail
+      ? { email: contact, otp }
+      : { mobileNumber: contact, otp };
     await OTP.create(otpPayload);
 
     if (isEmail) {
-      return res.status(200).json({ success: true, message: "OTP Sent Successfully"});
+      return res
+        .status(200)
+        .json({ success: true, message: "OTP Sent Successfully" });
     } else {
       const message = `Your OTP is ${otp}`;
       await sendSms(contact, message);
-      return res.status(200).json({ success: true, message: "OTP Sent Successfully"});
+      return res
+        .status(200)
+        .json({ success: true, message: "OTP Sent Successfully" });
     }
   } catch (error) {
-    handleValidationError(error ,res)
+    handleValidationError(error, res);
   }
 };
 
@@ -265,7 +295,10 @@ exports.verifyOtp = async (req, res) => {
       return res.status(400).json({ error: "Invalid OTP" });
     }
 
-    const query = user.email === contact ? { email: contact, otp } : { phoneNumber: contact, otp };
+    const query =
+      user.email === contact
+        ? { email: contact, otp }
+        : { phoneNumber: contact, otp };
     const otpRecord = await OTP.findOne(query);
 
     if (otpRecord) {
@@ -305,7 +338,9 @@ exports.resetPassword = async (req, res) => {
     const { contact, confirmPassword, newPassword } = req.body;
 
     if (!contact || contact.trim() === "") {
-      return res.status(400).json({ error: "Email or phone number is required" });
+      return res
+        .status(400)
+        .json({ error: "Email or phone number is required" });
     }
     const user = await User.findOne({
       $or: [{ email: contact }, { phoneNumber: contact }],
@@ -317,7 +352,8 @@ exports.resetPassword = async (req, res) => {
 
     if (user.googleAuthId !== null) {
       return res.status(409).json({
-        error: "You are registered with Google ID and cannot reset your password",
+        error:
+          "You are registered with Google ID and cannot reset your password",
       });
     }
 
@@ -328,7 +364,7 @@ exports.resetPassword = async (req, res) => {
     await user.save({ validateBeforeSave: false });
     return res.status(200).json({ message: "Password changed successfully" });
   } catch (error) {
-    handleValidationError(error ,res)
+    handleValidationError(error, res);
   }
 };
 
@@ -341,7 +377,9 @@ exports.uploadAvatar = async (req, res) => {
 
     const avatar = await uploadOnCloudinary(avatarLocalPath);
     if (!avatar) {
-      return res.status(500).json({ message: "Unable to upload profile photo" });
+      return res
+        .status(500)
+        .json({ message: "Unable to upload profile photo" });
     }
 
     const user = await User.findByIdAndUpdate(
@@ -350,10 +388,14 @@ exports.uploadAvatar = async (req, res) => {
       { new: true }
     ).select(`${excludeField}`);
 
-    return res.status(200).json({ message: "Avatar uploaded successfully" ,data:user });
+    return res
+      .status(200)
+      .json({ message: "Avatar uploaded successfully", data: user });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: "Unable to upload avatar. Server error!" });
+    return res
+      .status(500)
+      .json({ message: "Unable to upload avatar. Server error!" });
   }
 };
 
@@ -426,106 +468,19 @@ exports.createPost = async (req, res) => {
     }
 
     const createdPost = await post.create(postData);
-    if(!createdPost._id) return res.status(401).json({ messaage: "unabel to create post" });
-    
+    if (!createdPost._id)
+      return res.status(401).json({ messaage: "unabel to create post" });
+
     return res.status(401).json({ messaage: "Post created Sucessfully" });
   } catch (error) {
-    handleValidationError(error ,res)
+    handleValidationError(error, res);
   }
 };
 
-//------------------------------------------User Request----Pending..!!!-----------------------------------------
-exports.sendClubRequest = async (req, res) => {
-  try {
-    const requesterId = req.User._id;
-
-    const recipientUser = await User.findOne({ email: "bhavin@gmail.com" });
-    if (!recipientUser) {
-      return res.status(404).json({ message: "Recipient user not found" });
-    }
-
-    const recipientId = recipientUser._id;
-    const requester = await User.findById(requesterId);
-    const recipient = await User.findById(recipientId);
-    if (!requester || !recipient) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    const existingRequest = await userRequest.findOne({
-      requester: requesterId,
-      recipient: recipientId,
-    });
-
-    if (existingRequest) {
-      return res.status(400).json({ message: "Friend request already sent" });
-    }
-
-    const friendRequest = await userRequest.create({
-      requester: requesterId,
-      recipient: recipientId,
-    });
-
-    await friendRequest.save();
-    res.status(200).json({ message: "Friend request sent" });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Error sending friend request", error });
-  }
-};
-
-exports.acceptClubRequest = async (req, res) => {
-  try {
-    //const { requestId } = req.body;
-    const requesterId = req.User._id;
-    const request = await userRequest.findOne({ requester: requesterId });
-    const requestId = request._id;
-
-    const recipientUser = await User.findOne({ email: "bhavin@gmail.com" });
-    if (!recipientUser) {
-      return res.status(404).json({ message: "Recipient user not found" });
-    }
-
-    const recipientId = recipientUser._id;
-
-    const friendRequest = await userRequest.findById(requestId);
-    if (!friendRequest) {
-      return res.status(404).json({ message: "Friend request not found" });
-    }
-
-    friendRequest.status = "accepted";
-    friendRequest.updatedAt = Date.now();
-    await friendRequest.save();
-    res.status(200).json({ message: "Friend request accepted" });
-  } catch (error) {
-    res.status(500).json({ message: "Error accepting friend request", error });
-  }
-};
-
-exports.declineClubRequest = async (req, res) => {
-  try {
-    //const { requestId } = req.body;
-    const requesterId = req.User._id;
-    const request = await userRequest.findOne({ requester: requesterId });
-    const requestId = request._id;
-
-    const friendRequest = await userRequest.findById(requestId);
-    if (!friendRequest) {
-      return res.status(404).json({ message: "Friend request not found" });
-    }
-
-    friendRequest.status = "declined";
-    friendRequest.updatedAt = Date.now();
-    await friendRequest.save();
-    res.status(200).json({ message: "Friend request declined" });
-  } catch (error) {
-    res.status(500).json({ message: "Error declining friend request", error });
-  }
-};
-//-----------------update Controllers
 exports.UpdateUserDetails = async (req, res) => {
   try {
-    const { firstName, lastName, gender, password ,email } = req.body;
-    const userId = req.User._id; 
+    const { firstName, lastName, gender, password, email } = req.body;
+    const userId = req.User._id;
 
     let updateDetails = await User.findById(userId);
 
@@ -552,121 +507,152 @@ exports.UpdateUserDetails = async (req, res) => {
     if (gender) updateDetails.gender = gender.trim();
     if (email) updateDetails.email = email.trim();
 
-
     updateDetails = await updateDetails.save();
     let updateUser = await User.findById(userId).select(`${excludeField}`);
 
     return res.status(200).json({
       message: "User details updated successfully",
-      data: updateUser 
+      data: updateUser,
+    });
+  } catch (error) {
+    console.log(error);
+    handleValidationError(error, res);
+  }
+};
+
+//------------------------------------------User Request---------------------------------------------
+exports.sendClubRequest = async (req, res) => {
+  try {
+    const { postId } = req.body
+    const requesterId = req.User._id;
+    //postId = "669df8d76aa6d05e12291940";
+
+    const postData = await post.findById(postId);
+    if (!postData) {
+      return res.status(404).json({ message: "Post Not Found" });
+    }
+
+    if (postData.userId.equals(requesterId)) {
+      console.log("same request");
+      return res
+        .status(404)
+        .json({ message: "You can not send ClubRequest to your own Post" });
+    }
+    const recipientId = postData.userId;
+
+    if (!requesterId || !recipientId) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const existingRequest = await clubRequest.findOne({
+      requester: requesterId,
+      recipient: recipientId,
+      postId,
     });
 
+    if (existingRequest) {
+      return res.status(400).json({ message: "Club request already sent" });
+    }
+
+    const friendRequest = await clubRequest.create({
+      requester: requesterId,
+      recipient: recipientId,
+      postId,
+    });
+
+    await friendRequest.save();
+    return res.status(200).json({ message: "Club request sent" });
   } catch (error) {
     console.log(error);
-    handleValidationError(error ,res)
+    return res
+      .status(500)
+      .json({ message: "Error sending Club request", error });
   }
 };
 
-
-//--------------------------------------------------------------------------------------------------------
-exports.UpdateEmail = async (req, res) => {
+exports.acceptClubRequest = async (req, res) => {
   try {
+    const { requesterId, postId } = req.body;
 
+    const recipientId = req.User._id;
+    //postId = "669df8d76aa6d05e12291940";
+    //requesterId = "669defbe9dba6cc174c04f0a";
+    const postData = await post.findById(postId);
+    if (!postData) {
+      return res.status(404).json({ message: "Post Not Found" });
+    }
+
+    if (postData.userId.equals(requesterId)) {
+      return res.status(404).json({message:"You can not use your userId as requesterId to Accept ClubRequest",});
+    }
+
+    const requester = await User.findById(requesterId);
+    if (!requester) {
+      return res.status(404).json({ message: "requester Not Found" });
+    }
+
+    const pendingRequest = await clubRequest.findOne({
+      requester: requesterId,
+      recipient: recipientId,
+      postId,
+    });
+
+    if (pendingRequest) {
+      if (pendingRequest.status === "accepted")
+        return res.status(400).json({ message: "Club request already accepted" });
+    } else {
+      return res.status(400).json({ message: "Pending Request Not Found" });
+    }
+
+    pendingRequest.status = "accepted";
+    pendingRequest.updatedAt = Date.now();
+    await pendingRequest.save();
+    return res.status(200).json({ message: "club request accepted" });
   } catch (error) {
-    console.log(error);
-    new ErrorHandler("Unable to logout. Server error!", 500, res);
+    return res.status(500).json({ message: "Error accepting friend request", error });
   }
 };
 
-exports.updateMobileNumber = async (req, res) => {
+exports.declineClubRequest = async (req, res) => {
   try {
+    const { requesterId, postId } = req.body;
 
+    const recipientId = req.User._id;
+    //postId = "669df8d76aa6d05e12291940";
+    //requesterId = "669defbe9dba6cc174c04f0a";
+    const postData = await post.findById(postId);
+    if (!postData) {
+      return res.status(404).json({ message: "Post Not Found" });
+    }
+
+    if (postData.userId.equals(requesterId)) {
+      return res.status(404).json({message:"You can not use your userId as requesterId to declined ClubRequest",});
+    }
+
+    const requester = await User.findById(requesterId);
+    if (!requester) {
+      return res.status(404).json({ message: "requester Not Found" });
+    }
+
+    const pendingRequest = await clubRequest.findOne({
+      requester: requesterId,
+      recipient: recipientId,
+      postId,
+    });
+
+    if (pendingRequest) {
+      if (pendingRequest.status === "declined")
+        return res.status(400).json({ message: "Club request already declined" });
+    } else {
+      return res.status(400).json({ message: "Pending Request Not Found" });
+    }
+
+    pendingRequest.status = "declined";
+    pendingRequest.updatedAt = Date.now();
+    await pendingRequest.save();
+    return res.status(200).json({ message: "club request declined" });
   } catch (error) {
-    if (error.name === 'ValidationError') {
-      const errors = Object.keys(error.errors).map(key => ({
-      message: error.errors[key].message
-    }));
-    return new ErrorHandler(`${errors[0].message}`, 500, res);
-  }
-    new ErrorHandler("Unable to logout. Server error!", 500, res);
+    res.status(500).json({ message: "Error declining friend request", error });
   }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//---------------------------------------------------------------------extra content-------------------------------------------------------------
-
-// exports.acceptFriendRequest = async (req, res) => {
-//   try {
-//     const { requestId } = req.body;
-//     const userId = req.User._id;
-
-//     // Find the friend request
-//     const friendRequest = await userRequest.findById(requestId);
-//     if (!friendRequest) {
-//       return res.status(404).json({ message: 'Friend request not found' });
-//     }
-
-//     // Add both users to the group
-//     const requester = await User.findById(friendRequest.requester);
-//     const recipient = await User.findById(friendRequest.recipient);
-//     if (!requester || !recipient) {
-//       return res.status(404).json({ message: 'User not found' });
-//     }
-
-//     // Assuming a default group or you can create a new group for each pair
-//     const groupName = `Group_${requester._id}_${recipient._id}`;
-//     let group = await Group.findOne({ name: groupName });
-
-//     if (!group) {
-//       group = new Group({ name: groupName, members: [requester._id, recipient._id] });
-//     } else {
-//       group.members.push(requester._id, recipient._id);
-//     }
-
-//     await group.save();
-
-//     // Update the friend request status to accepted
-//     friendRequest.status = 'accepted';
-//     await friendRequest.save();
-
-//     res.status(200).json({ message: 'Friend request accepted', group });
-//   } catch (error) {
-//     console.log(error);
-//     res.status(500).json({ message: 'Error accepting friend request', error });
-//   }
-// };
 

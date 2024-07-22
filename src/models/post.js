@@ -21,7 +21,7 @@ const postSchema = new mongoose.Schema({
   price: { 
     type: Number, 
     required: [true, 'Price is required'],
-    min: [1, 'Price must be grater then 1 rupee']
+    min: [9, 'Price must be grater then 9 rupee']
   },
   quantity:{
     type: Number,
