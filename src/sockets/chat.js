@@ -13,7 +13,7 @@ function initializeChatSocket(server) {
         socket.join(roomId);
         console.log(`User joined room ${roomId}`);
 
-        const groupChat = await chatRoom.findById(roomId).populate("messages.sender", "name");
+        const groupChat = await chatRoom.findOne({ roomId }).populate("messages.sender", "name");
         if (groupChat) socket.emit("loadChatHistory", groupChat.messages);
       } catch (error) {
         console.error("Error joining room:", error);
@@ -49,7 +49,7 @@ function initializeChatSocket(server) {
 
     socket.on('markAsRead', async ({ roomId, messageId, receiverId }) => {
       try {
-        const groupChat = await chatRoom.findById(roomId);
+        const groupChat = await chatRoom.findOne({ roomId });
         if (groupChat) {
           const message = groupChat.messages.id(messageId);
           if (message) {
