@@ -11,7 +11,7 @@ const OTP = require("../models/otp.js");
 const post = require("../models/post.js");
 const categoryModel = require("../models/categorySchema.js");
 const clubRequest = require("../models/clubRequest.js");
-const {chatRoom} = require("../models/chatRoom.js")
+const chatRoom = require("../models/chatRoom.js")
 
 
 // Fast2SMS Configuration-----------------------------------
@@ -574,20 +574,22 @@ exports.sendClubRequest = async (req, res) => {
 exports.acceptClubRequest = async (req, res) => {
   try {
     const { requesterId, postId } = req.body;
-
     const recipientId = req.User._id;
+
     const postData = await post.findById(postId);
     if (!postData) {
       return res.status(404).json({ message: "Post Not Found" });
     }
 
     if (postData.userId.equals(requesterId)) {
-      return res.status(404).json({message:"You can not use your userId as requesterId to Accept ClubRequest",});
+      return res.status(400).json({
+        message: "You cannot use your userId as requesterId to Accept ClubRequest",
+      });
     }
 
     const requester = await User.findById(requesterId);
     if (!requester) {
-      return res.status(404).json({ message: "requester Not Found" });
+      return res.status(404).json({ message: "Requester Not Found" });
     }
 
     const pendingRequest = await clubRequest.findOne({
@@ -596,16 +598,22 @@ exports.acceptClubRequest = async (req, res) => {
       postId,
     });
 
-    if (pendingRequest) {
-      if (pendingRequest.status === "accepted")
-        return res.status(400).json({ message: "Club request already accepted" });
-    } else {
+    if (!pendingRequest) {
       return res.status(400).json({ message: "Pending Request Not Found" });
     }
-    // creating Group
-    const group = await chatRoom.findOne({ roomId: postData._id });
+
+    if (pendingRequest.status === "accepted") {
+      return res.status(400).json({ message: "Club request already accepted" });
+    }
+
+   
+    let group = await chatRoom.findOne({ roomId: postData._id });
     if (!group) {
-      const group = await chatRoom.create({roomId: postData._id , groupName: postData.title , members: [recipientId, requesterId] });
+      group = new chatRoom({
+        roomId: postData._id,
+        groupName: postData.title,
+        members: [recipientId, requesterId],
+      });
     } else {
       group.members.push(requesterId);
     }
@@ -613,12 +621,13 @@ exports.acceptClubRequest = async (req, res) => {
     pendingRequest.status = "accepted";
     pendingRequest.updatedAt = Date.now();
     await pendingRequest.save();
+    
     await group.save();
 
-    return res.status(200).json({ message: "club request accepted Added in Club chat" });
+    return res.status(200).json({ message: "Club request accepted and added to Club chat" });
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ message: "Error accepting friend request", error });
+    return res.status(500).json({ message: "Error accepting club request", error });
   }
 };
 
@@ -674,6 +683,29 @@ exports.fetchHistory = async (req, res) => {
     } else {
       res.status(404).json({ message: 'Room not found' });
     }
+  } catch (error) {
+    console.log(error);
+    new ErrorHandler("Unable to logout. Server error!", 500, res);
+  }
+};
+
+exports.fetchMembers = async (req, res) => {
+  try {
+    const { roomId } = req.body;
+
+    if (!roomId) {
+      return res.status(400).json({ error: 'Room ID is required' });
+    }
+  
+      const groupChat = await chatRoom.findOne({ roomId }).populate('members', '_id');
+  
+      if (!groupChat) {
+        return res.status(404).json({ error: 'Chat room not found' });
+      }
+  
+      const memberIds = groupChat.members.map(member => member._id);
+      res.json(memberIds);
+
   } catch (error) {
     console.log(error);
     new ErrorHandler("Unable to logout. Server error!", 500, res);

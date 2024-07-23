@@ -6,18 +6,17 @@ const messageSchema = new mongoose.Schema({
     required: true,
   },
   sender: {
-    type: mongoose.Schema.Types.ObjectId, 
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'user',
     required: true,
   },
-  receivers: [{
-    receiver: {
-      type: mongoose.Schema.Types.ObjectId,  
+  readBy: [{
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
       ref: 'user',
     },
-    isRead: {
-      type: Boolean,
-      default: false,
+    readAt: {
+      type: Date,
     },
   }],
 }, { timestamps: true });
@@ -38,13 +37,7 @@ const chatRoomSchema = new mongoose.Schema({
     required: true,
   }],
   messages: [messageSchema],
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+}, { timestamps: true });
 
 const chatRoom = mongoose.model('chatRoom', chatRoomSchema);
-const Message = mongoose.model('Message', messageSchema);
-
-module.exports = { chatRoom, Message };
+module.exports = chatRoom;

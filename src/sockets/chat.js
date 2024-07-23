@@ -1,5 +1,5 @@
 const { Server } = require("socket.io");
-const { chatRoom } = require("../models/chatRoom.js");
+const ChatRoom = require("../models/chatRoom.js");
 
 function initializeChatSocket(server) {
   const io = new Server(server);
@@ -13,52 +13,47 @@ function initializeChatSocket(server) {
         socket.join(roomId);
         console.log(`User joined room ${roomId}`);
 
-        const groupChat = await chatRoom.findOne({ roomId }).populate("messages.sender", "name");
-        if (groupChat) socket.emit("loadChatHistory", groupChat.messages);
+        const groupChat = await ChatRoom.findOne({ roomId }).populate("messages.sender", "name").populate("messages.readBy.userId", "name");
+        if (groupChat) {
+          socket.emit("loadChatHistory", groupChat.messages);
+        }
       } catch (error) {
         console.error("Error joining room:", error);
       }
     });
 
-    socket.on("sendMessage", async (message) => {
+    socket.on("sendMessage", async ({ roomId, senderId, text }) => {
       try {
-        const { roomId, senderId, text, receivers } = message;
-        console.log(roomId, senderId, text, receivers);
-
-        const groupChat = await chatRoom.findOne({ roomId });
-        console.log("groupChat:", groupChat);
-
+        const groupChat = await ChatRoom.findOne({ roomId });
         if (groupChat) {
           const newMessage = {
             text,
             sender: senderId,
-            receivers: receivers.map((receiverId) => ({
-              receiver: receiverId,
-              isRead: false,
-            })),
+            readBy: [{ userId: senderId, readAt: new Date() }]
           };
+
           groupChat.messages.push(newMessage);
           await groupChat.save();
 
-          io.to(roomId).emit("receiveMessage", newMessage);
+          io.to(roomId).emit("newMessage", newMessage);
         }
       } catch (error) {
         console.error("Error sending message:", error);
       }
     });
 
-    socket.on('markAsRead', async ({ roomId, messageId, receiverId }) => {
+    socket.on('markMessageAsRead', async ({ roomId, messageId, userId }) => {
       try {
-        const groupChat = await chatRoom.findOne({ roomId });
+        const groupChat = await ChatRoom.findOne({ roomId });
         if (groupChat) {
           const message = groupChat.messages.id(messageId);
           if (message) {
-            const receiver = message.receivers.find(r => r.receiver.toString() === receiverId);
-            if (receiver) {
-              receiver.isRead = true;
+            const alreadyRead = message.readBy.some(read => read.userId.toString() === userId);
+            if (!alreadyRead) {
+              message.readBy.push({ userId, readAt: new Date() });
               await groupChat.save();
 
-              io.to(roomId).emit('messageRead', { messageId, receiverId });
+              io.to(roomId).emit('messageRead', { messageId, userId });
             }
           }
         }
