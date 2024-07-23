@@ -42,26 +42,26 @@ function initializeChatSocket(server) {
       }
     });
 
-    socket.on('markMessageAsRead', async ({ roomId, messageId, userId }) => {
-      try {
-        const groupChat = await ChatRoom.findOne({ roomId });
-        if (groupChat) {
-          const message = groupChat.messages.id(messageId);
-          if (message) {
-            const alreadyRead = message.readBy.some(read => read.userId.toString() === userId);
-            if (!alreadyRead) {
-              message.readBy.push({ userId, readAt: new Date() });
-              await groupChat.save();
-
-              io.to(roomId).emit('messageRead', { messageId, userId });
-            }
+    socket.on('markMessageAsRead', ({ roomId, messageId }) => {
+      // Find the message
+      Message.findById(messageId, (err, message) => {
+        if (err || !message) return;
+  
+        // Update readBy for all users in the group (assuming groupUsers is an array of user IDs)
+        const groupUsers = getGroupUsers(roomId); // Implement this based on your app logic
+  
+        groupUsers.forEach(user => {
+          if (!message.readBy.some(read => read.userId === user)) {
+            message.readBy.push({ userId: user, readAt: new Date() });
           }
-        }
-      } catch (error) {
-        console.error("Error marking message as read:", error);
-      }
+        });
+  
+        message.save().then(() => {
+          io.to(roomId).emit('messageRead', { messageId, userId: socket.userId });
+        });
+      });
     });
-
+    
     socket.on('disconnect', () => {
       console.log('Client disconnected');
     });
