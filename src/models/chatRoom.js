@@ -15,6 +15,10 @@ const messageSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: 'user',
     },
+    isRead: {
+      type: Boolean,
+      default: false,
+    },
     readAt: {
       type: Date,
     },
