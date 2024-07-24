@@ -17,7 +17,7 @@ function initializeChatSocket(server) {
       const message = {
         text,
         sender,
-        readBy: [{ userId: sender, isRead: true, readAt: new Date() }]
+        readBy: [] // Initialize without adding the sender
       };
   
       const updatedRoom = await chatRoom.findOneAndUpdate(
