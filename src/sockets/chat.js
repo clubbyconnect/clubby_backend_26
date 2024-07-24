@@ -13,17 +13,11 @@ function initializeChatSocket(server) {
   });
 
   io.on('connection', (socket) => {
-    console.log('a user connected');
-
+  
     socket.on('joinRoom', async (roomId) => {
       socket.join(roomId);
-      console.log(`User joined room ${roomId}`);
-
-      // Fetch chat history when a user joins the room
       const room = await chatRoom.findOne({ roomId });
-      if (room) {
-        socket.emit('chatHistory', room);
-      }
+      if (room) socket.emit('chatHistory', room);
     });
 
     socket.on('sendMessage', async (data) => {
@@ -31,7 +25,7 @@ function initializeChatSocket(server) {
       const message = {
         text,
         sender,
-        readBy: [] // Initialize without adding the sender
+        readBy: [] 
       };
 
       const updatedRoom = await chatRoom.findOneAndUpdate(
@@ -46,7 +40,6 @@ function initializeChatSocket(server) {
     socket.on('markMessageAsRead', async (data) => {
       const { roomId, messageId, userId } = data;
 
-      // Only add the user to readBy if they are not the sender
       const room = await chatRoom.findOne({ roomId });
       const message = room.messages.id(messageId);
 
@@ -62,11 +55,9 @@ function initializeChatSocket(server) {
       }
     });
 
-    socket.on('disconnect', () => {
-      console.log('user disconnected');
-    });
-  });
+    socket.on('disconnect', () => {});
 
+  });
   return io;
 }
 
