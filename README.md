@@ -1,2 +1,1 @@
-# clubby-backend
 # clubbyBackend
