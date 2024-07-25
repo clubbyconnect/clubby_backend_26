@@ -165,7 +165,7 @@ exports.googleAuth = async (req, res) => {
       });
   } catch (error) {
     console.log(error);
-    new ErrorHandler("An error occurred", 500, res);
+    return new ErrorHandler("An error occurred", 500, res);
   }
 };
 
@@ -179,7 +179,7 @@ exports.appleAuth = async (req, res) => {
 
     console.log(userInfo);
   } catch (error) {
-    new ErrorHandler("Unable to logout. Server error!", 500, res);
+    return new ErrorHandler("Unable to logout. Server error!", 500, res);
   }
 };
 
@@ -199,7 +199,7 @@ exports.facebookAuth = async (req, res) => {
       });
     });
   } catch (error) {
-    new ErrorHandler("Unable to logout. Server error!", 500, res);
+    return new ErrorHandler("Unable to logout. Server error!", 500, res);
   }
 };
 
@@ -309,7 +309,7 @@ exports.verifyOtp = async (req, res) => {
       return res.status(400).json({ error: "Invalid OTP" });
     }
   } catch (error) {
-    new ErrorHandler("An error occurred during sign in", 500, res);
+    return new ErrorHandler("An error occurred during sign in", 500, res);
   }
 };
 
@@ -331,7 +331,7 @@ exports.logout = async (req, res) => {
       .json({ message: "User logged out successfully" });
   } catch (error) {
     console.log(error);
-    new ErrorHandler("Unable to logout. Server error!", 500, res);
+    return new ErrorHandler("Unable to logout. Server error!", 500, res);
   }
 };
 
@@ -627,7 +627,7 @@ exports.acceptClubRequest = async (req, res) => {
     return res.status(200).json({ message: "Club request accepted and added to Club chat" });
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ message: "Error accepting club request", error });
+    return new ErrorHandler("Error accepting club request", 500, res);
   }
 };
 
@@ -670,6 +670,7 @@ exports.declineClubRequest = async (req, res) => {
     await pendingRequest.save();
     return res.status(200).json({ message: "club request declined" });
   } catch (error) {
-    res.status(500).json({ message: "Error declining friend request", error });
+    return new ErrorHandler("Error declining friend request", 500, res);
+    
   }
 };
