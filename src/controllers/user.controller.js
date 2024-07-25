@@ -440,6 +440,7 @@ exports.createPost = async (req, res) => {
       return res.status(400).json({ message: "Product Image is requierd" });
 
     const productImage = await uploadOnCloudinary(productImageLocalPath);
+  
 
     const categoryid = await categoryModel.findOne({ name: category });
     const subcategoryid = await categoryModel.findOne({ name: category });
