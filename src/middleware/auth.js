@@ -21,5 +21,3 @@ exports.verifyJWT = async (req, res, next) => {
     }
   };
 
-
-

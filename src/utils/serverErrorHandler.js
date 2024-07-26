@@ -7,7 +7,7 @@ class ErrorHandler extends Error {
   }
 }
 
-exports.serverErrorHandler = (error, res) => {
+const serverErrorHandler = (error, res) => {
 
   if (error.name === 'ValidationError') {
     const errors = Object.keys(error.errors).map(key => ({
@@ -18,6 +18,6 @@ exports.serverErrorHandler = (error, res) => {
   return new ErrorHandler("Server error. Something went wrong", 500, res);
 };
 
-
+module.exports = serverErrorHandler;
 
 
