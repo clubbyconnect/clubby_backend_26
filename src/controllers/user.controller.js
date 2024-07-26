@@ -177,7 +177,7 @@ exports.appleAuth = async (req, res) => {
       ignoreExpiration: true,
     });
 
-    console.log(userInfo);
+    //console.log(userInfo);
   } catch (error) {
     return new ErrorHandler("Unable to logout. Server error!", 500, res);
   }
@@ -315,7 +315,7 @@ exports.verifyOtp = async (req, res) => {
 
 exports.logout = async (req, res) => {
   try {
-    console.log(req);
+
     await User.findByIdAndUpdate(
       req.User._id,
       { $unset: { refreshToken: 1 } },
@@ -535,10 +535,7 @@ exports.sendClubRequest = async (req, res) => {
     }
 
     if (postData.userId.equals(requesterId)) {
-      console.log("same request");
-      return res
-        .status(404)
-        .json({ message: "You can not send ClubRequest to your own Post" });
+      return res.status(404).json({ message: "You can not send ClubRequest to your own Post" });
     }
     const recipientId = postData.userId;
 
@@ -675,3 +672,31 @@ exports.declineClubRequest = async (req, res) => {
     
   }
 };
+
+exports.removeUserFromClub = async (req, res) => {
+  try {
+   
+    const { roomId, userId } = req.body;
+
+      const room = await chatRoom.findOne({ roomId });
+      if (!room) {
+        return res.status(404).json({ error: 'Chat room not found' });
+      }
+  
+      if (!room.members.includes(userId)) {
+        return res.status(400).json({ error: 'User not in chat room' });
+      }
+  
+      // room.members.pull(userId);
+      // await room.save();
+
+    req.app.get('io').to(roomId).emit('userRemoved', { roomId, userId });
+
+    return res.status(200).json({ message: 'User removed from chat room' });
+
+  } catch (error) {
+    console.log(error);
+    return new ErrorHandler("Unable to logout. Server error!", 500, res);
+  }
+};
+

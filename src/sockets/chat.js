@@ -1,7 +1,12 @@
 const { Server } = require("socket.io");
 const chatRoom = require("../models/chatRoom.js");
 
-function initializeChatSocket(server) {
+
+function initializeChatSocket(server , app) {
+
+  //events in controller
+  //-->> 'userRemoved', { roomId, userId }
+  
   const io = new Server(server, {
     cors: {
       origin: "*",
@@ -12,8 +17,11 @@ function initializeChatSocket(server) {
     pingInterval: 25000 
   });
 
+  app.set('io', io)
+
   io.on('connection', (socket) => {
   
+    console.log("user joine3d");
     socket.on('joinRoom', async (roomId) => {
       socket.join(roomId);
       const room = await chatRoom.findOne({ roomId });
@@ -54,6 +62,8 @@ function initializeChatSocket(server) {
         io.to(roomId).emit('messageRead', updatedRoom);
       }
     });
+
+
 
     socket.on('disconnect', () => {});
 

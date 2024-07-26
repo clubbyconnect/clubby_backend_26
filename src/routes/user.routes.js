@@ -19,6 +19,7 @@ const { signUp,
     acceptClubRequest,
     declineClubRequest,
     UpdateUserDetails,
+    removeUserFromClub
 } = require('../controllers/user.controller.js');
 const { fetchallcategory,
     fetchsubcategory,
@@ -46,7 +47,6 @@ router.post("/fetchsubcategory",verifyJWT,fetchsubcategory);
 router.post("/sendClubRequest",verifyJWT,sendClubRequest);
 router.post("/acceptClubRequest",verifyJWT,acceptClubRequest);
 router.post("/declineClubRequest",verifyJWT,declineClubRequest);
-
-
+router.post("/removeUserFromClub",verifyJWT,removeUserFromClub);
 
 module.exports = router;

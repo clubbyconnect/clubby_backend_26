@@ -3,23 +3,6 @@ const User = require("../models/user.js");
 const post = require("../models/post.js");
 const chatRoom = require("../models/chatRoom.js");
 const categoryModel = require("../models/categorySchema.js")
-const initializeChatSocket = require('../sockets/chat.js'); 
-const io = initializeChatSocket(); 
-
-
-exports.chat = async (req, res) => {
-  try {
-    const groupId =2
-    const userId =3
-
-    io.emit('joinGroup', { groupId, userId });
-    
-    return res.status(200).json({ message: 'Message sent via API' });
-  } catch (error) {
-    console.log(error);
-    new ErrorHandler("Unable to create ChatRoomID. Server error!", 500, res);
-  }
-};
 
 
 //functions
@@ -38,7 +21,6 @@ const deleteCategoryRecursive = async (categoryId) => {
 };
 
 // controllers
-
 //--------------------------------Category----------------------------------
 exports.createCategory = async (req, res) => {
   try {
@@ -135,7 +117,19 @@ exports.findCategoryWithSubcategories = async (req, res) => {
   }
 };
 
+exports.deleteUser = async (req, res, next) => {
+  const { category } = req.body;
 
+  try {
+    const categoryToDelete = await categoryModel.findOne({ name: category });
+    if (!categoryToDelete) return res.status(404).json({ message: 'Category does not exist' });
+    
+    await deleteCategoryRecursive(categoryToDelete._id);
+    res.status(200).json({ message: 'Category and its subcategories deleted successfully' });
+  } catch (error) {
+    next(new ErrorHandler('Unable to delete category. Server error!', 500));
+  }
+};
 
 
 
