@@ -113,16 +113,8 @@ const postSchema = new mongoose.Schema({
         message: 'Report message cannot be longer than 300 characters.'
       }
     ]
-  }],
-  createdAt: { 
-    type: Date, 
-    default: Date.now
-  },
-  updatedAt: { 
-    type: Date, 
-    default: Date.now 
-  },
-});
+  }]
+},{timestamps: true,});
 
 const Post = mongoose.model("Post", postSchema);
 module.exports = Post;

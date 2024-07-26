@@ -1,11 +1,8 @@
 const mongoose = require("mongoose");
-const Schema = mongoose.Schema;
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const validator = require("validator");
 
-
-const userSchema = new Schema(
+const userSchema = new mongoose.Schema(
   {
     firstName: {
       type: String,
@@ -130,7 +127,7 @@ const userSchema = new Schema(
     },
     blockedUsers: [
       { 
-        type: Schema.Types.ObjectId, ref: 'User'
+        type: mongoose.Schema.Types.ObjectId, ref: 'User'
        }
     ],
     reportCount: {
@@ -144,10 +141,7 @@ const userSchema = new Schema(
     refreshToken: {
       type: String,
     },
-  },
-  {
-    timestamps: true,
-  }
+  },{timestamps: true,}
 );
 
 // Hashing password
@@ -197,9 +191,8 @@ userSchema.methods.generateRefreshToken = function () {
 //spam security Restrictions Functions
 userSchema.pre('save', async function (next) {
 
-  if (this.isNew) {
-    return next();
-  }
+  if (this.isNew) return next();
+  
   const now = new Date();
   const minChangeInterval = 30 * 24 * 60 * 60 * 1000;
 
@@ -233,7 +226,7 @@ userSchema.pre('save', async function (next) {
   next();
 });
 
-const User = mongoose.model("user", userSchema);
+const User = mongoose.model("User", userSchema);
 module.exports = User;
 
 

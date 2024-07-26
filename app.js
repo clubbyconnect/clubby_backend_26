@@ -19,5 +19,4 @@ const adminRoutes = require("./src/routes/admin.routes.js");
 app.use("/api/user", userRoutes);
 app.use("/api/admin", adminRoutes);
 
-
 module.exports = app;

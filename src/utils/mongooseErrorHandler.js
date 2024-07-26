@@ -1,4 +1,3 @@
-
 const ErrorHandler = require('../utils/ErrorHandler.js'); 
 
 const handleValidationError = (error, res) => {
@@ -13,8 +12,6 @@ const handleValidationError = (error, res) => {
 };
 
 module.exports = handleValidationError;
-
-
 
 // class ErrorHandler extends Error {
 //     constructor(message, statusCode, res) {

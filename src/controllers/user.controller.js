@@ -9,10 +9,9 @@ const handleValidationError = require("../utils/mongooseErrorHandler.js");
 const User = require("../models/user.js");
 const OTP = require("../models/otp.js");
 const post = require("../models/post.js");
-const categoryModel = require("../models/categorySchema.js");
-const clubRequest = require("../models/clubRequest.js");
-const chatRoom = require("../models/chatRoom.js")
-
+const CategoryModel = require("../models/categorySchema.js");
+const ClubRequest = require("../models/clubRequest.js");
+const ChatRoom = require("../models/chatRoom.js")
 
 // Fast2SMS Configuration-----------------------------------
 const fast2SMSapiKey = process.env.FAST2SMS_API_KEY;
@@ -442,9 +441,9 @@ exports.createPost = async (req, res) => {
     const productImage = await uploadOnCloudinary(productImageLocalPath);
   
 
-    const categoryid = await categoryModel.findOne({ name: category });
-    const subcategoryid = await categoryModel.findOne({ name: category });
-    const subsubcategoryid = await categoryModel.findOne({
+    const categoryid = await CategoryModel.findOne({ name: category });
+    const subcategoryid = await CategoryModel.findOne({ name: category });
+    const subsubcategoryid = await CategoryModel.findOne({
       name: subsubcategory,
     });
 
@@ -543,7 +542,7 @@ exports.sendClubRequest = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const existingRequest = await clubRequest.findOne({
+    const existingRequest = await ClubRequest.findOne({
       requester: requesterId,
       recipient: recipientId,
       postId,
@@ -553,7 +552,7 @@ exports.sendClubRequest = async (req, res) => {
       return res.status(400).json({ message: "Club request already sent" });
     }
 
-    const friendRequest = await clubRequest.create({
+    const friendRequest = await ClubRequest.create({
       requester: requesterId,
       recipient: recipientId,
       postId,
@@ -590,7 +589,7 @@ exports.acceptClubRequest = async (req, res) => {
       return res.status(404).json({ message: "Requester Not Found" });
     }
 
-    const pendingRequest = await clubRequest.findOne({
+    const pendingRequest = await ClubRequest.findOne({
       requester: requesterId,
       recipient: recipientId,
       postId,
@@ -605,9 +604,9 @@ exports.acceptClubRequest = async (req, res) => {
     }
 
    
-    let group = await chatRoom.findOne({ roomId: postData._id });
+    let group = await ChatRoom.findOne({ roomId: postData._id });
     if (!group) {
-      group = new chatRoom({
+      group = new ChatRoom({
         roomId: postData._id,
         groupName: postData.title,
         members: [recipientId, requesterId],
@@ -650,7 +649,7 @@ exports.declineClubRequest = async (req, res) => {
       return res.status(404).json({ message: "requester Not Found" });
     }
 
-    const pendingRequest = await clubRequest.findOne({
+    const pendingRequest = await ClubRequest.findOne({
       requester: requesterId,
       recipient: recipientId,
       postId,
@@ -678,7 +677,7 @@ exports.removeUserFromClub = async (req, res) => {
    
     const { roomId, userId } = req.body;
 
-      const room = await chatRoom.findOne({ roomId });
+      const room = await ChatRoom.findOne({ roomId });
       if (!room) {
         return res.status(404).json({ error: 'Chat room not found' });
       }

@@ -1,11 +1,11 @@
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const User = require("../models/user.js");
-const categoryModel = require("../models/categorySchema.js");
+const CategoryModel = require("../models/categorySchema.js");
 
 // controllers-----------------------------------
 exports.fetchallcategory = async (req, res) => {
   try {
-    const allcategory = await categoryModel.aggregate([
+    const allcategory = await CategoryModel.aggregate([
       {
         $lookup: {
           from: "categories",
@@ -48,7 +48,7 @@ exports.fetchsubcategory = async (req, res) => {
   try {
     const { parentCategoryName } = req.body;
 
-    const subcategories = await categoryModel.aggregate([
+    const subcategories = await CategoryModel.aggregate([
       {
         $match: {
           name: parentCategoryName,

@@ -1,15 +1,12 @@
 const mongoose = require("mongoose");
-const Schema = mongoose.Schema;
 
-const clubRequestSchema = new Schema({
+const clubRequestSchema = new mongoose.Schema({
     requester: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     postId: { type: mongoose.Schema.Types.ObjectId, ref: 'post', required: true },
     status: { type: String, enum: ['pending', 'accepted', 'declined'], default: 'pending' },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
-  });
+  },{timestamps: true,}
+);
   
-const clubRequest = mongoose.model('clubRequest', clubRequestSchema);
-
-module.exports = clubRequest;
+const ClubRequest = mongoose.model('ClubRequest', clubRequestSchema);
+module.exports = ClubRequest;

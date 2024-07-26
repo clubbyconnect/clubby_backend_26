@@ -1,12 +1,11 @@
 const { Server } = require("socket.io");
-const chatRoom = require("../models/chatRoom.js");
-
-
-function initializeChatSocket(server , app) {
+const ChatRoom = require("../models/chatRoom.js");
 
   //events in controller
   //-->> 'userRemoved', { roomId, userId }
-  
+
+function ChatSocket(server , app) {
+
   const io = new Server(server, {
     cors: {
       origin: "*",
@@ -16,15 +15,14 @@ function initializeChatSocket(server , app) {
     pingTimeout: 60000, 
     pingInterval: 25000 
   });
-
   app.set('io', io)
-
+  
+  //------------------------------Events---------------------------------------------
   io.on('connection', (socket) => {
   
-    console.log("user joine3d");
     socket.on('joinRoom', async (roomId) => {
       socket.join(roomId);
-      const room = await chatRoom.findOne({ roomId });
+      const room = await ChatRoom.findOne({ roomId });
       if (room) socket.emit('chatHistory', room);
     });
 
@@ -36,7 +34,7 @@ function initializeChatSocket(server , app) {
         readBy: [] 
       };
 
-      const updatedRoom = await chatRoom.findOneAndUpdate(
+      const updatedRoom = await ChatRoom.findOneAndUpdate(
         { roomId },
         { $push: { messages: message } },
         { new: true, useFindAndModify: false }
@@ -48,7 +46,7 @@ function initializeChatSocket(server , app) {
     socket.on('markMessageAsRead', async (data) => {
       const { roomId, messageId, userId } = data;
 
-      const room = await chatRoom.findOne({ roomId });
+      const room = await ChatRoom.findOne({ roomId });
       const message = room.messages.id(messageId);
 
       if (message.sender.toString() !== userId) {
@@ -58,17 +56,14 @@ function initializeChatSocket(server , app) {
           { new: true }
         );
 
-        const updatedRoom = await chatRoom.findOne({ roomId });
+        const updatedRoom = await ChatRoom.findOne({ roomId });
         io.to(roomId).emit('messageRead', updatedRoom);
       }
     });
 
-
-
     socket.on('disconnect', () => {});
-
   });
   return io;
 }
 
-module.exports = initializeChatSocket;
+module.exports = ChatSocket;

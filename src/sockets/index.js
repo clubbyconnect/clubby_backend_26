@@ -1,8 +1,8 @@
 const { Server } = require("socket.io");
-const initializeChatSocket = require("./chat.js");
+const ChatSocket = require("./chat.js");
 const app = require("../../app.js")
 
 exports.setupSocket = (server)=>{
 
-  initializeChatSocket(server,app);
+  ChatSocket(server,app);
 }

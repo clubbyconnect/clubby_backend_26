@@ -1,22 +1,22 @@
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const User = require("../models/user.js");
 const post = require("../models/post.js");
-const chatRoom = require("../models/chatRoom.js");
-const categoryModel = require("../models/categorySchema.js")
+const ChatRoom = require("../models/chatRoom.js");
+const CategoryModel = require("../models/categorySchema.js")
 
 
 //functions
 const deleteCategoryRecursive = async (categoryId) => {
-  const category = await categoryModel.findById(categoryId);
+  const category = await CategoryModel.findById(categoryId);
   if (category) {
     for (const subcategoryId of category.subcategories) {
       await deleteCategoryRecursive(subcategoryId);
     }
-    await categoryModel.updateMany(
+    await CategoryModel.updateMany(
       { subcategories: categoryId },
       { $pull: { subcategories: categoryId } }
     );
-    await categoryModel.findByIdAndDelete(categoryId);
+    await CategoryModel.findByIdAndDelete(categoryId);
   }
 };
 
@@ -26,10 +26,10 @@ exports.createCategory = async (req, res) => {
   try {
     const { category } = req.body;
 
-    const isCategoryexist = await categoryModel.findOne({category});
+    const isCategoryexist = await CategoryModel.findOne({category});
     if (isCategoryexist) return res.status(404).json({ message: 'category already exist' });
 
-    const newCategory = await categoryModel.create({name :category});
+    const newCategory = await CategoryModel.create({name :category});
     if (newCategory) return res.status(200).json({ message: "category created" });
      
   } catch (error) {
@@ -41,14 +41,14 @@ exports.createCategory = async (req, res) => {
 exports.addSubcategory = async (req, res) => {
   const { parentCategory, SubcategoryName } = req.body;
   try {
-    const pCategory = await categoryModel.findOne({name: parentCategory});
+    const pCategory = await CategoryModel.findOne({name: parentCategory});
 
     if (!pCategory) return res.status(404).json({ message: 'Parent category not found' });
 
-    const sCategory = await categoryModel.findOne({name:SubcategoryName});
+    const sCategory = await CategoryModel.findOne({name:SubcategoryName});
     if (sCategory) return res.status(404).json({ message: 'this subCategory name already exist' });
 
-    const newSubcategory = await categoryModel.create({name : SubcategoryName });
+    const newSubcategory = await CategoryModel.create({name : SubcategoryName });
 
     pCategory.subcategories.push(newSubcategory._id);
     await pCategory.save();
@@ -63,7 +63,7 @@ exports.deleteCategory = async (req, res, next) => {
   const { category } = req.body;
 
   try {
-    const categoryToDelete = await categoryModel.findOne({ name: category });
+    const categoryToDelete = await CategoryModel.findOne({ name: category });
     if (!categoryToDelete) return res.status(404).json({ message: 'Category does not exist' });
     
     await deleteCategoryRecursive(categoryToDelete._id);
@@ -77,7 +77,7 @@ exports.findCategoryWithSubcategories = async (req, res) => {
   try {
     const { categoryName } = req.body;
 
-    const result = await categoryModel.aggregate([
+    const result = await CategoryModel.aggregate([
       {
         "$match": {
           "name": categoryName
@@ -117,11 +117,12 @@ exports.findCategoryWithSubcategories = async (req, res) => {
   }
 };
 
+//--------------------------------user----------------------------------
 exports.deleteUser = async (req, res, next) => {
   const { category } = req.body;
 
   try {
-    const categoryToDelete = await categoryModel.findOne({ name: category });
+    const categoryToDelete = await CategoryModel.findOne({ name: category });
     if (!categoryToDelete) return res.status(404).json({ message: 'Category does not exist' });
     
     await deleteCategoryRecursive(categoryToDelete._id);
