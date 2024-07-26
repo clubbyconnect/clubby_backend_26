@@ -1,4 +1,4 @@
-const ErrorHandler = require("../utils/ErrorHandler.js");
+const serverErrorHandler = require("../utils/serverErrorHandler.js");
 const User = require("../models/user.js");
 const CategoryModel = require("../models/categorySchema.js");
 
@@ -37,7 +37,6 @@ exports.fetchallcategory = async (req, res) => {
       return res.status(404).json({ message: "No top-level categories found" });
     }
   } catch (error) {
-    console.error(error);
     return res
       .status(500)
       .json({ message: "Unable to fetch allcategory. Server error!" });
@@ -89,7 +88,6 @@ exports.fetchsubcategory = async (req, res) => {
         });
     }
   } catch (error) {
-    console.error(error);
     return res
       .status(500)
       .json({ message: "Unable to fetch subcategories. Server error!" });

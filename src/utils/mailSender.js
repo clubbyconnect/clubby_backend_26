@@ -1,6 +1,6 @@
 const nodemailer = require('nodemailer')
 
-const mailSender = async (email, title, body)=>{
+exports.mailSender = async (email, title, body)=>{
     try {
         //to send email -> Transporter
         let transporter = nodemailer.createTransport({
@@ -13,7 +13,7 @@ const mailSender = async (email, title, body)=>{
 
         //now Send e-mails to users
         let info = await transporter.sendMail({
-            from: 'www.sandeepdev.me - Sandeep Singh',
+            from: 'www.Clubby.com - Kaushal Kumar',
             to:`${email}`,
                 subject: `${title}`,
                 html: `${body}`,
@@ -26,9 +26,3 @@ const mailSender = async (email, title, body)=>{
      throw error
     }
 }
-
-module.exports = mailSender;
-
-//MAIL_HOST=smtp.gmail.com
-//MAIL_USER=amjglobaliasoft@gmail.com
-//MAIL_PASS=sass jpno kdvg ffpc

@@ -1,4 +1,4 @@
-const ErrorHandler = require("../utils/ErrorHandler.js");
+const serverErrorHandler = require("../utils/serverErrorHandler.js");
 const User = require("../models/user.js");
 const post = require("../models/post.js");
 const ChatRoom = require("../models/chatRoom.js");
@@ -33,8 +33,7 @@ exports.createCategory = async (req, res) => {
     if (newCategory) return res.status(200).json({ message: "category created" });
      
   } catch (error) {
-    console.log(error);
-    new ErrorHandler("Unable to create Category. Server error!", 500, res);
+    serverErrorHandler(error, res);
   }
 };
 
@@ -55,7 +54,7 @@ exports.addSubcategory = async (req, res) => {
 
     return res.status(200).json({ message: 'subCategory created' });
   } catch (error) {
-    new ErrorHandler("Unable to create Subcategory. Server error!", 500, res);
+    serverErrorHandler(error, res);
   }
 };
 
@@ -69,7 +68,7 @@ exports.deleteCategory = async (req, res, next) => {
     await deleteCategoryRecursive(categoryToDelete._id);
     res.status(200).json({ message: 'Category and its subcategories deleted successfully' });
   } catch (error) {
-    next(new ErrorHandler('Unable to delete category. Server error!', 500));
+    next(serverErrorHandler(error, res));
   }
 };
 
@@ -112,7 +111,6 @@ exports.findCategoryWithSubcategories = async (req, res) => {
       return res.status(404).json({ message: "Category not found" });
     }
   } catch (error) {
-    console.error(error);
     return res.status(500).json({ message: "Unable to fetch category and subcategories. Server error!" });
   }
 };
@@ -128,7 +126,7 @@ exports.deleteUser = async (req, res, next) => {
     await deleteCategoryRecursive(categoryToDelete._id);
     res.status(200).json({ message: 'Category and its subcategories deleted successfully' });
   } catch (error) {
-    next(new ErrorHandler('Unable to delete category. Server error!', 500));
+    next(serverErrorHandler(error, res));
   }
 };
 

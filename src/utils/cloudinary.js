@@ -1,4 +1,4 @@
-const ErrorHandler = require("./ErrorHandler.js");
+const serverErrorHandler = require("./serverErrorHandler.js");
 const cloudinary = require("cloudinary").v2;
 const fs = require("fs");
 
@@ -8,9 +8,9 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET 
   });
 
-const uploadOnCloudinary = async (localFilePath) => {
+exports.uploadOnCloudinary = async (localFilePath) => {
     try {
-        if (!localFilePath) new ErrorHandler("Unable to upload image on cloud storage", 500, res);
+        if (!localFilePath) serverErrorHandler(error, res);
     
         const response = await cloudinary.uploader.upload(localFilePath, {
             resource_type: "auto"
@@ -23,5 +23,5 @@ const uploadOnCloudinary = async (localFilePath) => {
     }
 }
 
-module.exports = uploadOnCloudinary;
+
 

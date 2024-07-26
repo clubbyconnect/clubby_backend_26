@@ -3,9 +3,8 @@ const axios = require("axios");
 const { OAuth2Client } = require("google-auth-library");
 const Facebook = require("facebook-node-sdk");
 const { appleAuth } = require("apple-auth");
-const ErrorHandler = require("../utils/ErrorHandler.js");
 const uploadOnCloudinary = require("../utils/cloudinary.js");
-const handleValidationError = require("../utils/mongooseErrorHandler.js");
+const serverErrorHandler = require("../utils/serverErrorHandler.js");
 const User = require("../models/user.js");
 const OTP = require("../models/otp.js");
 const post = require("../models/post.js");
@@ -119,7 +118,7 @@ exports.signUp = async (req, res) => {
       .status(200)
       .json({ message: "User registered successfully", data: user });
   } catch (error) {
-    handleValidationError(error, res);
+    serverErrorHandler(error, res);
   }
 };
 
@@ -140,12 +139,8 @@ exports.googleAuth = async (req, res) => {
       user = await User.findById(newUser._id).select("-password -refreshToken");
     }
 
-    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
-      user._id
-    );
-    const loggedInUser = await User.findById(user._id).select(
-      "-password -refreshToken"
-    );
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
 
     const options = {
       httpOnly: true,
@@ -163,8 +158,8 @@ exports.googleAuth = async (req, res) => {
         data: loggedInUser,
       });
   } catch (error) {
-    console.log(error);
-    return new ErrorHandler("An error occurred", 500, res);
+  
+    serverErrorHandler(error, res);
   }
 };
 
@@ -176,9 +171,9 @@ exports.appleAuth = async (req, res) => {
       ignoreExpiration: true,
     });
 
-    //console.log(userInfo);
+  
   } catch (error) {
-    return new ErrorHandler("Unable to logout. Server error!", 500, res);
+    serverErrorHandler(error, res);
   }
 };
 
@@ -198,7 +193,7 @@ exports.facebookAuth = async (req, res) => {
       });
     });
   } catch (error) {
-    return new ErrorHandler("Unable to logout. Server error!", 500, res);
+    serverErrorHandler(error, res);
   }
 };
 
@@ -211,7 +206,7 @@ exports.signIn = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(409).json({ error: "User does not exist" });
+      return res.status(404).json({ error: "User does not exist" });
     }
 
     const isPasswordValid = await user.isPasswordCorrect(password);
@@ -236,7 +231,7 @@ exports.signIn = async (req, res) => {
       .status(200)
       .json({ message: "User signed in successfully", data: loggedInUser });
   } catch (error) {
-    handleValidationError(error, res);
+    serverErrorHandler(error, res);
   }
 };
 
@@ -277,7 +272,7 @@ exports.sendOtp = async (req, res) => {
         .json({ success: true, message: "OTP Sent Successfully" });
     }
   } catch (error) {
-    handleValidationError(error, res);
+    serverErrorHandler(error, res);
   }
 };
 
@@ -308,7 +303,7 @@ exports.verifyOtp = async (req, res) => {
       return res.status(400).json({ error: "Invalid OTP" });
     }
   } catch (error) {
-    return new ErrorHandler("An error occurred during sign in", 500, res);
+    serverErrorHandler(error, res);
   }
 };
 
@@ -329,8 +324,7 @@ exports.logout = async (req, res) => {
       .clearCookie("refreshToken", cookieOptions)
       .json({ message: "User logged out successfully" });
   } catch (error) {
-    console.log(error);
-    return new ErrorHandler("Unable to logout. Server error!", 500, res);
+    serverErrorHandler(error, res);
   }
 };
 
@@ -352,7 +346,7 @@ exports.resetPassword = async (req, res) => {
     }
 
     if (user.googleAuthId !== null) {
-      return res.status(409).json({
+      return res.status(403).json({
         error:
           "You are registered with Google ID and cannot reset your password",
       });
@@ -365,7 +359,7 @@ exports.resetPassword = async (req, res) => {
     await user.save({ validateBeforeSave: false });
     return res.status(200).json({ message: "Password changed successfully" });
   } catch (error) {
-    handleValidationError(error, res);
+    serverErrorHandler(error, res);
   }
 };
 
@@ -380,7 +374,7 @@ exports.uploadAvatar = async (req, res) => {
     if (!avatar) {
       return res
         .status(500)
-        .json({ message: "Unable to upload profile photo" });
+        .json({ error: "Unable to upload profile photo" });
     }
 
     const user = await User.findByIdAndUpdate(
@@ -393,10 +387,9 @@ exports.uploadAvatar = async (req, res) => {
       .status(200)
       .json({ message: "Avatar uploaded successfully", data: user });
   } catch (error) {
-    console.error(error);
     return res
       .status(500)
-      .json({ message: "Unable to upload avatar. Server error!" });
+      .json({ error: "Unable to upload avatar. Server error!" });
   }
 };
 
@@ -436,7 +429,7 @@ exports.createPost = async (req, res) => {
     }
     const productImageLocalPath = req.file?.path;
     if (!productImageLocalPath)
-      return res.status(400).json({ message: "Product Image is requierd" });
+      return res.status(400).json({ error: "Product Image is requierd" });
 
     const productImage = await uploadOnCloudinary(productImageLocalPath);
   
@@ -471,11 +464,11 @@ exports.createPost = async (req, res) => {
 
     const createdPost = await post.create(postData);
     if (!createdPost._id)
-      return res.status(401).json({ messaage: "unabel to create post" });
+      return res.status(401).json({ error: "unabel to create post" });
 
-    return res.status(401).json({ messaage: "Post created Sucessfully" });
+    return res.status(200).json({ messaage: "Post created Sucessfully" });
   } catch (error) {
-    handleValidationError(error, res);
+    serverErrorHandler(error, res);
   }
 };
 
@@ -491,7 +484,7 @@ exports.UpdateUserDetails = async (req, res) => {
       if (isPasswordValid) {
         updateDetails.password = password;
       } else {
-        return res.status(400).json({ message: "Invalid password" });
+        return res.status(400).json({ error: "Invalid password" });
       }
     }
 
@@ -499,7 +492,7 @@ exports.UpdateUserDetails = async (req, res) => {
     if (avatarLocalPath) {
       const avatar = await uploadOnCloudinary(avatarLocalPath);
       if (!avatar) {
-        return res.status(400).json({ message: "Unable to upload avatar" });
+        return res.status(400).json({ error: "Unable to upload avatar" });
       }
       updateDetails.avatar = avatar.secure_url;
     }
@@ -517,8 +510,7 @@ exports.UpdateUserDetails = async (req, res) => {
       data: updateUser,
     });
   } catch (error) {
-    console.log(error);
-    handleValidationError(error, res);
+    serverErrorHandler(error, res);
   }
 };
 
@@ -530,16 +522,16 @@ exports.sendClubRequest = async (req, res) => {
 
     const postData = await post.findById(postId);
     if (!postData) {
-      return res.status(404).json({ message: "Post Not Found" });
+      return res.status(404).json({ error: "Post Not Found" });
     }
 
     if (postData.userId.equals(requesterId)) {
-      return res.status(404).json({ message: "You can not send ClubRequest to your own Post" });
+      return res.status(404).json({ error: "You can not send ClubRequest to your own Post" });
     }
     const recipientId = postData.userId;
 
     if (!requesterId || !recipientId) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ error: "User not found" });
     }
 
     const existingRequest = await ClubRequest.findOne({
@@ -549,7 +541,7 @@ exports.sendClubRequest = async (req, res) => {
     });
 
     if (existingRequest) {
-      return res.status(400).json({ message: "Club request already sent" });
+      return res.status(400).json({ error: "Club request already sent" });
     }
 
     const friendRequest = await ClubRequest.create({
@@ -561,10 +553,9 @@ exports.sendClubRequest = async (req, res) => {
     await friendRequest.save();
     return res.status(200).json({ message: "Club request sent" });
   } catch (error) {
-    console.log(error);
     return res
       .status(500)
-      .json({ message: "Error sending Club request", error });
+      .json({ error: "Error sending Club request", error });
   }
 };
 
@@ -575,7 +566,7 @@ exports.acceptClubRequest = async (req, res) => {
 
     const postData = await post.findById(postId);
     if (!postData) {
-      return res.status(404).json({ message: "Post Not Found" });
+      return res.status(404).json({ error: "Post Not Found" });
     }
 
     if (postData.userId.equals(requesterId)) {
@@ -586,7 +577,7 @@ exports.acceptClubRequest = async (req, res) => {
 
     const requester = await User.findById(requesterId);
     if (!requester) {
-      return res.status(404).json({ message: "Requester Not Found" });
+      return res.status(404).json({ error: "Requester Not Found" });
     }
 
     const pendingRequest = await ClubRequest.findOne({
@@ -596,11 +587,11 @@ exports.acceptClubRequest = async (req, res) => {
     });
 
     if (!pendingRequest) {
-      return res.status(400).json({ message: "Pending Request Not Found" });
+      return res.status(400).json({ error: "Pending Request Not Found" });
     }
 
     if (pendingRequest.status === "accepted") {
-      return res.status(400).json({ message: "Club request already accepted" });
+      return res.status(400).json({ error: "Club request already accepted" });
     }
 
    
@@ -623,8 +614,7 @@ exports.acceptClubRequest = async (req, res) => {
 
     return res.status(200).json({ message: "Club request accepted and added to Club chat" });
   } catch (error) {
-    console.log(error);
-    return new ErrorHandler("Error accepting club request", 500, res);
+    serverErrorHandler(error, res);
   }
 };
 
@@ -637,16 +627,16 @@ exports.declineClubRequest = async (req, res) => {
     //requesterId = "669defbe9dba6cc174c04f0a";
     const postData = await post.findById(postId);
     if (!postData) {
-      return res.status(404).json({ message: "Post Not Found" });
+      return res.status(404).json({ error: "Post Not Found" });
     }
 
     if (postData.userId.equals(requesterId)) {
-      return res.status(404).json({message:"You can not use your userId as requesterId to declined ClubRequest",});
+      return res.status(404).json({error:"You can not use your userId as requesterId to declined ClubRequest",});
     }
 
     const requester = await User.findById(requesterId);
     if (!requester) {
-      return res.status(404).json({ message: "requester Not Found" });
+      return res.status(404).json({ error: "requester Not Found" });
     }
 
     const pendingRequest = await ClubRequest.findOne({
@@ -657,9 +647,9 @@ exports.declineClubRequest = async (req, res) => {
 
     if (pendingRequest) {
       if (pendingRequest.status === "declined")
-        return res.status(400).json({ message: "Club request already declined" });
+        return res.status(400).json({ error: "Club request already declined" });
     } else {
-      return res.status(400).json({ message: "Pending Request Not Found" });
+      return res.status(400).json({ error: "Pending Request Not Found" });
     }
 
     pendingRequest.status = "declined";
@@ -667,7 +657,7 @@ exports.declineClubRequest = async (req, res) => {
     await pendingRequest.save();
     return res.status(200).json({ message: "club request declined" });
   } catch (error) {
-    return new ErrorHandler("Error declining friend request", 500, res);
+    serverErrorHandler(error, res);
     
   }
 };
@@ -694,8 +684,7 @@ exports.removeUserFromClub = async (req, res) => {
     return res.status(200).json({ message: 'User removed from chat room' });
 
   } catch (error) {
-    console.log(error);
-    return new ErrorHandler("Unable to logout. Server error!", 500, res);
+    serverErrorHandler(error, res);
   }
 };
 

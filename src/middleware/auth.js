@@ -1,7 +1,7 @@
 
 const jwt = require("jsonwebtoken");
 const User = require("../models/user.js")
-const ErrorHandler = require("../utils/ErrorHandler.js");
+const serverErrorHandler = require("../utils/serverErrorHandler.js");
 
 exports.verifyJWT = async (req, res, next) => {
     try {
@@ -17,8 +17,7 @@ exports.verifyJWT = async (req, res, next) => {
         req.User = user;
         next()   
     } catch (error) {
-        console.log(error);
-      new ErrorHandler("Unable to verify JWT", 500, res);
+      serverErrorHandler(error, res);
     }
   };
 
