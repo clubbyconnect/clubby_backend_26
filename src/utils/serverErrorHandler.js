@@ -15,6 +15,7 @@ const serverErrorHandler = (error, res) => {
     }));
     return new ErrorHandler(`${errors[0].message}`, 400, res);
   }
+  console.log(error);
   return new ErrorHandler("Server error. Something went wrong", 500, res);
 };
 
