@@ -71,7 +71,7 @@ const userSchema = new mongoose.Schema(
       minlength: [8, "Password should be at least 8 characters long"],
     },
     mobileNo: {
-      type: String,
+      type: Number,
       match: [
         /^[6-9]\d{9}$/,
         "Please enter a valid 10 digits Indian mobile number",

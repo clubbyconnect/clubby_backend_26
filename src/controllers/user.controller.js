@@ -58,23 +58,31 @@ const generateUniqueOtp = async () => {
   return otp;
 };
 const sendSms = async (phoneNumber, message) => {
-  const response = await axios.post(
-    fast2SMSurl,
-    {
-      route: "v3",
-      sender_id: "TXTIND",
-      message,
-      language: "english",
-      flash: 0,
-      numbers: phoneNumber,
-    },
-    {
-      headers: {
+  const fast2SMSurl = 'https://www.fast2sms.com/dev/bulkV2';
+  const fast2SMSapiKey = 'Zivh0PV87e5sDAcJ3ty6Q4gK9pXx21UjkWnHaSqTFoMfGIuRrYWtOBVjknIQTSeg2AJsv5FchYK4PN17';
+
+  try {
+    const response = await axios.get(fast2SMSurl, {
+      params: {
         authorization: fast2SMSapiKey,
-        "Content-Type": "application/json",
-      },
+        route: 'otp',
+        variables_values: message,
+        numbers: phoneNumber,
+        flash: '0'
+      }
+    });
+
+    console.log("SMS sent successfully:", response.data);
+    if (!response.data) {
+      console.error("Empty response data. Please check the Fast2SMS API documentation or contact support.");
     }
-  );
+  } catch (error) {
+    if (error.response) {
+      console.error("Error response from Fast2SMS:", error.response.data);
+    } else {
+      console.error("Error sending SMS:", error.message);
+    }
+  }
 };
 
 // controllers-----------------------------------
@@ -246,7 +254,7 @@ exports.sendOtp = async (req, res) => {
     }
 
     const user = await User.findOne({
-      $or: [{ email: contact }, { phoneNumber: contact }],
+      $or: [{ email: contact }, { mobileNo: contact }],
     });
 
     if (!user) {
@@ -474,7 +482,7 @@ exports.createPost = async (req, res) => {
 
 exports.UpdateUserDetails = async (req, res) => {
   try {
-    const { firstName, lastName, gender, password, email } = req.body;
+    const { firstName, lastName, gender, password, email , mobileNo} = req.body;
     const userId = req.User._id;
 
     let updateDetails = await User.findById(userId);
@@ -501,6 +509,7 @@ exports.UpdateUserDetails = async (req, res) => {
     if (lastName) updateDetails.lastName = lastName.trim();
     if (gender) updateDetails.gender = gender.trim();
     if (email) updateDetails.email = email.trim();
+    if (mobileNo) updateDetails.mobileNo = mobileNo.trim();
 
     updateDetails = await updateDetails.save();
     let updateUser = await User.findById(userId).select(`${excludeField}`);
