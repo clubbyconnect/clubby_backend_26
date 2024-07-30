@@ -1,11 +1,7 @@
 const { Server } = require("socket.io");
 const ChatRoom = require("../models/chatRoom.js");
 
-  //events in controller
-  //-->> 'userRemoved', { roomId, userId }
-
-function ChatSocket(server , app) {
-
+function ChatSocket(server, app) {
   const io = new Server(server, {
     cors: {
       origin: "*",
@@ -15,13 +11,11 @@ function ChatSocket(server , app) {
     pingTimeout: 60000, 
     pingInterval: 25000 
   });
-  app.set('io', io)
+  app.set('io', io);
   
-  //------------------------------ChatEvents---------------------------------------------
   io.on('connection', (socket) => {
 
-    //text chat
-  
+    // Text chat
     socket.on('joinRoom', async (roomId) => {
       socket.join(roomId);
       const room = await ChatRoom.findOne({ roomId });
@@ -33,7 +27,8 @@ function ChatSocket(server , app) {
       const message = {
         text,
         sender,
-        readBy: [] 
+        readBy: [],
+        type: 'text'
       };
 
       const updatedRoom = await ChatRoom.findOneAndUpdate(
@@ -63,25 +58,99 @@ function ChatSocket(server , app) {
       }
     });
 
-    // Audio call
+    // Audio Call & Video Call
     socket.on('joinRoom', (roomId) => {
       socket.join(roomId);
       console.log(`User joined room: ${roomId}`);
-  });
+    });
 
-  socket.on('offer', (offer, roomId) => {
+    socket.on('offer', (offer, roomId) => {
       socket.to(roomId).emit('offer', offer);
-  });
+    });
 
-  socket.on('answer', (answer, roomId) => {
+    socket.on('answer', (answer, roomId) => {
       socket.to(roomId).emit('answer', answer);
-  });
+    });
 
-  socket.on('ice-candidate', (candidate, roomId) => {
+    socket.on('ice-candidate', (candidate, roomId) => {
       socket.to(roomId).emit('ice-candidate', candidate);
-  });
+    });
 
-    //disconnect
+    // Call Logs
+    socket.on('startCall', async (data) => {
+      const { roomId, sender, callType } = data;
+      const message = {
+        text: `${callType} call started`,
+        sender,
+        readBy: [],
+        type: callType === 'audio' ? 'audio-call' : 'video-call'
+      };
+
+      const updatedRoom = await ChatRoom.findOneAndUpdate(
+        { roomId },
+        { $push: { messages: message } },
+        { new: true, useFindAndModify: false }
+      );
+
+      io.to(roomId).emit('callStarted', updatedRoom);
+    });
+
+    socket.on('endCall', async (data) => {
+      const { roomId, sender, callType } = data;
+      const message = {
+        text: `${callType} call ended`,
+        sender,
+        readBy: [],
+        type: callType === 'audio' ? 'audio-call' : 'video-call'
+      };
+
+      const updatedRoom = await ChatRoom.findOneAndUpdate(
+        { roomId },
+        { $push: { messages: message } },
+        { new: true, useFindAndModify: false }
+      );
+
+      io.to(roomId).emit('callEnded', updatedRoom);
+    });
+
+    // System Messages
+    socket.on('userJoined', async (data) => {
+      const { roomId, userId, userName } = data;
+      const message = {
+        text: `${userName} has joined the group`,
+        sender: userId,
+        readBy: [],
+        type: 'system'
+      };
+
+      const updatedRoom = await ChatRoom.findOneAndUpdate(
+        { roomId },
+        { $push: { messages: message } },
+        { new: true, useFindAndModify: false }
+      );
+
+      io.to(roomId).emit('userJoined', updatedRoom);
+    });
+
+    socket.on('userLeft', async (data) => {
+      const { roomId, userId, userName } = data;
+      const message = {
+        text: `${userName} has left the group`,
+        sender: userId,
+        readBy: [],
+        type: 'system'
+      };
+
+      const updatedRoom = await ChatRoom.findOneAndUpdate(
+        { roomId },
+        { $push: { messages: message } },
+        { new: true, useFindAndModify: false }
+      );
+
+      io.to(roomId).emit('userLeft', updatedRoom);
+    });
+
+    // Disconnect
     socket.on('disconnect', () => {});
   });
   return io;

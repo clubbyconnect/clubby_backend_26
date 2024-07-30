@@ -23,6 +23,11 @@ const messageSchema = new mongoose.Schema({
       type: Date,
     },
   }],
+  type: {
+    type: String,
+    enum: ['text', 'audio-call', 'video-call', 'system'],
+    default: 'text',
+  },
 }, { timestamps: true });
 
 const chatRoomSchema = new mongoose.Schema({
