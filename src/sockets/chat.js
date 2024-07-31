@@ -16,7 +16,7 @@ function ChatSocket(server, app) {
   io.on('connection', (socket) => {
 
     // Text chat
-    socket.on('joinRoom', async (roomId) => {
+    socket.on('join-Room-For-text-Mssg', async (roomId) => {
       socket.join(roomId);
       const room = await ChatRoom.findOne({ roomId });
       if (room) socket.emit('chatHistory', room);
@@ -59,7 +59,7 @@ function ChatSocket(server, app) {
     });
 
     // Audio Call & Video Call
-    socket.on('joinRoom', (roomId) => {
+    socket.on('join-Room-For-MediaCall', (roomId) => {
       socket.join(roomId);
       console.log(`User joined room: ${roomId}`);
     });

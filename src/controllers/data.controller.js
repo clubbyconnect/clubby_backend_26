@@ -1,8 +1,43 @@
 const serverErrorHandler = require("../utils/serverErrorHandler.js");
 const User = require("../models/user.js");
 const CategoryModel = require("../models/categorySchema.js");
+const admin = require('firebase-admin');
+const bodyParser = require('body-parser');
+
+const bodyParser = require('body-parser');
+
+// Parseing service account 
+const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
 
 // controllers-----------------------------------
+exports.sendPushNotification = async (req, res) => {
+  const { token, message, title } = req.body;
+  try {
+      const payload = {
+        notification: {
+          title,
+          body: message,
+        },
+      };
+    
+      admin.messaging().sendToDevice(token, payload)
+        .then(response => {
+          console.log('Successfully sent message:', response);
+          return res.status(200).json({message: "Successfully sent message", data : response});
+        })
+        .catch(error => {
+          console.log('Error sending message:', error);
+          return res.status(404).json({ error: "Error sending message" });
+        });
+  } catch (error) {
+    serverErrorHandler(error, res);
+  }
+};
+
 exports.fetchallcategory = async (req, res) => {
   try {
     const allcategory = await CategoryModel.aggregate([
@@ -34,12 +69,10 @@ exports.fetchallcategory = async (req, res) => {
           data: categoryNames,
         });
     } else {
-      return res.status(404).json({ message: "No top-level categories found" });
+      return res.status(404).json({ error: "No top-level categories found" });
     }
   } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Unable to fetch allcategory. Server error!" });
+    serverErrorHandler(error, res);
   }
 };
 
@@ -84,12 +117,10 @@ exports.fetchsubcategory = async (req, res) => {
       return res
         .status(404)
         .json({
-          message: "No subcategories found for the parent category name",
+          error: "No subcategories found for the parent category name",
         });
     }
   } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Unable to fetch subcategories. Server error!" });
+    serverErrorHandler(error, res);
   }
 };

@@ -19,7 +19,8 @@ const { signUp,
     UpdateUserDetails,
     removeUserFromClub
 } = require('../controllers/user.controller.js');
-const { fetchallcategory,
+const { sendPushNotification,
+    fetchallcategory,
     fetchsubcategory,
 } = require('../controllers/data.controller.js');
 
@@ -38,6 +39,7 @@ router.post("/createPost",verifyJWT,upload.single('productImage') ,createPost);
 router.post("/UpdateUserDetails",verifyJWT,upload.single('avatar') ,UpdateUserDetails);
 
 //App data
+router.post("/fetchallcategory",sendPushNotification);
 router.post("/fetchallcategory",verifyJWT,fetchallcategory);
 router.post("/fetchsubcategory",verifyJWT,fetchsubcategory);
 
