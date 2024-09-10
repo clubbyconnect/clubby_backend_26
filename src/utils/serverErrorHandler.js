@@ -7,6 +7,9 @@ class ErrorHandler extends Error {
   }
 }
 
+
+
+
 const serverErrorHandler = (error, res) => {
 
   if (error.name === 'ValidationError') {
