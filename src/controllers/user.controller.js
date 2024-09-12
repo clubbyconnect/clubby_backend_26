@@ -707,3 +707,4 @@ exports.removeUserFromClub = async (req, res) => {
   }
 };
 
+console.log("");
