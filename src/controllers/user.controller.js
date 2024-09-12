@@ -256,9 +256,6 @@ exports.sendOtp = async (req, res) => {
         .json({ error: "Email or phone number is required" });
     }
 
-    console.log("contact",contact);
-    
-
     const user = await User.findOne({
       $or: [{ email: contact }, { phoneNumber: contact }],
     });
