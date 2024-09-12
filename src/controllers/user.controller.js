@@ -25,7 +25,7 @@ const fb = new Facebook({
 
 //Exclude Fields in Response--------------------------------------------
 const excludeField =
-  "-password -refreshToken -UserRating -homelocationChangeCount -lastHomelocationChange -emailChangeCount -lastEmailChange -mobileNoChangeCount -lastMobileNoChange -googleAuthId -blockedUsers -reportCount -refreshToken";
+  "-password -refreshToken -UserRating -homelocationChangeCount -lastHomelocationChange -emailChangeCount -lastEmailChange -phoneNumberChangeCount -lastPhoneNumberChange -googleAuthId -blockedUsers -reportCount -refreshToken";
 
 //Custom Methods-----------------------------------
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -61,6 +61,9 @@ const sendSms = async (phoneNumber, message) => {
   const fast2SMSurl = 'https://www.fast2sms.com/dev/bulkV2';
   const fast2SMSapiKey = 'Zivh0PV87e5sDAcJ3ty6Q4gK9pXx21UjkWnHaSqTFoMfGIuRrYWtOBVjknIQTSeg2AJsv5FchYK4PN17';
 
+  console.log("phoneNumber" , phoneNumber);
+  console.log("message" , message);
+  
   try {
     const response = await axios.get(fast2SMSurl, {
       params: {
@@ -253,8 +256,11 @@ exports.sendOtp = async (req, res) => {
         .json({ error: "Email or phone number is required" });
     }
 
+    console.log("contact",contact);
+    
+
     const user = await User.findOne({
-      $or: [{ email: contact }, { mobileNo: contact }],
+      $or: [{ email: contact }, { phoneNumber: contact }],
     });
 
     if (!user) {
@@ -265,7 +271,7 @@ exports.sendOtp = async (req, res) => {
 
     const otpPayload = isEmail
       ? { email: contact, otp }
-      : { mobileNumber: contact, otp };
+      : { phoneNumber: contact, otp };
     await OTP.create(otpPayload);
 
     if (isEmail) {
@@ -273,7 +279,7 @@ exports.sendOtp = async (req, res) => {
         .status(200)
         .json({ success: true, message: "OTP Sent Successfully" });
     } else {
-      const message = `Your OTP is ${otp}`;
+      const message = otp;
       await sendSms(contact, message);
       return res
         .status(200)
@@ -287,14 +293,18 @@ exports.sendOtp = async (req, res) => {
 exports.verifyOtp = async (req, res) => {
   try {
     const { contact, otp } = req.body;
+    console.log("contact",contact);
+    console.log("otp",otp);
+    
     if (!contact || !otp) {
       return res.status(400).json({ error: "Contact and OTP are required" });
     }
 
-    const user = await User.findOne({
+    const user = await OTP.findOne({
       $or: [{ email: contact }, { phoneNumber: contact }],
     });
 
+  
     if (!user) {
       return res.status(400).json({ error: "Invalid OTP" });
     }
@@ -482,7 +492,7 @@ exports.createPost = async (req, res) => {
 
 exports.UpdateUserDetails = async (req, res) => {
   try {
-    const { firstName, lastName, gender, password, email , mobileNo} = req.body;
+    const { firstName, lastName, gender, password, email , phoneNumber} = req.body;
     const userId = req.User._id;
 
     let updateDetails = await User.findById(userId);
@@ -509,7 +519,7 @@ exports.UpdateUserDetails = async (req, res) => {
     if (lastName) updateDetails.lastName = lastName.trim();
     if (gender) updateDetails.gender = gender.trim();
     if (email) updateDetails.email = email.trim();
-    if (mobileNo) updateDetails.mobileNo = mobileNo.trim();
+    if (phoneNumber) updateDetails.phoneNumber = phoneNumber.trim();
 
     updateDetails = await updateDetails.save();
     let updateUser = await User.findById(userId).select(`${excludeField}`);
