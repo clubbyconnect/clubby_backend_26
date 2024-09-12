@@ -70,6 +70,7 @@ exports.fetchallcategory = async (req, res) => {
       },
     ]);
 
+console.log("allcategory????????????",allcategory);
 
 
     if (allcategory && allcategory.length > 0) {
@@ -137,53 +138,3 @@ exports.fetchsubcategory = async (req, res) => {
     serverErrorHandler(error, res);
   }
 };
-
-
-// exports.fetchsubcategory = async (req, res) => {
-//   try {
-//     const { parentCategoryName } = req.body;
-
-//     const subcategories = await CategoryModel.aggregate([
-//       {
-//         $match: {
-//           name: parentCategoryName,
-//         },
-//       },
-//       {
-//         $lookup: {
-//           from: "categories",
-//           localField: "subcategories",
-//           foreignField: "_id",
-//           as: "subcategories",
-//         },
-//       },
-//       {
-//         $unwind: "$subcategories",
-//       },
-//       {
-//         $project: {
-//           _id: 0,
-//           name: "$subcategories.name",
-//         },
-//       },
-//     ]);
-
-//     if (subcategories && subcategories.length > 0) {
-//       const subcategoryNames = subcategories.map((category) => category.name);
-//       return res
-//         .status(200)
-//         .json({
-//           message: "Subcategories fetched successfully",
-//           data: subcategoryNames,
-//         });
-//     } else {
-//       return res
-//         .status(404)
-//         .json({
-//           error: "No subcategories found for the parent category name",
-//         });
-//     }
-//   } catch (error) {
-//     serverErrorHandler(error, res);
-//   }
-// };

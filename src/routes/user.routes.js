@@ -39,7 +39,7 @@ router.post("/createPost",verifyJWT,upload.single('productImage') ,createPost);
 router.post("/UpdateUserDetails",verifyJWT,upload.single('avatar') ,UpdateUserDetails);
 
 //App data
-router.post("/fetchallcategory",sendPushNotification);
+//router.post("/fetchallcategory",sendPushNotification);
 router.post("/fetchallcategory",verifyJWT,fetchallcategory);
 router.post("/fetchsubcategory",verifyJWT,fetchsubcategory);
 
