@@ -190,40 +190,53 @@ userSchema.methods.generateRefreshToken = function () {
 
 //spam security Restrictions Functions
 userSchema.pre('save', async function (next) {
-
   if (this.isNew) return next();
   
   const now = new Date();
   const minChangeInterval = 30 * 24 * 60 * 60 * 1000;
+  const errors = {};  // Object to hold validation errors
 
-  if (this.isModified('email')) {
-    if (this.lastEmailChange && now - this.lastEmailChange < minChangeInterval) {
-      const err = new Error('You cannot change your email more than once in 30 days.');
-      next(err);
-    } else {
-      this.emailChangeCount += 1;
-      this.lastEmailChange = now;
+  try {
+    if (this.isModified('email')) {
+      if (this.lastEmailChange && now - this.lastEmailChange < minChangeInterval) {
+        errors.email = 'You cannot change your email more than once in 30 days.';
+      } else {
+        this.emailChangeCount += 1;
+        this.lastEmailChange = now;
+      }
     }
-  }
-  if (this.isModified('homelocation')) {
-    if (this.lastHomelocationChange && now - this.lastHomelocationChange < minChangeInterval) {
-      const err = new Error('You cannot change your homelocation more than once in 30 days.');
-      next(err);
-    } else {
-      this.homelocationChangeCount += 1;
-      this.lastHomelocationChange = now;
+    if (this.isModified('homelocation')) {
+      if (this.lastHomelocationChange && now - this.lastHomelocationChange < minChangeInterval) {
+        errors.homelocation = 'You cannot change your homelocation more than once in 30 days.';
+      } else {
+        this.homelocationChangeCount += 1;
+        this.lastHomelocationChange = now;
+      }
     }
-  }
-  if (this.isModified('phoneNumber')) {
-    if (this.lastPhoneNumberChange && now - this.lastPhoneNumberChange < minChangeInterval) {
-      const err = new Error('You cannot change your PhoneNumber more than once in 30 days.');
-      next(err);
-    } else {
-      this.phoneNumberChangeCount += 1;
-      this.lastPhoneNumberChange = now;
+    if (this.isModified('phoneNumber')) {
+      if (this.lastPhoneNumberChange && now - this.lastPhoneNumberChange < minChangeInterval) {
+        errors.phoneNumber = 'You cannot change your phone number more than once in 30 days.';
+      } else {
+        this.phoneNumberChangeCount += 1;
+        this.lastPhoneNumberChange = now;
+      }
     }
+
+    if (Object.keys(errors).length > 0) {
+      const validationError = new mongoose.Error.ValidationError(this);
+      Object.keys(errors).forEach((field) => {
+        validationError.errors[field] = new mongoose.Error.ValidatorError({
+          path: field,
+          message: errors[field],
+        });
+      });
+      return next(validationError);
+    }
+
+    next();
+  } catch (err) {
+    next(err);
   }
-  next();
 });
 
 const User = mongoose.model("User", userSchema);

@@ -2,8 +2,8 @@ const serverErrorHandler = require("../utils/serverErrorHandler.js");
 const User = require("../models/user.js");
 const CategoryModel = require("../models/categorySchema.js");
 const admin = require('firebase-admin');
-process.env.REFRESH_TOKEN_SECRET
 
+//Firebase-setup
 const serviceAccount = {
   type : process.env.type,
   project_id : process.env.project_id,
@@ -17,12 +17,14 @@ const serviceAccount = {
   client_x509_cert_url : process.env.client_x509_cert_url,
   universe_domain : process.env.universe_domain
 }
-
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
+
+
 // controllers-----------------------------------
+
 exports.sendPushNotification = async (req, res) => {
   const { token, message, title } = req.body;
   try {
@@ -35,11 +37,9 @@ exports.sendPushNotification = async (req, res) => {
     
       admin.messaging().sendToDevice(token, payload)
         .then(response => {
-          console.log('Successfully sent message:', response);
           return res.status(200).json({message: "Successfully sent message", data : response});
         })
         .catch(error => {
-          console.log('Error sending message:', error);
           return res.status(404).json({ error: "Error sending message" });
         });
   } catch (error) {
@@ -69,14 +69,18 @@ exports.fetchallcategory = async (req, res) => {
         },
       },
     ]);
+
+
+
     if (allcategory && allcategory.length > 0) {
       const categoryNames = allcategory.map((category) => category.name);
-      return res
-        .status(200)
-        .json({
+      
+      
+      return res.status(200).json({
           message: "Top-level categories fetched successfully",
           data: categoryNames,
         });
+
     } else {
       return res.status(404).json({ error: "No top-level categories found" });
     }
@@ -133,3 +137,53 @@ exports.fetchsubcategory = async (req, res) => {
     serverErrorHandler(error, res);
   }
 };
+
+
+// exports.fetchsubcategory = async (req, res) => {
+//   try {
+//     const { parentCategoryName } = req.body;
+
+//     const subcategories = await CategoryModel.aggregate([
+//       {
+//         $match: {
+//           name: parentCategoryName,
+//         },
+//       },
+//       {
+//         $lookup: {
+//           from: "categories",
+//           localField: "subcategories",
+//           foreignField: "_id",
+//           as: "subcategories",
+//         },
+//       },
+//       {
+//         $unwind: "$subcategories",
+//       },
+//       {
+//         $project: {
+//           _id: 0,
+//           name: "$subcategories.name",
+//         },
+//       },
+//     ]);
+
+//     if (subcategories && subcategories.length > 0) {
+//       const subcategoryNames = subcategories.map((category) => category.name);
+//       return res
+//         .status(200)
+//         .json({
+//           message: "Subcategories fetched successfully",
+//           data: subcategoryNames,
+//         });
+//     } else {
+//       return res
+//         .status(404)
+//         .json({
+//           error: "No subcategories found for the parent category name",
+//         });
+//     }
+//   } catch (error) {
+//     serverErrorHandler(error, res);
+//   }
+// };

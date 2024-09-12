@@ -61,7 +61,6 @@ function ChatSocket(server, app) {
     // Audio Call & Video Call
     socket.on('join-Room-For-MediaCall', (roomId) => {
       socket.join(roomId);
-      console.log(`User joined room: ${roomId}`);
     });
 
     socket.on('offer', (offer, roomId) => {

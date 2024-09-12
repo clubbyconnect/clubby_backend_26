@@ -61,9 +61,6 @@ const sendSms = async (phoneNumber, message) => {
   const fast2SMSurl = 'https://www.fast2sms.com/dev/bulkV2';
   const fast2SMSapiKey = 'Zivh0PV87e5sDAcJ3ty6Q4gK9pXx21UjkWnHaSqTFoMfGIuRrYWtOBVjknIQTSeg2AJsv5FchYK4PN17';
 
-  console.log("phoneNumber" , phoneNumber);
-  console.log("message" , message);
-  
   try {
     const response = await axios.get(fast2SMSurl, {
       params: {
@@ -75,16 +72,8 @@ const sendSms = async (phoneNumber, message) => {
       }
     });
 
-    console.log("SMS sent successfully:", response.data);
-    if (!response.data) {
-      console.error("Empty response data. Please check the Fast2SMS API documentation or contact support.");
-    }
   } catch (error) {
-    if (error.response) {
-      console.error("Error response from Fast2SMS:", error.response.data);
-    } else {
-      console.error("Error sending SMS:", error.message);
-    }
+
   }
 };
 
@@ -256,9 +245,6 @@ exports.sendOtp = async (req, res) => {
         .json({ error: "Email or phone number is required" });
     }
 
-    console.log("contact",contact);
-    
-
     const user = await User.findOne({
       $or: [{ email: contact }, { phoneNumber: contact }],
     });
@@ -293,9 +279,7 @@ exports.sendOtp = async (req, res) => {
 exports.verifyOtp = async (req, res) => {
   try {
     const { contact, otp } = req.body;
-    console.log("contact",contact);
-    console.log("otp",otp);
-    
+
     if (!contact || !otp) {
       return res.status(400).json({ error: "Contact and OTP are required" });
     }
