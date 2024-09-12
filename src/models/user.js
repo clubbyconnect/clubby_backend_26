@@ -70,23 +70,23 @@ const userSchema = new mongoose.Schema(
       required: [true, "Password is required"],
       minlength: [8, "Password should be at least 8 characters long"],
     },
-    mobileNo: {
+    phoneNumber: {
       type: Number,
       match: [
         /^[6-9]\d{9}$/,
-        "Please enter a valid 10 digits Indian mobile number",
+        "Please enter a valid 10 digits Indian  phoneNumber",
       ],
       default : null
     },
-    mobileNoVerified: {
+    phoneNumberVerified: {
       type: Boolean,
       default: false,
     },
-    mobileNoChangeCount: {
+    phoneNumberChangeCount: {
       type: Number,
       default: 0
     },
-    lastMobileNoChange: {
+    lastPhoneNumberChange: {
       type: Date,
       default: null
     },
@@ -214,13 +214,13 @@ userSchema.pre('save', async function (next) {
       this.lastHomelocationChange = now;
     }
   }
-  if (this.isModified('mobileNo')) {
-    if (this.lastMobileNoChange && now - this.lastMobileNoChange < minChangeInterval) {
-      const err = new Error('You cannot change your mobileNo more than once in 30 days.');
+  if (this.isModified('phoneNumber')) {
+    if (this.lastPhoneNumberChange && now - this.lastPhoneNumberChange < minChangeInterval) {
+      const err = new Error('You cannot change your PhoneNumber more than once in 30 days.');
       next(err);
     } else {
-      this.mobileNoChangeCount += 1;
-      this.lastMobileNoChange = now;
+      this.phoneNumberChangeCount += 1;
+      this.lastPhoneNumberChange = now;
     }
   }
   next();

@@ -10,11 +10,11 @@ const OTPSchema = new mongoose.Schema({
         "Please enter a valid email address",
       ]
 	},
-    mobileNumber: {
+    phoneNumber: {
 		type: String,
 		match: [
 			/^[6-9]\d{9}$/,
-			"Please enter a valid 10 digits Indian mobile number",
+			"Please enter a valid 10 digits Indian phoneNumber",
 		  ],
 	},
 	otp: {
@@ -44,7 +44,7 @@ async function sendVerificationEmail(email, otp) {
 
 OTPSchema.pre("save", async function (next) {
 
-	if (!this.mobileNumber) {
+	if (!this.phoneNumber) {
 		if (this.isNew) {
 			await sendVerificationEmail(this.email, this.otp);
 		}
