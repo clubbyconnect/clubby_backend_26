@@ -516,6 +516,14 @@ exports.UpdateUserDetails = async (req, res) => {
     if (gender) updateDetails.gender = gender.trim();
     if (email) updateDetails.email = email.trim();
     if (phoneNumber) updateDetails.phoneNumber = phoneNumber.trim();
+
+    if (birthdate) {
+      const parsedBirthdate = new Date(birthdate);
+      if (parsedBirthdate > new Date()) {
+        return res.status(400).json({ error: "Birthdate cannot be in the future" });
+      }
+      updateDetails.birthdate = parsedBirthdate;
+    }
    
     updateDetails = await updateDetails.save();
     let updateUser = await User.findById(userId).select(`${excludeField}`);

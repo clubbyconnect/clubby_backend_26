@@ -28,6 +28,16 @@ const userSchema = new mongoose.Schema(
       match: [/^[a-zA-Z0-9._]+$/, "Username can only contain letters, numbers, and underscores"],
       default: null,
     },
+    birthdate: {
+      type: Date,
+      validate: {
+        validator: function(value) {
+          return value <= new Date();
+        },
+        message: "Birthdate cannot be in the future",
+      },
+      default: null,
+    },
     gender : {
       type: String,
       enum: {
