@@ -479,7 +479,7 @@ exports.createPost = async (req, res) => {
 
 exports.UpdateUserDetails = async (req, res) => {
   try {
-    const { firstName, lastName, gender, password, email , phoneNumber} = req.body;
+    const { firstName, lastName, gender, password, email , phoneNumber ,userName} = req.body;
     const userId = req.User._id;
 
     let updateDetails = await User.findById(userId);
@@ -502,14 +502,21 @@ exports.UpdateUserDetails = async (req, res) => {
       updateDetails.avatar = avatar.secure_url;
     }
 
+    if (userName) {
+      isUserNameExist = await User.findOne({userName});
+
+      if (isUserNameExist) {
+        return res.status(404).json({ error: "userName Already exist" });
+      }
+      updateDetails.userName = userName.trim();
+    }
+
     if (firstName) updateDetails.firstName = firstName.trim();
     if (lastName) updateDetails.lastName = lastName.trim();
     if (gender) updateDetails.gender = gender.trim();
     if (email) updateDetails.email = email.trim();
     if (phoneNumber) updateDetails.phoneNumber = phoneNumber.trim();
-    if (phoneNumber) updateDetails.phoneNumber = phoneNumber.trim();
-    if (phoneNumber) updateDetails.phoneNumber = phoneNumber.trim();
-
+   
     updateDetails = await updateDetails.save();
     let updateUser = await User.findById(userId).select(`${excludeField}`);
 
