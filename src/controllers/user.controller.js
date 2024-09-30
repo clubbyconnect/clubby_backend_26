@@ -125,10 +125,13 @@ exports.signUp = async (req, res) => {
 exports.googleAuth = async (req, res) => {
   try {
     const { token } = req.body;
+    
     const result = await client.verifyIdToken({
       idToken: token,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
+
+    console.log(result);
 
     const googleAuthId = result.payload.sub;
     const email = result.payload.email;
@@ -503,6 +506,8 @@ exports.UpdateUserDetails = async (req, res) => {
     if (lastName) updateDetails.lastName = lastName.trim();
     if (gender) updateDetails.gender = gender.trim();
     if (email) updateDetails.email = email.trim();
+    if (phoneNumber) updateDetails.phoneNumber = phoneNumber.trim();
+    if (phoneNumber) updateDetails.phoneNumber = phoneNumber.trim();
     if (phoneNumber) updateDetails.phoneNumber = phoneNumber.trim();
 
     updateDetails = await updateDetails.save();

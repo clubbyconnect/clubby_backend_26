@@ -20,6 +20,14 @@ const userSchema = new mongoose.Schema(
       match: [/^[a-zA-Z\s]+$/, "First name can only contain letters and spaces"],
       default: null,
     },
+    userName: {
+      type: String,
+      trim: true,
+      minlength: [3, "Username must be at least 3 characters long"],
+      maxlength: [30, "Username cannot exceed 30 characters"],
+      match: [/^[a-zA-Z0-9._]+$/, "Username can only contain letters, numbers, and underscores"],
+      unique: true, 
+    },
     gender : {
       type: String,
       enum: {
