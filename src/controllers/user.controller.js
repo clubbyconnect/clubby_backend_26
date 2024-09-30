@@ -479,7 +479,7 @@ exports.createPost = async (req, res) => {
 
 exports.UpdateUserDetails = async (req, res) => {
   try {
-    const { firstName, lastName, gender, password, email , phoneNumber ,userName} = req.body;
+    const { firstName, lastName, gender, password, email , phoneNumber ,userName ,birthdate} = req.body;
     const userId = req.User._id;
 
     let updateDetails = await User.findById(userId);
