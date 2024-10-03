@@ -248,9 +248,10 @@ exports.sendOtp = async (req, res) => {
         .json({ error: "Email or phone number is required" });
     }
 
-    const user = await User.findOne({
-      $or: [{ email: contact }, { phoneNumber: contact }],
-    });
+    const Email = /\S+@\S+\.\S+/.test(contact);  
+    const userQuery = Email ? { email: contact } : { phoneNumber: contact };
+
+    const user = await User.findOne(userQuery);
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
