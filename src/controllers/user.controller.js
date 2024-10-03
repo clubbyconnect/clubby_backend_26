@@ -343,9 +343,12 @@ exports.resetPassword = async (req, res) => {
         .status(400)
         .json({ error: "Email or phone number is required" });
     }
-    const user = await User.findOne({
-      $or: [{ email: contact }, { phoneNumber: contact }],
-    });
+
+    const isEmail = /\S+@\S+\.\S+/.test(contact);
+    
+    const user = await User.findOne(isEmail 
+      ? { email: contact } 
+      : { phoneNumber: contact });
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
@@ -361,6 +364,7 @@ exports.resetPassword = async (req, res) => {
     if (newPassword !== confirmPassword) {
       return res.status(400).json({ error: "Passwords do not match" });
     }
+
     user.password = newPassword;
     await user.save({ validateBeforeSave: false });
     return res.status(200).json({ message: "Password changed successfully" });
@@ -484,15 +488,6 @@ exports.UpdateUserDetails = async (req, res) => {
     const userId = req.User._id;
 
     let updateDetails = await User.findById(userId);
-
-    if (password) {
-      const isPasswordValid = await updateDetails.isPasswordCorrect(password);
-      if (isPasswordValid) {
-        updateDetails.password = password;
-      } else {
-        return res.status(400).json({ error: "Invalid password" });
-      }
-    }
 
     const avatarLocalPath = req.file?.path;
     if (avatarLocalPath) {
