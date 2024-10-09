@@ -10,7 +10,7 @@ const OTP = require("../models/otp.js");
 const post = require("../models/post.js");
 const CategoryModel = require("../models/categorySchema.js");
 const ClubRequest = require("../models/clubRequest.js");
-const ChatRoom = require("../models/chatRoom.js")
+const ChatRoom = require("../models/chatRoom.js");
 
 // Fast2SMS Configuration-----------------------------------
 const fast2SMSapiKey = process.env.FAST2SMS_API_KEY;
@@ -58,23 +58,21 @@ const generateUniqueOtp = async () => {
   return otp;
 };
 const sendSms = async (phoneNumber, message) => {
-  const fast2SMSurl = 'https://www.fast2sms.com/dev/bulkV2';
-  const fast2SMSapiKey = 'Zivh0PV87e5sDAcJ3ty6Q4gK9pXx21UjkWnHaSqTFoMfGIuRrYWtOBVjknIQTSeg2AJsv5FchYK4PN17';
+  const fast2SMSurl = "https://www.fast2sms.com/dev/bulkV2";
+  const fast2SMSapiKey =
+    "Zivh0PV87e5sDAcJ3ty6Q4gK9pXx21UjkWnHaSqTFoMfGIuRrYWtOBVjknIQTSeg2AJsv5FchYK4PN17";
 
   try {
     const response = await axios.get(fast2SMSurl, {
       params: {
         authorization: fast2SMSapiKey,
-        route: 'otp',
+        route: "otp",
         variables_values: message,
         numbers: phoneNumber,
-        flash: '0'
-      }
+        flash: "0",
+      },
     });
-
-  } catch (error) {
-
-  }
+  } catch (error) {}
 };
 
 // controllers-----------------------------------
@@ -125,7 +123,7 @@ exports.signUp = async (req, res) => {
 exports.googleAuth = async (req, res) => {
   try {
     const { token } = req.body;
-    
+
     const result = await client.verifyIdToken({
       idToken: token,
       audience: process.env.GOOGLE_CLIENT_ID,
@@ -142,8 +140,12 @@ exports.googleAuth = async (req, res) => {
       user = await User.findById(newUser._id).select("-password -refreshToken");
     }
 
-    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
-    const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+      user._id
+    );
+    const loggedInUser = await User.findById(user._id).select(
+      "-password -refreshToken"
+    );
 
     const options = {
       httpOnly: true,
@@ -161,7 +163,6 @@ exports.googleAuth = async (req, res) => {
         data: loggedInUser,
       });
   } catch (error) {
-  
     serverErrorHandler(error, res);
   }
 };
@@ -173,8 +174,6 @@ exports.appleAuth = async (req, res) => {
       audience: process.env.APPLE_CLIENT_ID,
       ignoreExpiration: true,
     });
-
-  
   } catch (error) {
     serverErrorHandler(error, res);
   }
@@ -248,7 +247,7 @@ exports.sendOtp = async (req, res) => {
         .json({ error: "Email or phone number is required" });
     }
 
-    const Email = /\S+@\S+\.\S+/.test(contact);  
+    const Email = /\S+@\S+\.\S+/.test(contact);
     const userQuery = Email ? { email: contact } : { phoneNumber: contact };
 
     const user = await User.findOne(userQuery);
@@ -280,6 +279,27 @@ exports.sendOtp = async (req, res) => {
   }
 };
 
+exports.sendOtpToVerifyMobileNumber = async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    console.log("phoneNumber",phoneNumber);
+    
+
+    const otp = await generateUniqueOtp();
+
+    const otpPayload = { phoneNumber, otp };
+    await OTP.create(otpPayload);
+
+    const message = otp;
+    await sendSms(phoneNumber, message);
+    return res
+      .status(200)
+      .json({ success: true, message: "OTP Sent Successfully" });
+  } catch (error) {
+    serverErrorHandler(error, res);
+  }
+};
+
 exports.verifyOtp = async (req, res) => {
   try {
     const { contact, otp } = req.body;
@@ -292,7 +312,6 @@ exports.verifyOtp = async (req, res) => {
       $or: [{ email: contact }, { phoneNumber: contact }],
     });
 
-  
     if (!user) {
       return res.status(400).json({ error: "Invalid OTP" });
     }
@@ -315,7 +334,6 @@ exports.verifyOtp = async (req, res) => {
 
 exports.logout = async (req, res) => {
   try {
-
     await User.findByIdAndUpdate(
       req.User._id,
       { $unset: { refreshToken: 1 } },
@@ -345,10 +363,10 @@ exports.resetPassword = async (req, res) => {
     }
 
     const isEmail = /\S+@\S+\.\S+/.test(contact);
-    
-    const user = await User.findOne(isEmail 
-      ? { email: contact } 
-      : { phoneNumber: contact });
+
+    const user = await User.findOne(
+      isEmail ? { email: contact } : { phoneNumber: contact }
+    );
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
@@ -382,9 +400,7 @@ exports.uploadAvatar = async (req, res) => {
 
     const avatar = await uploadOnCloudinary(avatarLocalPath);
     if (!avatar) {
-      return res
-        .status(500)
-        .json({ error: "Unable to upload profile photo" });
+      return res.status(500).json({ error: "Unable to upload profile photo" });
     }
 
     const user = await User.findByIdAndUpdate(
@@ -442,7 +458,6 @@ exports.createPost = async (req, res) => {
       return res.status(400).json({ error: "Product Image is requierd" });
 
     const productImage = await uploadOnCloudinary(productImageLocalPath);
-  
 
     const categoryid = await CategoryModel.findOne({ name: category });
     const subcategoryid = await CategoryModel.findOne({ name: category });
@@ -484,7 +499,16 @@ exports.createPost = async (req, res) => {
 
 exports.UpdateUserDetails = async (req, res) => {
   try {
-    const { firstName, lastName, gender, password, email , phoneNumber ,userName ,birthdate} = req.body;
+    const {
+      firstName,
+      lastName,
+      gender,
+      password,
+      email,
+      phoneNumber,
+      userName,
+      birthdate,
+    } = req.body;
     const userId = req.User._id;
 
     let updateDetails = await User.findById(userId);
@@ -499,7 +523,7 @@ exports.UpdateUserDetails = async (req, res) => {
     }
 
     if (userName) {
-      isUserNameExist = await User.findOne({userName});
+      isUserNameExist = await User.findOne({ userName });
 
       if (isUserNameExist) {
         return res.status(404).json({ error: "userName Already exist" });
@@ -516,11 +540,13 @@ exports.UpdateUserDetails = async (req, res) => {
     if (birthdate) {
       const parsedBirthdate = new Date(birthdate);
       if (parsedBirthdate > new Date()) {
-        return res.status(400).json({ error: "Birthdate cannot be in the future" });
+        return res
+          .status(400)
+          .json({ error: "Birthdate cannot be in the future" });
       }
       updateDetails.birthdate = parsedBirthdate;
     }
-   
+
     updateDetails = await updateDetails.save();
     let updateUser = await User.findById(userId).select(`${excludeField}`);
 
@@ -536,7 +562,7 @@ exports.UpdateUserDetails = async (req, res) => {
 //------------------------------------------User Request---------------------------------------------
 exports.sendClubRequest = async (req, res) => {
   try {
-    const { postId } = req.body
+    const { postId } = req.body;
     const requesterId = req.User._id;
 
     const postData = await post.findById(postId);
@@ -545,7 +571,9 @@ exports.sendClubRequest = async (req, res) => {
     }
 
     if (postData.userId.equals(requesterId)) {
-      return res.status(404).json({ error: "You can not send ClubRequest to your own Post" });
+      return res
+        .status(404)
+        .json({ error: "You can not send ClubRequest to your own Post" });
     }
     const recipientId = postData.userId;
 
@@ -572,9 +600,7 @@ exports.sendClubRequest = async (req, res) => {
     await friendRequest.save();
     return res.status(200).json({ message: "Club request sent" });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ error: "Error sending Club request", error });
+    return res.status(500).json({ error: "Error sending Club request", error });
   }
 };
 
@@ -590,7 +616,8 @@ exports.acceptClubRequest = async (req, res) => {
 
     if (postData.userId.equals(requesterId)) {
       return res.status(400).json({
-        message: "You cannot use your userId as requesterId to Accept ClubRequest",
+        message:
+          "You cannot use your userId as requesterId to Accept ClubRequest",
       });
     }
 
@@ -613,7 +640,6 @@ exports.acceptClubRequest = async (req, res) => {
       return res.status(400).json({ error: "Club request already accepted" });
     }
 
-   
     let group = await ChatRoom.findOne({ roomId: postData._id });
     if (!group) {
       group = new ChatRoom({
@@ -628,10 +654,12 @@ exports.acceptClubRequest = async (req, res) => {
     pendingRequest.status = "accepted";
     pendingRequest.updatedAt = Date.now();
     await pendingRequest.save();
-    
+
     await group.save();
 
-    return res.status(200).json({ message: "Club request accepted and added to Club chat" });
+    return res
+      .status(200)
+      .json({ message: "Club request accepted and added to Club chat" });
   } catch (error) {
     serverErrorHandler(error, res);
   }
@@ -650,7 +678,12 @@ exports.declineClubRequest = async (req, res) => {
     }
 
     if (postData.userId.equals(requesterId)) {
-      return res.status(404).json({error:"You can not use your userId as requesterId to declined ClubRequest",});
+      return res
+        .status(404)
+        .json({
+          error:
+            "You can not use your userId as requesterId to declined ClubRequest",
+        });
     }
 
     const requester = await User.findById(requesterId);
@@ -677,33 +710,29 @@ exports.declineClubRequest = async (req, res) => {
     return res.status(200).json({ message: "club request declined" });
   } catch (error) {
     serverErrorHandler(error, res);
-    
   }
 };
 
 exports.removeUserFromClub = async (req, res) => {
   try {
-   
     const { roomId, userId } = req.body;
 
-      const room = await ChatRoom.findOne({ roomId });
-      if (!room) {
-        return res.status(404).json({ error: 'Chat room not found' });
-      }
-  
-      if (!room.members.includes(userId)) {
-        return res.status(400).json({ error: 'User not in chat room' });
-      }
-  
-      // room.members.pull(userId);
-      // await room.save();
+    const room = await ChatRoom.findOne({ roomId });
+    if (!room) {
+      return res.status(404).json({ error: "Chat room not found" });
+    }
 
-    req.app.get('io').to(roomId).emit('userRemoved', { roomId, userId });
+    if (!room.members.includes(userId)) {
+      return res.status(400).json({ error: "User not in chat room" });
+    }
 
-    return res.status(200).json({ message: 'User removed from chat room' });
+    // room.members.pull(userId);
+    // await room.save();
 
+    req.app.get("io").to(roomId).emit("userRemoved", { roomId, userId });
+
+    return res.status(200).json({ message: "User removed from chat room" });
   } catch (error) {
     serverErrorHandler(error, res);
   }
 };
-
