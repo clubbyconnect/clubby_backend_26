@@ -17,7 +17,8 @@ const { signUp,
     acceptClubRequest,
     declineClubRequest,
     UpdateUserDetails,
-    removeUserFromClub
+    removeUserFromClub,
+    sendOtpToVerifyMobileNumber
 } = require('../controllers/user.controller.js');
 const { sendPushNotification,
     fetchallcategory,
@@ -31,6 +32,7 @@ router.post("/appleAuth",appleAuth);
 router.post("/facebookAuth",facebookAuth);
 router.post("/signIn",signIn); 
 router.post("/sendOtp",sendOtp);
+router.post("/sendOtpToVerifyMobileNumber",sendOtpToVerifyMobileNumber);
 router.post("/verifyOtp",verifyOtp);
 router.post("/logout",verifyJWT,logout);
 router.post("/resetPassword",resetPassword);
@@ -48,5 +50,6 @@ router.post("/sendClubRequest",verifyJWT,sendClubRequest);
 router.post("/acceptClubRequest",verifyJWT,acceptClubRequest);
 router.post("/declineClubRequest",verifyJWT,declineClubRequest);
 router.post("/removeUserFromClub",verifyJWT,removeUserFromClub);
+
 
 module.exports = router;
