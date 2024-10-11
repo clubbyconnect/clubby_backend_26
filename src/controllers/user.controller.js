@@ -284,7 +284,6 @@ exports.sendOtpToVerifyMobileNumber = async (req, res) => {
     const { phoneNumber } = req.body;
     console.log("phoneNumber",phoneNumber);
     
-
     const otp = await generateUniqueOtp();
 
     const otpPayload = { phoneNumber, otp };
