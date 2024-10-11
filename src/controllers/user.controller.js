@@ -282,8 +282,18 @@ exports.sendOtp = async (req, res) => {
 exports.sendOtpToVerifyMobileNumber = async (req, res) => {
   try {
     const { phoneNumber } = req.body;
-    console.log("phoneNumber",phoneNumber);
-    
+
+    const existingUser = await User.findOne({ phoneNumber });
+    if(existingUser){
+      return res.status(200).json({ message: "Phone number already exist" });
+    }
+
+    const existingOtp = await OTP.findOne({ phoneNumber });
+
+    if (existingOtp) {
+      return res.status(400).json({ error: "OTP already sent pls try after some time" });
+    }
+
     const otp = await generateUniqueOtp();
 
     const otpPayload = { phoneNumber, otp };
@@ -293,7 +303,43 @@ exports.sendOtpToVerifyMobileNumber = async (req, res) => {
     await sendSms(phoneNumber, message);
     return res
       .status(200)
-      .json({ success: true, message: "OTP Sent Successfully" });
+      .json({ message: "OTP Sent Successfully" });
+  } catch (error) {
+    serverErrorHandler(error, res);
+  }
+};
+
+exports.verifyOtpToVerfiyMobileNumber = async (req, res) => {
+  try {
+    const { phoneNumber, otp } = req.body;
+
+    if (!contact || !otp) {
+      return res.status(400).json({ error: "Contact and OTP are required" });
+    }
+
+    const user = await OTP.findOne({ phoneNumber });
+
+    if (!user) {
+      return res.status(400).json({ error: "OTP expierd" });
+    }
+
+    const otpRecord = await OTP.findOne({ phoneNumber, otp });
+
+    if (otpRecord) {
+      const existingUser = await User.findOne({ phoneNumber });
+      if(existingUser){
+        return res.status(200).json({ message: "Phone number already exist" });
+      }else{
+        const userId = req.User._id;
+        let updateDetails = await User.findById(userId);
+        if (phoneNumber) updateDetails.phoneNumber = phoneNumber.trim();
+        updateDetails = await updateDetails.save();
+      }
+
+      return res.status(200).json({ message: "OTP verified successfully" });
+    } else {
+      return res.status(400).json({ error: "Invalid OTP" });
+    }
   } catch (error) {
     serverErrorHandler(error, res);
   }
@@ -312,7 +358,7 @@ exports.verifyOtp = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(400).json({ error: "Invalid OTP" });
+      return res.status(400).json({ error: "OTP expierd" });
     }
 
     const query =

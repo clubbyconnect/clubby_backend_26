@@ -18,7 +18,8 @@ const { signUp,
     declineClubRequest,
     UpdateUserDetails,
     removeUserFromClub,
-    sendOtpToVerifyMobileNumber
+    sendOtpToVerifyMobileNumber,
+    verifyOtpToVerfiyMobileNumber
 } = require('../controllers/user.controller.js');
 const { sendPushNotification,
     fetchallcategory,
@@ -32,7 +33,8 @@ router.post("/appleAuth",appleAuth);
 router.post("/facebookAuth",facebookAuth);
 router.post("/signIn",signIn); 
 router.post("/sendOtp",sendOtp);
-router.post("/sendOtpToVerifyMobileNumber",sendOtpToVerifyMobileNumber);
+router.post("/sendOtpToVerifyMobileNumber",verifyJWT,sendOtpToVerifyMobileNumber);
+router.post("/verifyOtpToVerfiyMobileNumber",verifyJWT,verifyOtpToVerfiyMobileNumber);
 router.post("/verifyOtp",verifyOtp);
 router.post("/logout",verifyJWT,logout);
 router.post("/resetPassword",resetPassword);
