@@ -312,33 +312,28 @@ exports.sendOtpToVerifyMobileNumber = async (req, res) => {
 exports.verifyOtpToVerfiyMobileNumber = async (req, res) => {
   try {
     const { phoneNumber, otp } = req.body;
-    console.log("....",phoneNumber,otp);
-    
+
     if (!phoneNumber || !otp) {
       return res.status(400).json({ error: "phoneNumber and OTP are required" });
     }
 
     const user = await OTP.findOne({ phoneNumber });
-    console.log("..user..",user);
+
     if (!user) {
       return res.status(400).json({ error: "OTP expierd" });
     }
 
     const otpRecord = await OTP.findOne({ phoneNumber, otp });
-    console.log("..otpRecord..",otpRecord);
+
     if (otpRecord) {
       const existingUser = await User.findOne({ phoneNumber });
-      console.log("..existingUser..",existingUser);
       if(existingUser){
         return res.status(200).json({ message: "Phone number already exist" });
       }else{
         const userId = req.User._id;
-        console.log("...userId.",userId);
         let updateDetails = await User.findById(userId);
-        console.log("..updateDetails..",updateDetails);
         if (phoneNumber) updateDetails.phoneNumber = phoneNumber.trim();
         updateDetails = await updateDetails.save();
-        console.log("..updateDetailsupdateDetails..",updateDetails);
       }
 
       return res.status(200).json({ message: "OTP verified successfully" });
