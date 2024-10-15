@@ -330,6 +330,7 @@ exports.verifyOtpToVerfiyMobileNumber = async (req, res) => {
         const userId = req.User._id;
         let updateDetails = await User.findById(userId);
         if (phoneNumber) updateDetails.phoneNumber = phoneNumber.trim();
+        updateDetails.phoneNumberVerified = true
         updateDetails = await updateDetails.save();
      
 
