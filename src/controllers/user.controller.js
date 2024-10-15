@@ -326,15 +326,12 @@ exports.verifyOtpToVerfiyMobileNumber = async (req, res) => {
     const otpRecord = await OTP.findOne({ phoneNumber, otp });
 
     if (otpRecord) {
-      const existingUser = await User.findOne({ phoneNumber });
-      if(existingUser){
-        return res.status(200).json({ message: "Phone number already exist" });
-      }else{
+
         const userId = req.User._id;
         let updateDetails = await User.findById(userId);
         if (phoneNumber) updateDetails.phoneNumber = phoneNumber.trim();
         updateDetails = await updateDetails.save();
-      }
+     
 
       return res.status(200).json({ message: "OTP verified successfully" });
     } else {
