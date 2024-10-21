@@ -534,7 +534,7 @@ exports.createPost = async (req, res) => {
     if (!createdPost._id)
       return res.status(401).json({ error: "unabel to create post" });
 
-    return res.status(200).json({ messaage: "Post created Sucessfully" });
+    return res.status(200).json({ message: "Post created Sucessfully" });
   } catch (error) {
     serverErrorHandler(error, res);
   }
