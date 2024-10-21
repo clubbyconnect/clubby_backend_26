@@ -779,3 +779,4 @@ exports.removeUserFromClub = async (req, res) => {
     serverErrorHandler(error, res);
   }
 };
+

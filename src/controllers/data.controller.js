@@ -52,7 +52,15 @@ exports.fetchallcategory = async (req, res) => {
     const allcategory = await CategoryModel.aggregate([
       {
         $lookup: {
-          from: "categories",
+          from: "categories", 
+          localField: "subcategories", 
+          foreignField: "_id", 
+          as: "subcategoriesData", 
+        },
+      },
+      {
+        $lookup: {
+          from: "categories", 
           localField: "_id",
           foreignField: "subcategories",
           as: "parentCategories",
@@ -60,27 +68,35 @@ exports.fetchallcategory = async (req, res) => {
       },
       {
         $match: {
-          parentCategories: { $size: 0 },
+          parentCategories: { $size: 0 }, 
         },
       },
       {
         $project: {
           name: 1,
+          image: 1,
+          subcategoriesData: {
+            name: 1, 
+          },
         },
       },
     ]);
 
-console.log("allcategory????????????",allcategory);
-
-
     if (allcategory && allcategory.length > 0) {
-      const categoryNames = allcategory.map((category) => category.name);
-      
+      const categoryData = allcategory.map((category) => ({
+        name: category.name,
+        image: category.image,
+        subcategories: category.subcategoriesData.map((sub) => ({
+          name: sub.name, 
+        })),
+      }));
+
+      console.log("allcategory.........", allcategory);
       
       return res.status(200).json({
-          message: "Top-level categories fetched successfully",
-          data: categoryNames,
-        });
+        message: "Top-level categories fetched successfully",
+        data: categoryData,
+      });
 
     } else {
       return res.status(404).json({ error: "No top-level categories found" });
