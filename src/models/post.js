@@ -52,8 +52,8 @@ const postSchema = new mongoose.Schema({
   OfferType:{
     type: String,
     enum: {
-      values: ['Discounts', 'Cashback', 'Buy One, Get One' ,'Bundle Deals','Referral Discounts',],
-      message: 'Offer type must be Discounts, Cashback, Buy One-Get One , Bundle Deals , Referral Discounts'
+      values: ['Buy one get one free', 'Multi buying discount offer and device', 'Minimum value purchase' ,'Brands coupons for minimum purchase','sell coupons or brands offer code','Already have a personal coupon'],
+      message: 'Offer type must be valid'
     }
   },
   dealValidityPeriod:{
