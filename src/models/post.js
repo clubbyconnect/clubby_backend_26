@@ -6,58 +6,82 @@ const postSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
-  title: { 
+  itemName: { 
     type: String, 
-    required: [true, 'Title is required'],
-    minlength: [3, 'Title must be at least 3 characters long'],
-    maxlength: [70, 'Title must be less than 70 characters']
+    required: [true, 'Item name is required'],
+    minlength: [3, 'Item name must be at least 3 characters long'],
+    maxlength: [70, 'Item name must be less than 70 characters']
   },
-  description: { 
+  offerType: { 
     type: String, 
-    required: [true, 'Description is required'],
-    minlength: [10, 'Description must be at least 10 characters long'],
-    maxlength: [1000, 'Description must be less than 1000 characters'] 
+    required: [true, 'Offer type is required'],
+    enum: {
+      values: [
+        'Buy one get one free', 
+        'Multi buying discount offer and device', 
+        'Minimum value purchase',
+        'Brands coupons for minimum purchase',
+        'Sell coupons or brands offer code',
+        'Already have a personal coupon'
+      ],
+      message: 'Invalid offer type'
+    }
   },
   price: { 
     type: Number, 
     required: [true, 'Price is required'],
-    min: [9, 'Price must be grater then 9 rupee']
+    min: [9, 'Price must be greater than 9 rupees']
   },
-  quantity:{
-    type: Number,
-    required: [true, 'Quantity is required'],
-    min: [1, 'Quantity must be at least 1'] 
-  },
-  productLink:{
-    type: String, 
-    required: [true, 'Product link is required'],
-    match: [/^(http|https):\/\/[^ "]+$/, "Product link must be a valid URL"],
-  },
-  location:{
-    type: String, 
-    required: [true, 'Location is required']
-  },
-  NumberOfclubMenber:{
+  clubMembers: {
     type: Number,
     required: [true, 'Number of club members is required'],
-    min: [1, 'Number of club members must be at least 1'] 
+    min: [1, 'Club members must be at least 1']
   },
-  clubType:{
+  size: {
+    type: String,  // Optional field
+    default: null, // Default is null, so it's not mandatory
+  },
+  additionalInformation: {
+    type: String,  // Optional field
+    default: null, // Default is null, so it's not mandatory
+  },
+  productImage: { 
+    type: String, 
+    default : "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721192873/zhcbblypjd3qg4gohafv.png"
+  },
+  clubType: {
     type: String,
+    required: [true, 'Club type is required'],
     enum: {
-      values: ['Online', 'Offline'],
-      message: 'Club type must be Online or Offline'
+      values: ['online', 'offline'],
+      message: 'Club type must be either online or offline'
     }
   },
-  OfferType:{
+  storeLocation: {
     type: String,
-    enum: {
-      values: ['Buy one get one free', 'Multi buying discount offer and device', 'Minimum value purchase' ,'Brands coupons for minimum purchase','sell coupons or brands offer code','Already have a personal coupon'],
-      message: 'Offer type must be valid'
+    default: null, // Optional for offline clubs, not required for online clubs
+  },
+  itemLink: {
+    type: String,
+    default: null, // Optional for online clubs, not required for offline clubs
+    validate: {
+      validator: function(v) {
+        return v ? /^(http|https):\/\/[^ "]+$/.test(v) : true;
+      },
+      message: 'Item link must be a valid URL'
     }
   },
-  dealValidityPeriod:{
+  platform: {
     type: String,
+    default: null, // Optional for online clubs
+  },
+  deliveryLocation: {
+    type: String,
+    default: null, // Optional for online clubs
+  },
+  paymentMode: {
+    type: String,
+    default: null, // Optional for online clubs
   },
   category: {
     type: mongoose.Schema.Types.ObjectId,
@@ -73,13 +97,9 @@ const postSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category',
   },
-  productImage: { 
-    type: String, 
-    default : "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721192873/zhcbblypjd3qg4gohafv.png"
-  },
-  clubSatus: {
+  clubStatus: {
     type: String,
-    enum: ['Pending', 'created'],
+    enum: ['Pending', 'Created'],
     default: 'Pending'
   },
   reportCount: {
@@ -92,7 +112,6 @@ const postSchema = new mongoose.Schema({
   }],
   reportMessage: [{
     type: String,
-    required: [true, 'Report message is required.'],
     validate: [
       {
         validator: function(v) {
@@ -114,9 +133,7 @@ const postSchema = new mongoose.Schema({
       }
     ]
   }]
-},{timestamps: true,});
+}, { timestamps: true });
 
 const Post = mongoose.model("Post", postSchema);
 module.exports = Post;
-
-

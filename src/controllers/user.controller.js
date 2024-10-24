@@ -284,14 +284,16 @@ exports.sendOtpToVerifyMobileNumber = async (req, res) => {
     const { phoneNumber } = req.body;
 
     const existingUser = await User.findOne({ phoneNumber });
-    if(existingUser){
+    if (existingUser) {
       return res.status(200).json({ message: "Phone number already exist" });
     }
 
     const existingOtp = await OTP.findOne({ phoneNumber });
 
     if (existingOtp) {
-      return res.status(400).json({ error: "OTP already sent pls try after some time" });
+      return res
+        .status(400)
+        .json({ error: "OTP already sent pls try after some time" });
     }
 
     const otp = await generateUniqueOtp();
@@ -301,9 +303,7 @@ exports.sendOtpToVerifyMobileNumber = async (req, res) => {
 
     const message = otp;
     await sendSms(phoneNumber, message);
-    return res
-      .status(200)
-      .json({ message: "OTP Sent Successfully" });
+    return res.status(200).json({ message: "OTP Sent Successfully" });
   } catch (error) {
     serverErrorHandler(error, res);
   }
@@ -314,7 +314,9 @@ exports.verifyOtpToVerfiyMobileNumber = async (req, res) => {
     const { phoneNumber, otp } = req.body;
 
     if (!phoneNumber || !otp) {
-      return res.status(400).json({ error: "phoneNumber and OTP are required" });
+      return res
+        .status(400)
+        .json({ error: "phoneNumber and OTP are required" });
     }
 
     const user = await OTP.findOne({ phoneNumber });
@@ -326,13 +328,11 @@ exports.verifyOtpToVerfiyMobileNumber = async (req, res) => {
     const otpRecord = await OTP.findOne({ phoneNumber, otp });
 
     if (otpRecord) {
-
-        const userId = req.User._id;
-        let updateDetails = await User.findById(userId);
-        if (phoneNumber) updateDetails.phoneNumber = phoneNumber.trim();
-        updateDetails.phoneNumberVerified = true
-        updateDetails = await updateDetails.save();
-     
+      const userId = req.User._id;
+      let updateDetails = await User.findById(userId);
+      if (phoneNumber) updateDetails.phoneNumber = phoneNumber.trim();
+      updateDetails.phoneNumberVerified = true;
+      updateDetails = await updateDetails.save();
 
       return res.status(200).json({ message: "OTP verified successfully" });
     } else {
@@ -465,80 +465,120 @@ exports.uploadAvatar = async (req, res) => {
 exports.createPost = async (req, res) => {
   try {
     const {
-      title,
-      description,
-      price,
-      quantity,
-      productLink,
-      location,
-      NumberOfclubMenber,
-      clubType,
-      OfferType,
+      clubType,             
       category,
-      subcategory,
-      subsubcategory,
+      selectionType,
+      itemName,
+      offerType,
+      price,
+      clubMembers,
+      storeLocation,        
+      additionalInformation, // Optional
+      size,                 // Optional
+      itemLink,             
+      platform,             
+      deliveryLocation,     
+      paymentMode,          
     } = req.body;
 
+    // Validate common required fields
     if (
       [
-        title,
-        description,
-        price,
-        quantity,
-        category,
-        subcategory,
-        productLink,
-        location,
-        NumberOfclubMenber,
         clubType,
-        OfferType,
+        category,
+        selectionType,
+        itemName,
+        offerType,
+        price,
+        clubMembers,
       ].some((field) => field?.trim() === "")
     ) {
-      return res.status(400).json({ error: "pls fill required fields" });
+      return res.status(400).json({ error: "Please fill all required fields." });
     }
-    const productImageLocalPath = req.file?.path;
-    if (!productImageLocalPath)
-      return res.status(400).json({ error: "Product Image is requierd" });
 
+    // Validate based on clubType
+    if (clubType === "offline") {
+      if (!storeLocation || storeLocation.trim() === "") {
+        return res
+          .status(400)
+          .json({ error: "Offline posts require store location." });
+      }
+    } else if (clubType === "online") {
+      if (
+        [itemLink, platform, deliveryLocation, paymentMode].some(
+          (field) => field?.trim() === ""
+        )
+      ) {
+        return res.status(400).json({
+          error: "Online posts require item link, platform, delivery location, and payment mode.",
+        });
+      }
+    } else {
+      return res.status(400).json({ error: "Invalid club type." });
+    }
+
+    // Validate product image
+    const productImageLocalPath = req.file?.path;
+    if (!productImageLocalPath) {
+      return res.status(400).json({ error: "Product Image is required." });
+    }
+
+    // Upload image to Cloudinary
     const productImage = await uploadOnCloudinary(productImageLocalPath);
 
-    const categoryid = await CategoryModel.findOne({ name: category });
-    const subcategoryid = await CategoryModel.findOne({ name: category });
-    const subsubcategoryid = await CategoryModel.findOne({
-      name: subsubcategory,
-    });
-
-    const postData = {
-      userId: req.User._id,
-      title,
-      description,
-      price,
-      quantity,
-      category,
-      subcategory,
-      productLink,
-      location,
-      NumberOfclubMenber,
-      clubType,
-      OfferType,
-      category: categoryid._id,
-      subcategory: subcategoryid._id,
-      productImage: productImage.url,
-    };
-
-    if (subsubcategory && subsubcategoryid) {
-      postData.subsubcategory = subsubcategoryid._id;
+    // Fetch category and subcategory
+    const categoryObj = await CategoryModel.findOne({ name: category });
+    if (!categoryObj) {
+      return res.status(400).json({ error: "Invalid category." });
     }
 
-    const createdPost = await post.create(postData);
-    if (!createdPost._id)
-      return res.status(401).json({ error: "unabel to create post" });
+    const subcategoryObj = await CategoryModel.findOne({ name: selectionType });
+    if (!subcategoryObj) {
+      return res.status(400).json({ error: "Invalid subcategory." });
+    }
 
-    return res.status(200).json({ message: "Post created Sucessfully" });
+    // Prepare post data for saving
+    const postData = {
+      userId: req.User._id,
+      itemName,
+      offerType,
+      price,
+      clubMembers,
+      category: categoryObj._id,
+      subcategory: subcategoryObj._id,
+      productImage: productImage.url,
+      clubType,
+    };
+
+    // Add optional fields if provided
+    if (size) postData.size = size;
+    if (additionalInformation) postData.additionalInformation = additionalInformation;
+
+    // Add offline or online specific fields
+    if (clubType === "offline") {
+      postData.storeLocation = storeLocation;
+    } else if (clubType === "online") {
+      postData.itemLink = itemLink;
+      postData.platform = platform;
+      postData.deliveryLocation = deliveryLocation;
+      postData.paymentMode = paymentMode;
+    }
+
+    // Save the post in the database
+    const createdPost = await post.create(postData);
+    if (!createdPost._id) {
+      return res.status(500).json({ error: "Unable to create post." });
+    }
+
+    return res.status(200).json({
+      message: "Post created successfully.",
+      post: createdPost,
+    });
   } catch (error) {
     serverErrorHandler(error, res);
   }
 };
+
 
 exports.UpdateUserDetails = async (req, res) => {
   try {
@@ -721,12 +761,10 @@ exports.declineClubRequest = async (req, res) => {
     }
 
     if (postData.userId.equals(requesterId)) {
-      return res
-        .status(404)
-        .json({
-          error:
-            "You can not use your userId as requesterId to declined ClubRequest",
-        });
+      return res.status(404).json({
+        error:
+          "You can not use your userId as requesterId to declined ClubRequest",
+      });
     }
 
     const requester = await User.findById(requesterId);
@@ -779,4 +817,3 @@ exports.removeUserFromClub = async (req, res) => {
     serverErrorHandler(error, res);
   }
 };
-
