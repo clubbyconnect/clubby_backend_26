@@ -18,7 +18,7 @@ const postSchema = new mongoose.Schema({
     enum: {
       values: [
         'Buy one get one free', 
-        'Multi buying discount offer and device', 
+        'Multi buying discount offer and divide', 
         'Minimum value purchase',
         'Brands coupons for minimum purchase',
         'Bank and card offers',
