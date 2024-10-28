@@ -21,7 +21,7 @@ const postSchema = new mongoose.Schema({
         'Multi buying discount offer and device', 
         'Minimum value purchase',
         'Brands coupons for minimum purchase',
-        'Sell coupons or brands offer code',
+        'Bank and card offers',
         'Already have a personal coupon'
       ],
       message: 'Invalid offer type'
