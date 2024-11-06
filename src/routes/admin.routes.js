@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { 
      createCategory,
+     createOfflineCategory,
+     createOnlineCategory,
+     addOfflineSubcategory,
+     addOnlineSubcategory,
      addSubcategory,
      deleteCategory,
      findCategoryWithSubcategories,
@@ -10,6 +14,10 @@ const {
 
 //admin
 router.post("/createCategory",createCategory);
+router.post("/createOfflineCategory",createOfflineCategory);
+router.post("/addOfflineSubcategory",addOfflineSubcategory);
+router.post("/createOnlineCategory",createOnlineCategory);
+router.post("/addOnlineSubcategory",addOnlineSubcategory);
 router.post("/addSubcategory",addSubcategory);
 router.post("/deleteCategory",deleteCategory);
 router.post("/findCategoryWithSubcategories",findCategoryWithSubcategories);

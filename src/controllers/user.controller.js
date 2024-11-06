@@ -579,7 +579,6 @@ exports.createPost = async (req, res) => {
   }
 };
 
-
 exports.UpdateUserDetails = async (req, res) => {
   try {
     const {

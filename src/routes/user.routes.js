@@ -24,6 +24,8 @@ const { signUp,
 const { sendPushNotification,
     fetchallcategory,
     fetchsubcategory,
+    fetchOfflinecategory,
+    fetchOnlinecategory
 } = require('../controllers/data.controller.js');
 
 //user
@@ -46,6 +48,8 @@ router.post("/UpdateUserDetails",verifyJWT,upload.single('avatar') ,UpdateUserDe
 //router.post("/fetchallcategory",sendPushNotification);
 router.post("/fetchallcategory",verifyJWT,fetchallcategory);
 router.post("/fetchsubcategory",verifyJWT,fetchsubcategory);
+router.post("/fetchOfflinecategory",fetchOfflinecategory);
+router.post("/fetchOnlinecategory",fetchOnlinecategory);
 
 //clubRequest
 router.post("/sendClubRequest",verifyJWT,sendClubRequest);

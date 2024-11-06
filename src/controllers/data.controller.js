@@ -1,6 +1,8 @@
 const serverErrorHandler = require("../utils/serverErrorHandler.js");
 const User = require("../models/user.js");
 const CategoryModel = require("../models/categorySchema.js");
+const OfflineCategoryModel = require("../models/offlineCategorySchema.js");
+const onlineCategoryModel = require("../models/onlineCategorySchema.js")
 const admin = require('firebase-admin');
 
 //Firebase-setup
@@ -20,8 +22,6 @@ const serviceAccount = {
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
-
-
 
 // controllers-----------------------------------
 
@@ -91,15 +91,73 @@ exports.fetchallcategory = async (req, res) => {
         })),
       }));
 
-      console.log("allcategory.........", allcategory);
       
       return res.status(200).json({
-        message: "Top-level categories fetched successfully",
+        message: "Categories fetched successfully",
         data: categoryData,
       });
 
     } else {
-      return res.status(404).json({ error: "No top-level categories found" });
+      return res.status(404).json({ error: "Categories found" });
+    }
+  } catch (error) {
+    serverErrorHandler(error, res);
+  }
+};
+
+//new
+exports.fetchOnlinecategory = async (req, res) => {
+  try {
+    const allcategory = await onlineCategoryModel.aggregate([
+      {
+        $lookup: {
+          from: "onlinecategories", 
+          localField: "onlineSubcategories", 
+          foreignField: "_id", 
+          as: "subcategoriesData", 
+        },
+      },
+      {
+        $lookup: {
+          from: "onlinecategories", 
+          localField: "_id",
+          foreignField: "onlineSubcategories",
+          as: "parentCategories",
+        },
+      },
+      {
+        $match: {
+          parentCategories: { $size: 0 }, 
+        },
+      },
+      {
+        $project: {
+          name: 1,
+          image: 1,
+          subcategoriesData: {
+            name: 1, 
+          },
+        },
+      },
+    ]);
+
+    if (allcategory && allcategory.length > 0) {
+      const categoryData = allcategory.map((category) => ({
+        name: category.name,
+        image: category.image,
+        subcategories: category.subcategoriesData.map((sub) => ({
+          name: sub.name, 
+        })),
+      }));
+
+      
+      return res.status(200).json({
+        message: "Categories fetched successfully",
+        data: categoryData,
+      });
+
+    } else {
+      return res.status(404).json({ error: "Categories found" });
     }
   } catch (error) {
     serverErrorHandler(error, res);
@@ -154,3 +212,60 @@ exports.fetchsubcategory = async (req, res) => {
     serverErrorHandler(error, res);
   }
 };
+
+exports.fetchOfflinecategory = async (req, res) => {
+  try {
+    const allcategory = await OfflineCategoryModel.aggregate([
+      {
+        $lookup: {
+          from: "offlinecategories", 
+          localField: "offlineSubcategories", 
+          foreignField: "_id", 
+          as: "offlineSubcategoriesData",  
+        },
+      },
+      {
+        $match: {
+          "offlineSubcategoriesData.0": { $exists: true },  
+        },
+      },
+      {
+        $project: {
+          _id: 0,  
+          name: 1,
+          image: 1,
+          offlineSubcategoriesData: {  
+            name: 1,  
+          },
+        },
+      },
+    ]);
+
+
+    if (allcategory && allcategory.length > 0) {
+      const categoryData = allcategory.map((category) => ({
+        name: category.name,
+        image: category.image,
+        offlineSubcategories: category.offlineSubcategoriesData.map((sub) => ({
+          name: sub.name,  
+        })),
+      }));
+
+      return res.status(200).json({
+        message: "Categories fetched successfully",
+        data: categoryData,
+      });
+    } else {
+      return res.status(404).json({ error: "No categories found" });  
+    }
+  } catch (error) {
+    serverErrorHandler(error, res);  
+  }
+};
+
+
+
+
+
+
+
