@@ -1,4 +1,7 @@
 const mongoose = require("mongoose");
+const OfflineCategoryModel = require("./offlineCategorySchema.js");
+const onlineCategoryModel = require("./onlineCategorySchema.js");
+
 
 const postSchema = new mongoose.Schema({
   userId: {
@@ -16,14 +19,39 @@ const postSchema = new mongoose.Schema({
   },
   category: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Category",
     required: true,
+    ref: function () {
+      return this.clubType === "offline" ? "OfflineCategory" : "onlineCategory";
+    },
+    validate: {
+      validator: async function (v) {
+        const CategoryModel = mongoose.model(this.clubType === "offline" ? "OfflineCategory" : "onlineCategory");
+        console.log("in mongoose 1");
+        
+        const category = await CategoryModel.findById(v);
+        return !!category; // Returns true if the category exists
+      },
+      message: "Invalid category for the selected club type.",
+    },
   },
+
   subCategory: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Category",
     required: true,
+    ref: function () {
+      return this.clubType === "offline" ? "OfflineCategory" : "onlineCategory";
+    },
+    validate: {
+      validator: async function (v) {
+        const CategoryModel = mongoose.model(this.clubType === "offline" ? "OfflineCategory" : "onlineCategory");
+        console.log("in mongoose 2");
+        const subCategory = await CategoryModel.findById(v);
+        return !!subCategory; // Returns true if subCategory exists
+      },
+      message: "Invalid subcategory for the selected club type.",
+    },
   },
+
   itemName: { 
     type: String, 
     required: [true, 'Item name is required'],
@@ -52,7 +80,7 @@ const postSchema = new mongoose.Schema({
   },
   price_type: { 
     type: String, 
-    required: [true, 'price_type'],
+    required: [true, 'price_type is requierd'],
     enum: {
       values: ['Fixed (Price split evenly among club members)', 'Price will split based on the higher-value purchase.'],
       message: 'value should be : Fixed (Price split evenly among club members) or Price will split based on the higher-value purchase.'
@@ -82,12 +110,12 @@ const postSchema = new mongoose.Schema({
   itemLink: {
     type: String,
     default: null, // Optional for online clubs, not required for offline clubs
-    validate: {
-      validator: function(v) {
-        return v ? /^(http|https):\/\/[^ "]+$/.test(v) : true;
-      },
-      message: 'Item link must be a valid URL'
-    }
+    // validate: {
+    //   validator: function(v) {
+    //     return v ? /^(http|https):\/\/[^ "]+$/.test(v) : true;
+    //   },
+    //   message: 'Item link must be a valid URL'
+    // }
   },
   platform: {
     type: String,

@@ -131,8 +131,6 @@ exports.googleAuth = async (req, res) => {
       audience: process.env.GOOGLE_CLIENT_ID,
     });
 
-    console.log(result);
-
     const googleAuthId = result.payload.sub;
     const email = result.payload.email;
     let user = await User.findOne({ googleAuthId });
@@ -528,6 +526,7 @@ exports.createPost = async (req, res) => {
 
     // Validate product image
     const productImageLocalPath = req.file?.path;
+
     if (!productImageLocalPath) {
       return res.status(400).json({ error: "Product Image is required." });
     }
@@ -547,18 +546,17 @@ exports.createPost = async (req, res) => {
       itemName,
       offerType,
       price,
+      price_type,
       clubMembers,
       category: categoryObj._id,
-      subcategory: subcategoryObj._id,
+      subCategory: subcategoryObj._id,
       productImage: productImage.url,
       clubType,
     };
 
-    // Add optional fields if provided
     if (size) postData.size = size;
     if (additionalInformation) postData.additionalInformation = additionalInformation;
 
-    // Add offline or online specific fields
     if (clubType === "offline") {
       postData.store_location_latitude = store_location_latitude;
       postData.store_location_longitude = store_location_longitude;
