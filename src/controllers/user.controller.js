@@ -8,6 +8,8 @@ const serverErrorHandler = require("../utils/serverErrorHandler.js");
 const User = require("../models/user.js");
 const OTP = require("../models/otp.js");
 const post = require("../models/post.js");
+const OfflineCategoryModel = require("../models/offlineCategorySchema.js");
+const onlineCategoryModel = require("../models/onlineCategorySchema.js");
 const CategoryModel = require("../models/categorySchema.js");
 const ClubRequest = require("../models/clubRequest.js");
 const ChatRoom = require("../models/chatRoom.js");
@@ -465,20 +467,23 @@ exports.uploadAvatar = async (req, res) => {
 exports.createPost = async (req, res) => {
   try {
     const {
-      clubType,             
+      clubType,
       category,
-      selectionType,
+      subCategory,
       itemName,
       offerType,
       price,
+      price_type,
       clubMembers,
-      storeLocation,        
-      additionalInformation, // Optional
-      size,                 // Optional
-      itemLink,             
-      platform,             
-      deliveryLocation,     
-      paymentMode,          
+      store_location_latitude,
+      store_location_longitude,
+      additionalInformation,
+      size,
+      itemLink,
+      platform,
+      delivery_location_latitude,
+      delivery_location_longitude,
+      paymentMode,
     } = req.body;
 
     // Validate common required fields
@@ -486,31 +491,35 @@ exports.createPost = async (req, res) => {
       [
         clubType,
         category,
-        selectionType,
+        subCategory,
         itemName,
         offerType,
         price,
+        price_type,
         clubMembers,
-      ].some((field) => field?.trim() === "")
+      ].some((field) => !field || field.trim() === "")
     ) {
       return res.status(400).json({ error: "Please fill all required fields." });
     }
 
     // Validate based on clubType
     if (clubType === "offline") {
-      if (!storeLocation || storeLocation.trim() === "") {
+      if (!store_location_latitude || !store_location_longitude || store_location_longitude.trim() === "") {
         return res
           .status(400)
-          .json({ error: "Offline posts require store location." });
+          .json({ error: "Offline category type requires a store location." });
       }
     } else if (clubType === "online") {
       if (
-        [itemLink, platform, deliveryLocation, paymentMode].some(
-          (field) => field?.trim() === ""
-        )
+        !platform ||
+        !itemLink ||
+        !delivery_location_latitude ||
+        !delivery_location_longitude ||
+        !paymentMode ||
+        [platform, itemLink, delivery_location_latitude, delivery_location_longitude, paymentMode].some((field) => field.trim() === "")
       ) {
         return res.status(400).json({
-          error: "Online posts require item link, platform, delivery location, and payment mode.",
+          error: "Online posts require an item link, platform, delivery location, and payment mode.",
         });
       }
     } else {
@@ -526,18 +535,13 @@ exports.createPost = async (req, res) => {
     // Upload image to Cloudinary
     const productImage = await uploadOnCloudinary(productImageLocalPath);
 
-    // Fetch category and subcategory
-    const categoryObj = await CategoryModel.findOne({ name: category });
-    if (!categoryObj) {
-      return res.status(400).json({ error: "Invalid category." });
-    }
+    const CategoryClubType = clubType === "offline" ? OfflineCategoryModel : onlineCategoryModel;
 
-    const subcategoryObj = await CategoryModel.findOne({ name: selectionType });
-    if (!subcategoryObj) {
-      return res.status(400).json({ error: "Invalid subcategory." });
-    }
-
-    // Prepare post data for saving
+    const categoryObj = await CategoryClubType.findOne({ name: category });
+    if (!categoryObj) return res.status(400).json({ error: "Invalid category." });
+    const subcategoryObj = await CategoryClubType.findOne({ name: subCategory });
+    if (!subcategoryObj) return res.status(400).json({ error: "Invalid subcategory." });
+    
     const postData = {
       userId: req.User._id,
       itemName,
@@ -556,19 +560,18 @@ exports.createPost = async (req, res) => {
 
     // Add offline or online specific fields
     if (clubType === "offline") {
-      postData.storeLocation = storeLocation;
+      postData.store_location_latitude = store_location_latitude;
+      postData.store_location_longitude = store_location_longitude;
     } else if (clubType === "online") {
       postData.itemLink = itemLink;
       postData.platform = platform;
-      postData.deliveryLocation = deliveryLocation;
+      postData.delivery_location_latitude = delivery_location_latitude;
+      postData.delivery_location_longitude = delivery_location_longitude;
       postData.paymentMode = paymentMode;
     }
 
-    // Save the post in the database
     const createdPost = await post.create(postData);
-    if (!createdPost._id) {
-      return res.status(500).json({ error: "Unable to create post." });
-    }
+    if (!createdPost._id) return res.status(500).json({ error: "Unable to create post." });
 
     return res.status(200).json({
       message: "Post created successfully.",
@@ -640,7 +643,6 @@ exports.UpdateUserDetails = async (req, res) => {
     serverErrorHandler(error, res);
   }
 };
-
 //------------------------------------------User Request---------------------------------------------
 exports.sendClubRequest = async (req, res) => {
   try {

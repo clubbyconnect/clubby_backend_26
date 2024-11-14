@@ -6,6 +6,24 @@ const postSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
+  clubType: {
+    type: String,
+    required: [true, 'Club type is required'],
+    enum: {
+      values: ['online', 'offline'],
+      message: 'Club type must be either online or offline'
+    }
+  },
+  category: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Category",
+    required: true,
+  },
+  subCategory: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Category",
+    required: true,
+  },
   itemName: { 
     type: String, 
     required: [true, 'Item name is required'],
@@ -32,34 +50,34 @@ const postSchema = new mongoose.Schema({
     required: [true, 'Price is required'],
     min: [9, 'Price must be greater than 9 rupees']
   },
+  price_type: { 
+    type: String, 
+    required: [true, 'price_type'],
+    enum: {
+      values: ['Fixed (Price split evenly among club members)', 'Price will split based on the higher-value purchase.'],
+      message: 'value should be : Fixed (Price split evenly among club members) or Price will split based on the higher-value purchase.'
+    }
+  },
   clubMembers: {
     type: Number,
     required: [true, 'Number of club members is required'],
     min: [1, 'Club members must be at least 1']
   },
-  size: {
-    type: String,  // Optional field
-    default: null, // Default is null, so it's not mandatory
+  store_location_latitude: {
+    type: String,
+    default: null, // Optional for offline clubs, not required for online clubs
+  },
+  store_location_longitude: {
+    type: String,
+    default: null, // Optional for offline clubs, not required for online clubs
   },
   additionalInformation: {
     type: String,  // Optional field
     default: null, // Default is null, so it's not mandatory
   },
-  productImage: { 
-    type: String, 
-    default : "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721192873/zhcbblypjd3qg4gohafv.png"
-  },
-  clubType: {
-    type: String,
-    required: [true, 'Club type is required'],
-    enum: {
-      values: ['online', 'offline'],
-      message: 'Club type must be either online or offline'
-    }
-  },
-  storeLocation: {
-    type: String,
-    default: null, // Optional for offline clubs, not required for online clubs
+  size: {
+    type: String,  // Optional field
+    default: null, // Default is null, so it's not mandatory
   },
   itemLink: {
     type: String,
@@ -75,7 +93,11 @@ const postSchema = new mongoose.Schema({
     type: String,
     default: null, // Optional for online clubs
   },
-  deliveryLocation: {
+  delivery_location_latitude: {
+    type: String,
+    default: null, // Optional for online clubs
+  },
+  delivery_location_longitude: {
     type: String,
     default: null, // Optional for online clubs
   },
@@ -83,20 +105,11 @@ const postSchema = new mongoose.Schema({
     type: String,
     default: null, // Optional for online clubs
   },
-  category: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Category",
-    required: true,
+  productImage: { 
+    type: String, 
+    default : "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721192873/zhcbblypjd3qg4gohafv.png"
   },
-  subcategory: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Category",
-    required: true,
-  },
-  subsubcategory: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Category',
-  },
+
   clubStatus: {
     type: String,
     enum: ['Pending', 'Created'],
