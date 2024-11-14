@@ -26,15 +26,12 @@ const postSchema = new mongoose.Schema({
     validate: {
       validator: async function (v) {
         const CategoryModel = mongoose.model(this.clubType === "offline" ? "OfflineCategory" : "onlineCategory");
-        console.log("in mongoose 1");
-        
         const category = await CategoryModel.findById(v);
-        return !!category; // Returns true if the category exists
+        return !!category; 
       },
       message: "Invalid category for the selected club type.",
     },
   },
-
   subCategory: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
@@ -44,14 +41,12 @@ const postSchema = new mongoose.Schema({
     validate: {
       validator: async function (v) {
         const CategoryModel = mongoose.model(this.clubType === "offline" ? "OfflineCategory" : "onlineCategory");
-        console.log("in mongoose 2");
         const subCategory = await CategoryModel.findById(v);
-        return !!subCategory; // Returns true if subCategory exists
+        return !!subCategory; 
       },
       message: "Invalid subcategory for the selected club type.",
     },
   },
-
   itemName: { 
     type: String, 
     required: [true, 'Item name is required'],
@@ -93,23 +88,23 @@ const postSchema = new mongoose.Schema({
   },
   store_location_latitude: {
     type: String,
-    default: null, // Optional for offline clubs, not required for online clubs
+    default: null, 
   },
   store_location_longitude: {
     type: String,
-    default: null, // Optional for offline clubs, not required for online clubs
+    default: null, 
   },
   additionalInformation: {
-    type: String,  // Optional field
-    default: null, // Default is null, so it's not mandatory
+    type: String, 
+    default: null,
   },
   size: {
-    type: String,  // Optional field
-    default: null, // Default is null, so it's not mandatory
+    type: String,  
+    default: null, 
   },
   itemLink: {
     type: String,
-    default: null, // Optional for online clubs, not required for offline clubs
+    default: null, 
     // validate: {
     //   validator: function(v) {
     //     return v ? /^(http|https):\/\/[^ "]+$/.test(v) : true;
@@ -119,19 +114,19 @@ const postSchema = new mongoose.Schema({
   },
   platform: {
     type: String,
-    default: null, // Optional for online clubs
+    default: null,
   },
   delivery_location_latitude: {
     type: String,
-    default: null, // Optional for online clubs
+    default: null, 
   },
   delivery_location_longitude: {
     type: String,
-    default: null, // Optional for online clubs
+    default: null, 
   },
   paymentMode: {
     type: String,
-    default: null, // Optional for online clubs
+    default: null, 
   },
   productImage: { 
     type: String, 
