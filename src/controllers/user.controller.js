@@ -484,7 +484,6 @@ exports.createPost = async (req, res) => {
       paymentMode,
     } = req.body;
 
-    // Validate common required fields
     if (
       [
         clubType,
@@ -500,9 +499,12 @@ exports.createPost = async (req, res) => {
       return res.status(400).json({ error: "Please fill all required fields." });
     }
 
-    // Validate based on clubType
     if (clubType === "offline") {
-      if (!store_location_latitude || !store_location_longitude || store_location_longitude.trim() === "") {
+      if (
+        !store_location_latitude ||
+        !store_location_longitude ||
+        store_location_longitude.trim() === ""
+      ) {
         return res
           .status(400)
           .json({ error: "Offline category type requires a store location." });
@@ -514,33 +516,44 @@ exports.createPost = async (req, res) => {
         !delivery_location_latitude ||
         !delivery_location_longitude ||
         !paymentMode ||
-        [platform, itemLink, delivery_location_latitude, delivery_location_longitude, paymentMode].some((field) => field.trim() === "")
+        [
+          platform,
+          itemLink,
+          delivery_location_latitude,
+          delivery_location_longitude,
+          paymentMode,
+        ].some((field) => field.trim() === "")
       ) {
         return res.status(400).json({
-          error: "Online posts require an item link, platform, delivery location, and payment mode.",
+          error:
+            "Online posts require an item link, platform, delivery location, and payment mode.",
         });
       }
     } else {
       return res.status(400).json({ error: "Invalid club type." });
     }
 
-    // Validate product image
     const productImageLocalPath = req.file?.path;
 
     if (!productImageLocalPath) {
       return res.status(400).json({ error: "Product Image is required." });
     }
 
-    // Upload image to Cloudinary
     const productImage = await uploadOnCloudinary(productImageLocalPath);
 
-    const CategoryClubType = clubType === "offline" ? OfflineCategoryModel : onlineCategoryModel;
+    const CategoryClubType =
+      clubType === "offline" ? OfflineCategoryModel : onlineCategoryModel;
 
     const categoryObj = await CategoryClubType.findOne({ name: category });
-    if (!categoryObj) return res.status(400).json({ error: "Invalid category." });
-    const subcategoryObj = await CategoryClubType.findOne({ name: subCategory });
-    if (!subcategoryObj) return res.status(400).json({ error: "Invalid subcategory." });
-    
+    if (!categoryObj)
+      return res.status(400).json({ error: "Invalid category." });
+
+    const subcategoryObj = await CategoryClubType.findOne({
+      name: subCategory,
+    });
+    if (!subcategoryObj)
+      return res.status(400).json({ error: "Invalid subcategory." });
+
     const postData = {
       userId: req.User._id,
       itemName,
@@ -555,7 +568,8 @@ exports.createPost = async (req, res) => {
     };
 
     if (size) postData.size = size;
-    if (additionalInformation) postData.additionalInformation = additionalInformation;
+    if (additionalInformation)
+      postData.additionalInformation = additionalInformation;
 
     if (clubType === "offline") {
       postData.store_location_latitude = store_location_latitude;
@@ -569,11 +583,21 @@ exports.createPost = async (req, res) => {
     }
 
     const createdPost = await post.create(postData);
-    if (!createdPost._id) return res.status(500).json({ error: "Unable to create post." });
+    if (!createdPost._id)
+      return res.status(500).json({ error: "Unable to create post." });
+
+    const populatedPost = await post
+      .findById(createdPost._id)
+      .populate("category", "name")
+      .populate("subCategory", "name");
 
     return res.status(200).json({
       message: "Post created successfully.",
-      post: createdPost,
+      post: {
+        ...populatedPost._doc,
+        category: populatedPost.category.name,
+        subCategory: populatedPost.subCategory.name,
+      },
     });
   } catch (error) {
     serverErrorHandler(error, res);
