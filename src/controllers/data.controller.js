@@ -3,7 +3,9 @@ const User = require("../models/user.js");
 const CategoryModel = require("../models/categorySchema.js");
 const OfflineCategoryModel = require("../models/offlineCategorySchema.js");
 const onlineCategoryModel = require("../models/onlineCategorySchema.js")
+const post = require("../models/post.js");
 const admin = require('firebase-admin');
+
 
 //Firebase-setup
 const serviceAccount = {
@@ -24,7 +26,6 @@ admin.initializeApp({
 });
 
 // controllers-----------------------------------
-
 exports.sendPushNotification = async (req, res) => {
   const { token, message, title } = req.body;
   try {
@@ -46,7 +47,6 @@ exports.sendPushNotification = async (req, res) => {
     serverErrorHandler(error, res);
   }
 };
-
 exports.fetchallcategory = async (req, res) => {
   try {
     const allcategory = await CategoryModel.aggregate([
@@ -163,7 +163,6 @@ exports.fetchOnlinecategory = async (req, res) => {
     serverErrorHandler(error, res);
   }
 };
-
 exports.fetchsubcategory = async (req, res) => {
   try {
     const { parentCategoryName } = req.body;
@@ -212,7 +211,6 @@ exports.fetchsubcategory = async (req, res) => {
     serverErrorHandler(error, res);
   }
 };
-
 exports.fetchOfflinecategory = async (req, res) => {
   try {
     const allcategory = await OfflineCategoryModel.aggregate([
@@ -263,8 +261,65 @@ exports.fetchOfflinecategory = async (req, res) => {
   }
 };
 
+//serching APi's
+exports.serchByProductName = async (req, res) => {
+  try {
+    const { productName } = req.query;
+
+    if (!productName) {
+      return res.status(400).json({ message: "Product name is required" });
+    }
+
+    const products = await post.find({
+      itemName: { $regex: productName, $options: "i" } 
+    });
+
+    if (products.length === 0) {
+      return res.status(404).json({ message: "No products found" });
+    }
+
+    res.status(200).json({ products });
+  } catch (error) {
+    serverErrorHandler(error, res);  
+  }
+};
 
 
+exports.searchByDistance = async (req, res) => {
+  try {
+
+  } catch (error) {
+    serverErrorHandler(error, res);  
+  }
+};
+exports.serchByGender = async (req, res) => {
+  try {
+
+  } catch (error) {
+    serverErrorHandler(error, res);  
+  }
+};
+exports.serchBYdate = async (req, res) => {
+  try {
+
+  } catch (error) {
+    serverErrorHandler(error, res);  
+  }
+};
+exports.serchByFilter = async (req, res) => {
+  try {
+
+  } catch (error) {
+    serverErrorHandler(error, res);  
+  }
+};
+exports.serchBySort = async (req, res) => {
+  try {
+
+  } catch (error) {
+    serverErrorHandler(error, res);  
+  }
+};
 
 
 

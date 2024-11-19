@@ -25,7 +25,8 @@ const { sendPushNotification,
     fetchallcategory,
     fetchsubcategory,
     fetchOfflinecategory,
-    fetchOnlinecategory
+    fetchOnlinecategory,
+    serchByProductName
 } = require('../controllers/data.controller.js');
 
 //user
@@ -50,6 +51,15 @@ router.post("/fetchallcategory",verifyJWT,fetchallcategory);
 router.post("/fetchsubcategory",verifyJWT,fetchsubcategory);
 router.post("/fetchOfflinecategory",fetchOfflinecategory);
 router.post("/fetchOnlinecategory",fetchOnlinecategory);
+
+
+router.get("/searchByProductName", serchByProductName);
+router.get("/searchByDistance", serchByProductName);
+router.get("/serchByGender", serchByProductName);
+router.get("/serchBYdate", serchByProductName);
+router.get("/serchByFilter", serchByProductName);
+router.get("/serchBySort", serchByProductName);
+
 
 //clubRequest
 router.post("/sendClubRequest",verifyJWT,sendClubRequest);
