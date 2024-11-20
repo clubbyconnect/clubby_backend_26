@@ -1,0 +1,53 @@
+// src/models/Group.js
+const mongoose = require('mongoose');
+const Schema = mongoose.Schema;
+
+const GroupSchema = new Schema({
+  productId: {
+    type: String,  // Unique for each product
+    required: true,
+    unique: true,
+    index: true // Index for fast retrieval by productId
+  },
+  productName: {
+    type: String,
+    required: true,
+    index: true // Index for fast retrieval by productName
+  },
+  adminId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true // Index for fast retrieval of groups by adminId
+  },
+  members: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      index: true // Index for fast querying of groups by member ID
+    },
+  ],
+  limit: {
+    type: Number,
+    required: true,
+    default: 10,
+  },
+  isActive: {
+    type: Boolean,
+    default: true,
+    index: true // Index for filtering active groups
+  },
+  votes: [String],  // Used for voting logic (e.g., 'yes', 'no')
+  messages: [{  // Add this field to store message IDs
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message'
+  }]
+}, {
+  timestamps: true,
+});
+
+// Create a compound index for frequently queried combinations, if needed
+GroupSchema.index({ adminId: 1, isActive: 1 });
+
+const Group = mongoose.model('Group', GroupSchema);
+module.exports = Group;

@@ -6,7 +6,6 @@ const onlineCategoryModel = require("../models/onlineCategorySchema.js")
 const post = require("../models/post.js");
 const admin = require('firebase-admin');
 
-
 //Firebase-setup
 const serviceAccount = {
   type : process.env.type,
@@ -284,43 +283,260 @@ exports.serchByProductName = async (req, res) => {
   }
 };
 
-
 exports.searchByDistance = async (req, res) => {
   try {
+    const { latitude, longitude, radius } = req.query; 
 
+    if (!latitude || !longitude || !radius) {
+      return res.status(400).json({
+        success: false,
+        message: "Latitude, longitude, and radius are required.",
+      });
+    }
+
+    const lat = parseFloat(latitude);
+    const lon = parseFloat(longitude);
+    const kmRadius = parseFloat(radius);
+
+    if (isNaN(lat) || isNaN(lon) || isNaN(kmRadius) || kmRadius <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid latitude, longitude, or radius.",
+      });
+    }
+
+    const radiusInMeters = kmRadius * 1000;
+
+    const results = await post.find({
+      location: {
+        $nearSphere: {
+          $geometry: {
+            type: "Point",
+            coordinates: [lon, lat], // Longitude first, then latitude
+          },
+          $maxDistance: radiusInMeters, 
+        },
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      data: results,
+    });
   } catch (error) {
-    serverErrorHandler(error, res);  
+    serverErrorHandler(error, res);
   }
 };
-exports.serchByGender = async (req, res) => {
+exports.searchByGender = async (req, res) => {
   try {
+    const { gender } = req.query;
 
+    if (!gender) {
+      return res.status(400).json({ message: "Gender is required" });
+    }
+
+    const products = await post.find();
+
+    const filteredProducts = [];
+    for (const product of products) {
+      const user = await User.findById(product.userId);
+
+      if (user && user.gender === gender) {
+        filteredProducts.push(product);
+      }
+    }
+
+    if (filteredProducts.length === 0) {
+      return res.status(404).json({ message: "No products found for the specified gender" });
+    }
+
+    res.status(200).json({ products: filteredProducts });
   } catch (error) {
-    serverErrorHandler(error, res);  
+    serverErrorHandler(error, res);
   }
 };
-exports.serchBYdate = async (req, res) => {
+exports.searchByDate = async (req, res) => {
   try {
+    const { date } = req.query; 
 
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: "Date is required",
+      });
+    }
+
+    const startDate = new Date(date);
+
+    if (isNaN(startDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid date format",
+      });
+    }
+
+    const results = await post.find({
+      createdAt: { $gte: startDate }, 
+    }).sort({ createdAt: -1 }); 
+
+    res.status(200).json({
+      success: true,
+      data: results,
+    });
   } catch (error) {
-    serverErrorHandler(error, res);  
+    serverErrorHandler(error, res);
   }
 };
-exports.serchByFilter = async (req, res) => {
+exports.searchByFilter = async (req, res) => {
   try {
+    const { offerType, paymentMode, clubMembers, size } = req.query;
 
+    let filter = {};
+
+    if (offerType) {
+      filter.offerType = offerType; 
+    }
+
+    if (paymentMode) {
+      filter.paymentMode = paymentMode; 
+    }
+
+    if (clubMembers) {
+      filter.clubMembers = parseInt(clubMembers);
+    }
+
+    if (size) {
+      filter.size = size; 
+    }
+
+    const results = await post.find(filter);
+
+    res.status(200).json({
+      success: true,
+      data: results,
+    });
   } catch (error) {
-    serverErrorHandler(error, res);  
+    serverErrorHandler(error, res);
   }
 };
-exports.serchBySort = async (req, res) => {
+exports.searchBySort = async (req, res) => {
   try {
+    const { sortBy } = req.query; 
 
+    let sortOptions = {};
+    if (sortBy === "price_high_to_low") {
+      sortOptions.price = -1; 
+    } else if (sortBy === "price_low_to_high") {
+      sortOptions.price = 1; 
+    } else if (sortBy === "newest") {
+      sortOptions.createdAt = -1; 
+    }
+
+    const results = await post.find().sort(sortOptions);
+
+    res.status(200).json({
+      success: true,
+      data: results,
+    });
   } catch (error) {
-    serverErrorHandler(error, res);  
+    serverErrorHandler(error, res);
   }
 };
 
+//-------------------All filters in One Api--------------------------------
+exports.unifiedSearch = async (req, res) => {
+  try {
+    const {
+      productName,
+      latitude,
+      longitude,
+      radius,
+      gender,
+      date,
+      offerType,
+      paymentMode,
+      clubMembers,
+      size,
+      sortBy,
+    } = req.query;
+
+    let filter = {};
+    let sortOptions = {};
+    let locationFilter = null;
+
+    if (productName) {
+      filter.itemName = { $regex: productName, $options: "i" };
+    }
+
+    if (latitude && longitude && radius) {
+      const lat = parseFloat(latitude);
+      const lon = parseFloat(longitude);
+      const kmRadius = parseFloat(radius);
+
+      if (!isNaN(lat) && !isNaN(lon) && !isNaN(kmRadius) && kmRadius > 0) {
+        locationFilter = {
+          location: {
+            $nearSphere: {
+              $geometry: {
+                type: "Point",
+                coordinates: [lon, lat],
+              },
+              $maxDistance: kmRadius * 1000,
+            },
+          },
+        };
+      }
+    }
+
+    if (gender) {
+      const products = await post.find();
+      const filteredProducts = [];
+      for (const product of products) {
+        const user = await User.findById(product.userId);
+        if (user && user.gender === gender) {
+          filteredProducts.push(product);
+        }
+      }
+      if (filteredProducts.length === 0) {
+        return res.status(404).json({ message: "No products found for the specified gender" });
+      }
+      return res.status(200).json({ products: filteredProducts });
+    }
+
+    if (date) {
+      const startDate = new Date(date);
+      if (!isNaN(startDate.getTime())) {
+        filter.createdAt = { $gte: startDate };
+      } else {
+        return res.status(400).json({ message: "Invalid date format" });
+      }
+    }
 
 
+    if (offerType) filter.offerType = offerType;
+    if (paymentMode) filter.paymentMode = paymentMode;
+    if (clubMembers) filter.clubMembers = parseInt(clubMembers);
+    if (size) filter.size = size;
+
+    if (sortBy === "price_high_to_low") {
+      sortOptions.price = -1;
+    } else if (sortBy === "price_low_to_high") {
+      sortOptions.price = 1;
+    } else if (sortBy === "newest") {
+      sortOptions.createdAt = -1;
+    }
+
+    const query = locationFilter ? { ...filter, ...locationFilter } : filter;
+
+    const results = await post.find(query).sort(sortOptions);
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: "No products found" });
+    }
+
+    res.status(200).json({ success: true, data: results });
+  } catch (error) {
+    serverErrorHandler(error, res);
+  }
+};
 

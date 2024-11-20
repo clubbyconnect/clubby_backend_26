@@ -3,6 +3,8 @@ const axios = require("axios");
 const { OAuth2Client } = require("google-auth-library");
 const Facebook = require("facebook-node-sdk");
 const { appleAuth } = require("apple-auth");
+const mongoose = require('mongoose');
+const ObjectId = mongoose.Types.ObjectId;
 const uploadOnCloudinary = require("../utils/cloudinary.js");
 const serverErrorHandler = require("../utils/serverErrorHandler.js");
 const User = require("../models/user.js");
@@ -13,6 +15,12 @@ const onlineCategoryModel = require("../models/onlineCategorySchema.js");
 const CategoryModel = require("../models/categorySchema.js");
 const ClubRequest = require("../models/clubRequest.js");
 const ChatRoom = require("../models/chatRoom.js");
+
+//Group chat
+const Group = require('../models/group.js');
+const Message = require('../models/message.js');
+const Voting = require('../models/voting.js')
+const { getIO } = require("../sockets/chats.js"); // Add this to access the socket instance
 
 // Fast2SMS Configuration-----------------------------------
 const fast2SMSapiKey = process.env.FAST2SMS_API_KEY;
@@ -668,7 +676,7 @@ exports.UpdateUserDetails = async (req, res) => {
 //------------------------------------------User Request---------------------------------------------
 exports.sendClubRequest = async (req, res) => {
   try {
-    const { postId } = req.body;
+    const { postId } = req.body
     const requesterId = req.User._id;
 
     const postData = await post.findById(postId);
@@ -677,9 +685,7 @@ exports.sendClubRequest = async (req, res) => {
     }
 
     if (postData.userId.equals(requesterId)) {
-      return res
-        .status(404)
-        .json({ error: "You can not send ClubRequest to your own Post" });
+      return res.status(404).json({ error: "You can not send ClubRequest to your own Post" });
     }
     const recipientId = postData.userId;
 
@@ -706,7 +712,9 @@ exports.sendClubRequest = async (req, res) => {
     await friendRequest.save();
     return res.status(200).json({ message: "Club request sent" });
   } catch (error) {
-    return res.status(500).json({ error: "Error sending Club request", error });
+    return res
+      .status(500)
+      .json({ error: "Error sending Club request", error });
   }
 };
 
@@ -722,8 +730,7 @@ exports.acceptClubRequest = async (req, res) => {
 
     if (postData.userId.equals(requesterId)) {
       return res.status(400).json({
-        message:
-          "You cannot use your userId as requesterId to Accept ClubRequest",
+        message: "You cannot use your userId as requesterId to Accept ClubRequest",
       });
     }
 
@@ -746,6 +753,7 @@ exports.acceptClubRequest = async (req, res) => {
       return res.status(400).json({ error: "Club request already accepted" });
     }
 
+
     let group = await ChatRoom.findOne({ roomId: postData._id });
     if (!group) {
       group = new ChatRoom({
@@ -763,9 +771,7 @@ exports.acceptClubRequest = async (req, res) => {
 
     await group.save();
 
-    return res
-      .status(200)
-      .json({ message: "Club request accepted and added to Club chat" });
+    return res.status(200).json({ message: "Club request accepted and added to Club chat" });
   } catch (error) {
     serverErrorHandler(error, res);
   }
@@ -784,10 +790,7 @@ exports.declineClubRequest = async (req, res) => {
     }
 
     if (postData.userId.equals(requesterId)) {
-      return res.status(404).json({
-        error:
-          "You can not use your userId as requesterId to declined ClubRequest",
-      });
+      return res.status(404).json({ error: "You can not use your userId as requesterId to declined ClubRequest", });
     }
 
     const requester = await User.findById(requesterId);
@@ -814,29 +817,481 @@ exports.declineClubRequest = async (req, res) => {
     return res.status(200).json({ message: "club request declined" });
   } catch (error) {
     serverErrorHandler(error, res);
+
   }
 };
 
 exports.removeUserFromClub = async (req, res) => {
   try {
+
     const { roomId, userId } = req.body;
 
     const room = await ChatRoom.findOne({ roomId });
     if (!room) {
-      return res.status(404).json({ error: "Chat room not found" });
+      return res.status(404).json({ error: 'Chat room not found' });
     }
 
     if (!room.members.includes(userId)) {
-      return res.status(400).json({ error: "User not in chat room" });
+      return res.status(400).json({ error: 'User not in chat room' });
     }
 
     // room.members.pull(userId);
     // await room.save();
 
-    req.app.get("io").to(roomId).emit("userRemoved", { roomId, userId });
+    req.app.get('io').to(roomId).emit('userRemoved', { roomId, userId });
 
-    return res.status(200).json({ message: "User removed from chat room" });
+    return res.status(200).json({ message: 'User removed from chat room' });
+
   } catch (error) {
     serverErrorHandler(error, res);
+  }
+};
+
+// Helper function to send system message
+exports.sendSystemMessage = async (groupId, content) => {
+  const newMessage = await Message.create({
+    groupId,
+    content,
+    type: "system", // Assuming there's a 'system' type in your Message model
+    timestamp: new Date(),
+  });
+
+  console.log('In the system message ', groupId.toString())
+  const io = getIO(); // Emit the updated admin to the group members
+  // Emit groupId and content along with the new message
+  io.to(groupId.toString()).emit("newMessage", newMessage);
+
+  console.log(`Emitting new message to.. group ${groupId}:`, newMessage);
+
+};
+
+// Group chat module starts
+
+// Create or join a group avoid duplicate user to join
+exports.createOrJoinGroup = async (req, res) => {
+  const { productId, productName, limit, adminId, userId } = req.body;
+
+  try {
+    // Find the group by productId
+    let group = await Group.findOne({ productId });
+
+    // If the group does not exist, create a new group
+    if (!group) {
+      group = await Group.create({
+        productId,
+        productName,
+        limit,
+        adminId: adminId || userId,
+        members: [adminId || userId],
+      });
+
+      // Emit group creation event
+      const io = getIO();
+      io.emit("groupCreated", { groupId: group._id, productName, adminId: group.adminId });
+
+      return res.status(201).json({ message: "Group created", group });
+    }
+
+    // If the group has reached the member limit
+    if (group.members.length >= group.limit) {
+      if (group.adminId.equals(userId)) {
+        return res.status(403).json({
+          message: "Group is full. Would you like to deactivate the group?",
+          action: "deactivateOption",
+        });
+      } else {
+        return res.status(403).json({ message: "Group is full." });
+      }
+    }
+
+    // Check if the user is already a member of the group
+    const isUserInGroup = group.members.some(member => member.equals(userId));
+    if (isUserInGroup) {
+      return res.status(400).json({ message: "User already exists in the group." });
+    }
+
+    // Add the user to the group
+    group.members.push(userId);
+    await group.save();
+
+    try {
+      await exports.sendSystemMessage(group._id, `${userId} has joined the group.`);
+    } catch (error) {
+      console.error("Error in sendSystemMessage:", error); // Log the error for more details
+    }
+
+    // Emit member joining event
+    const io = getIO();
+    io.to(group._id).emit("memberJoined", { userId });
+
+    return res.status(200).json({ message: "Joined the group", group });
+  } catch (error) {
+    console.error("Error in create/join group:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+// Deactivate a group (admin only)
+exports.deactivateGroup = async (req, res) => {
+  const { groupId, adminId } = req.body;
+
+  try {
+    const group = await Group.findById(groupId);
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found." });
+    }
+
+    // Check if the user making the request is the admin
+    if (!group.adminId.equals(adminId)) {
+      return res.status(403).json({ message: "Only the admin can deactivate the group." });
+    }
+
+    // Mark the group as inactive
+    group.isActive = false;
+    await group.save();
+
+    // Emit the group deactivation event to notify all members
+    const io = getIO();
+    io.to(group._id).emit("groupDeactivated", { groupId });
+
+    return res.status(200).json({ message: "Group has been deactivated", group });
+  } catch (error) {
+    console.error("Error deactivating group:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+// Send a message in the group
+exports.sendMessage = async (req, res) => {
+  console.log('Request body:', req.body);
+  console.log('req.file ', req.file)
+
+  // Access image, audio, and video files from req.files
+  const imageFile = req.files?.image ? req.files.image[0] : null;
+  const audioFile = req.files?.audio ? req.files.audio[0] : null;
+  const videoFile = req.files?.video ? req.files.video[0] : null;
+
+  console.log('Audio file:', audioFile);
+  console.log('Image file:', imageFile);
+  console.log('Video file:', videoFile);
+
+  const { groupId, messageType, messageContent } = req.body;
+  console.log('req.User is ', req.User)
+  const userId = req.User._id;
+
+  try {
+    const group = await Group.findById(groupId);
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found." });
+    }
+    console.log('group is ', group.isActive)
+
+
+    // Check if the user is a member of the group
+    const isMember = group.members.includes(userId);
+    if (!isMember) {
+      return res.status(403).json({ message: "You are not a member of this group." });
+    }
+
+    // Check if the group is active
+    if (!group.isActive) {
+      return res.status(403).json({ message: "No one can send messages as the group is deactivated." });
+    }
+
+    let finalMessageContent = messageContent;
+
+    if (messageType === 'image') {
+      const imageLocalPath = imageFile.path;
+      if (!imageLocalPath) {
+        return res.status(400).json({ error: "Image file is required for image messages" });
+      }
+
+      const cloudinaryResult = await uploadOnCloudinary(imageLocalPath);
+      if (!cloudinaryResult || !cloudinaryResult.secure_url) {
+        return res.status(500).json({ error: "Failed to upload image to Cloudinary" });
+      }
+
+      finalMessageContent = cloudinaryResult.secure_url;
+    }
+
+    if (messageType === 'audio') {
+      const audioLocalPath = audioFile.path;
+      if (!audioLocalPath) {
+        return res.status(400).json({ error: "Audio file is required for audio messages" });
+      }
+      console.log('audio part...')
+
+      const cloudinaryResult = await uploadOnCloudinary(audioLocalPath);
+      if (!cloudinaryResult || !cloudinaryResult.secure_url) {
+        return res.status(500).json({ error: "Failed to upload Audio to Cloudinary" });
+      }
+      console.log('audio part URL ', cloudinaryResult.secure_url)
+
+      finalMessageContent = cloudinaryResult.secure_url;
+    }
+    if (messageType === 'video') {
+      const videoLocalPath = videoFile.path;
+      if (!videoLocalPath) {
+        return res.status(400).json({ error: "Image file is required for image messages" });
+      }
+
+      const cloudinaryResult = await uploadOnCloudinary(videoLocalPath);
+      if (!cloudinaryResult || !cloudinaryResult.secure_url) {
+        return res.status(500).json({ error: "Failed to upload image to Cloudinary" });
+      }
+
+      finalMessageContent = cloudinaryResult.secure_url;
+    }
+
+    const newMessage = await Message.create({
+      groupId,
+      senderId: userId,
+      content: finalMessageContent,
+      type: messageType,
+    });
+
+    group.messages.push(newMessage._id);
+    await group.save();
+
+    // Emit message to the socket (real-time update)
+    // const io = getIO();
+    // io.to(groupId).emit("newMessage", newMessage);
+
+    return res.status(201).json(newMessage);
+
+  } catch (error) {
+    console.error("Error sending message:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+// New function to mark a message as read
+exports.markMessageAsRead = async (req, res) => {
+  const { messageId } = req.body;
+  const userId = req.User._id;
+
+  try {
+    const message = await Message.findById(messageId);
+
+    if (!message) {
+      return res.status(404).json({ message: "Message not found." });
+    }
+
+    // Check if the user has already read the message
+    if (!message.readBy.some(read => read.userId.equals(userId))) {
+      message.readBy.push({ userId, readAt: new Date() });
+      await message.save();
+
+      // Emit the read receipt to all users in the group
+      const io = getIO();
+      io.to(message.groupId.toString()).emit("messageRead", { messageId, userId });
+    }
+
+    return res.status(200).json({ message: "Message marked as read." });
+  } catch (error) {
+    console.error("Error marking message as read:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+exports.leaveGroup = async (req, res) => {
+  const { groupId, userId, newAdminId } = req.body;
+  if (!groupId || !userId) {
+    return res.status(400).json({ message: 'groupId and userId are required.' });
+  }
+
+  try {
+    const group = await Group.findById(groupId);
+    console.log('groupId, userId, newAdminId  group.adminId', groupId, userId, newAdminId, group.adminId)
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found." });
+    }
+    // Check if the user is a member of the group
+    const isMember = group.members.includes(userId);
+    if (!isMember) {
+      return res.status(403).json({ message: "You are not a member of this group." });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+    const userFirstName = user.firstName || "User";
+
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+    const newAdminObjectId = new mongoose.Types.ObjectId(newAdminId);
+
+    // Check if the user leaving is the admin
+    if (group.adminId.equals(userObjectId)) {
+      // Check if the group is active
+      if (!group.isActive) {
+        return res.status(403).json({ message: "No action can perform as Group is deactivated." });
+      }
+
+      // Admin is leaving, handle admin transfer or group deactivation
+      if (newAdminId) {
+
+        const newAdmin = await User.findById(newAdminId);
+        if (!newAdmin) {
+          return res.status(404).json({ message: "new Admin not found." });
+        }
+        const newAdminFirstName = newAdmin.firstName || "User";
+
+        // Transfer admin rights
+        console.log('Making Admin working')
+        group.adminId = newAdminObjectId;
+        ;
+        group.members = group.members.filter(member => !member.equals(userObjectId));
+        await group.save();
+        await exports.sendSystemMessage(group._id, `${userFirstName} transferred admin rights to ${newAdminFirstName}.`);
+        await exports.sendSystemMessage(group._id, `${userFirstName} left the group.`);
+
+        // const io = getIO(); // Emit the updated admin to the group members
+        // io.to(group._id).emit("sendSystemMessage", { newAdminId });
+        return res.status(200).json({ message: "Admin rights transferred", group });
+      } else {
+        // Deactivate group if no new admin is specified
+        // await Group.deleteOne({ _id: groupId });
+        group.isActive = false;
+        await group.save();
+        await exports.sendSystemMessage(group._id, `${userFirstName} deactivate the group. No one can send message now.`);
+
+        // const io = getIO(); // Emit group deactivation
+        // io.to(group._id).emit("groupDeactivated", { groupId });
+        return res.status(200).json({ message: "Group deactivated" });
+      }
+    } else {
+      // Normal user leaving the group without voting
+      group.members = group.members.filter(member => !member.equals(userObjectId));
+      await group.save();
+      await exports.sendSystemMessage(group._id, `${userFirstName} has left the group.`);
+
+
+      // const io = getIO(); // Emit user leave event to the group members
+      // io.to(group._id).emit("memberLeft", { userId });
+
+      return res.status(200).json({ message: "User has left the group", group });
+    }
+  } catch (error) {
+    console.error("Error in leave group:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+// Get all groups for a user
+exports.getGroupsForUser = async (req, res) => {
+  const { userId } = req.params;  // Access userId from query string
+
+  try {
+    const groups = await Group.find({ members: new mongoose.Types.ObjectId(userId) });
+    return res.status(200).json(groups);
+  } catch (error) {
+    console.error("Error fetching groups for user:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+// Get messages for a specific group
+exports.getMessagesForGroup = async (req, res) => {
+  const { groupId } = req.params;
+
+  try {
+    // Retrieve all messages for the given groupId
+    const messages = await Message.find({ groupId })
+      .populate('senderId', 'firstName avatar') // Populate senderId to get username
+      .sort({ createdAt: 1 }) // Sort messages by creation date in ascending order (oldest first)
+
+    // Return messages in the response
+    return res.status(200).json(messages);
+  } catch (error) {
+    console.error("Error fetching messages:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+// Controller function to fetch group members and admin by productId
+exports.getGroupMembersAndAdmin = async (req, res) => {
+  const { groupId } = req.params;  // Get groupId from URL params
+  console.log('groupId ', groupId);
+
+  try {
+    // Find the group by _id (groupId) and populate adminId and members fields
+    const group = await Group.findById((groupId)) // Find by _id
+      .populate('adminId', 'firstName') // Populate adminId with admin's name and email
+      .populate('members', 'firstName'); // Populate members with their names and emails
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found." });
+    }
+
+    return res.status(200).json({
+      message: "Group details fetched successfully",
+      admin: group.adminId,   // Return admin details
+      members: group.members, // Return member details
+    });
+  } catch (error) {
+    console.error("Error fetching group members and admin:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+//Currently no need of these
+// Helper function for sending a voting message
+exports.sendVotingMessage = async (groupId, userId) => {
+  const messageContent = `${userId} wants to leave the group. Please vote (yes/no).`;
+  await exports.sendSystemMessage(groupId, messageContent);
+};
+
+// Cast vote process
+exports.castVote = async (req, res) => {
+  const { votingId, voterId, vote } = req.body;
+
+  try {
+    const voting = await Voting.findById(votingId);
+
+    if (!voting || voting.status !== "ongoing") {
+      return res.status(404).json({ message: "No ongoing voting found." });
+    }
+
+    if (voting.votes[voterId]) {
+      return res.status(400).json({ message: "You have already voted." });
+    }
+
+    voting.votes[voterId] = vote;
+    await voting.save();
+
+    const io = getIO();
+    io.to(voting.groupId).emit("voteUpdate", { voterId, vote });
+
+    const group = await Group.findById(voting.groupId);
+    const allMembersVoted = group.members.every((member) => voting.votes[member]);
+
+    if (allMembersVoted) {
+      const allVotesAreYes = Object.values(voting.votes).every((vote) => vote === "yes");
+
+      if (allVotesAreYes) {
+        group.members = group.members.filter((member) => member !== voting.userId);
+        await group.save();
+        voting.status = "completed";
+        await voting.save();
+        await exports.sendSystemMessage(group._id, `${voting.userId} has left the group after a successful vote.`);
+        io.to(voting.groupId).emit("voteCompleted", { status: "success", userId: voting.userId });
+        return res.status(200).json({ message: "User has successfully left the group.", group });
+      } else {
+        voting.status = "denied";
+        await voting.save();
+        await exports.sendSystemMessage(group._id, `${voting.userId}'s request to leave was denied.`);
+        io.to(voting.groupId).emit("voteCompleted", { status: "denied", userId: voting.userId });
+        return res.status(200).json({ message: "Leave request denied.", group });
+      }
+    }
+
+    return res.status(200).json({ message: "Vote registered.", voting });
+  } catch (error) {
+    console.error("Error casting vote:", error);
+    return res.status(500).json({ message: "Internal server error." });
   }
 };
