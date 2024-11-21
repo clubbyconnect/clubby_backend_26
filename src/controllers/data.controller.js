@@ -447,25 +447,31 @@ exports.searchBySort = async (req, res) => {
 exports.unifiedSearch = async (req, res) => {
   try {
     const {
+      gender,
       productName,
       latitude,
       longitude,
       radius,
-      gender,
-      date,
-      offerType,
       paymentMode,
+      offerType,
       clubMembers,
       size,
       sortBy,
     } = req.query;
 
-    let filter = {};
+    let query = {}; // Initial empty query object
     let sortOptions = {};
-    let locationFilter = null;
+
+    // Apply filters dynamically in priority order
+    if (gender) {
+      const users = await User.find({ gender }); // Fetch all users matching gender
+      const userIds = users.map((user) => user._id); // Extract user IDs
+
+      query.userId = { $in: userIds }; // Filter products by user IDs matching gender
+    }
 
     if (productName) {
-      filter.itemName = { $regex: productName, $options: "i" };
+      query.itemName = { $regex: productName, $options: "i" }; // Case-insensitive product name match
     }
 
     if (latitude && longitude && radius) {
@@ -474,50 +480,35 @@ exports.unifiedSearch = async (req, res) => {
       const kmRadius = parseFloat(radius);
 
       if (!isNaN(lat) && !isNaN(lon) && !isNaN(kmRadius) && kmRadius > 0) {
-        locationFilter = {
-          location: {
-            $nearSphere: {
-              $geometry: {
-                type: "Point",
-                coordinates: [lon, lat],
-              },
-              $maxDistance: kmRadius * 1000,
+        query.location = {
+          $nearSphere: {
+            $geometry: {
+              type: "Point",
+              coordinates: [lon, lat],
             },
+            $maxDistance: kmRadius * 1000,
           },
         };
       }
     }
 
-    if (gender) {
-      const products = await post.find();
-      const filteredProducts = [];
-      for (const product of products) {
-        const user = await User.findById(product.userId);
-        if (user && user.gender === gender) {
-          filteredProducts.push(product);
-        }
-      }
-      if (filteredProducts.length === 0) {
-        return res.status(404).json({ message: "No products found for the specified gender" });
-      }
-      return res.status(200).json({ products: filteredProducts });
+    if (paymentMode) {
+      query.paymentMode = paymentMode; // Filter by payment mode
     }
 
-    if (date) {
-      const startDate = new Date(date);
-      if (!isNaN(startDate.getTime())) {
-        filter.createdAt = { $gte: startDate };
-      } else {
-        return res.status(400).json({ message: "Invalid date format" });
-      }
+    if (offerType) {
+      query.offerType = offerType; // Filter by offer type
     }
 
+    if (clubMembers) {
+      query.clubMembers = parseInt(clubMembers); // Filter by club member count
+    }
 
-    if (offerType) filter.offerType = offerType;
-    if (paymentMode) filter.paymentMode = paymentMode;
-    if (clubMembers) filter.clubMembers = parseInt(clubMembers);
-    if (size) filter.size = size;
+    if (size) {
+      query.size = size; // Filter by size
+    }
 
+    // Apply sorting dynamically
     if (sortBy === "price_high_to_low") {
       sortOptions.price = -1;
     } else if (sortBy === "price_low_to_high") {
@@ -526,10 +517,10 @@ exports.unifiedSearch = async (req, res) => {
       sortOptions.createdAt = -1;
     }
 
-    const query = locationFilter ? { ...filter, ...locationFilter } : filter;
-
+    // Fetch filtered products
     const results = await post.find(query).sort(sortOptions);
 
+    // Handle no results
     if (results.length === 0) {
       return res.status(404).json({ message: "No products found" });
     }
@@ -539,4 +530,5 @@ exports.unifiedSearch = async (req, res) => {
     serverErrorHandler(error, res);
   }
 };
+
 
