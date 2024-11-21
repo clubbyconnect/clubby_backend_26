@@ -518,6 +518,7 @@ exports.createPost = async (req, res) => {
           .json({ error: "Offline category type requires a store location." });
       }
     } else if (clubType === "online") {
+    
       if (
         !platform ||
         !itemLink ||
@@ -579,14 +580,28 @@ exports.createPost = async (req, res) => {
     if (additionalInformation)
       postData.additionalInformation = additionalInformation;
 
+
     if (clubType === "offline") {
-      postData.store_location_latitude = store_location_latitude;
-      postData.store_location_longitude = store_location_longitude;
+     
+      postData.store_location = {
+        type: "Point",
+        coordinates: [
+          parseFloat(store_location_longitude), 
+          parseFloat(store_location_latitude),  
+        ],
+      };
     } else if (clubType === "online") {
+     
+      postData.delivery_location = {
+        type: "Point",
+        coordinates: [
+          parseFloat(delivery_location_longitude), 
+          parseFloat(delivery_location_latitude),  
+        ],
+      };
+
       postData.itemLink = itemLink;
       postData.platform = platform;
-      postData.delivery_location_latitude = delivery_location_latitude;
-      postData.delivery_location_longitude = delivery_location_longitude;
       postData.paymentMode = paymentMode;
     }
 

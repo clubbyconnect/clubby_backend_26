@@ -3,7 +3,7 @@ const User = require("../models/user.js");
 const CategoryModel = require("../models/categorySchema.js");
 const OfflineCategoryModel = require("../models/offlineCategorySchema.js");
 const onlineCategoryModel = require("../models/onlineCategorySchema.js")
-const post = require("../models/post.js");
+const Post = require("../models/post.js");
 const admin = require('firebase-admin');
 
 //Firebase-setup
@@ -285,12 +285,12 @@ exports.serchByProductName = async (req, res) => {
 
 exports.searchByDistance = async (req, res) => {
   try {
-    const { latitude, longitude, radius } = req.query; 
+    const { latitude, longitude, radius, locationType } = req.query;
 
-    if (!latitude || !longitude || !radius) {
+    if (!latitude || !longitude || !radius || !locationType) {
       return res.status(400).json({
         success: false,
-        message: "Latitude, longitude, and radius are required.",
+        message: "Latitude, longitude, radius, and locationType are required.",
       });
     }
 
@@ -307,26 +307,60 @@ exports.searchByDistance = async (req, res) => {
 
     const radiusInMeters = kmRadius * 1000;
 
-    const results = await post.find({
-      location: {
-        $nearSphere: {
-          $geometry: {
-            type: "Point",
-            coordinates: [lon, lat], // Longitude first, then latitude
-          },
-          $maxDistance: radiusInMeters, 
-        },
-      },
-    });
+    if (locationType !== 'store' && locationType !== 'delivery') {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid locationType. It must be 'store' or 'delivery'.",
+      });
+    }
+
+    const geoQuery = locationType === 'store'
+    ? {
+        "store_location.coordinates": {
+          $nearSphere: {
+            $geometry: {
+              type: "Point",
+              coordinates: [lon, lat], 
+            },
+            $maxDistance: radiusInMeters, 
+          }
+        }
+      }
+    : {
+        "delivery_location.coordinates": {
+          $nearSphere: {
+            $geometry: {
+              type: "Point",
+              coordinates: [lon, lat], 
+            },
+            $maxDistance: radiusInMeters, 
+          }
+        }
+      };
+  
+    const results = await Post.find(geoQuery);
+
+    if (results.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No posts found within the specified radius.",
+      });
+    }
 
     res.status(200).json({
       success: true,
       data: results,
     });
   } catch (error) {
-    serverErrorHandler(error, res);
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 };
+
+
 exports.searchByGender = async (req, res) => {
   try {
     const { gender } = req.query;
@@ -459,19 +493,19 @@ exports.unifiedSearch = async (req, res) => {
       sortBy,
     } = req.query;
 
-    let query = {}; // Initial empty query object
+    let query = {}; 
     let sortOptions = {};
 
-    // Apply filters dynamically in priority order
+    
     if (gender) {
-      const users = await User.find({ gender }); // Fetch all users matching gender
-      const userIds = users.map((user) => user._id); // Extract user IDs
+      const users = await User.find({ gender }); 
+      const userIds = users.map((user) => user._id); 
 
-      query.userId = { $in: userIds }; // Filter products by user IDs matching gender
+      query.userId = { $in: userIds }; 
     }
 
     if (productName) {
-      query.itemName = { $regex: productName, $options: "i" }; // Case-insensitive product name match
+      query.itemName = { $regex: productName, $options: "i" }; 
     }
 
     if (latitude && longitude && radius) {
@@ -493,22 +527,21 @@ exports.unifiedSearch = async (req, res) => {
     }
 
     if (paymentMode) {
-      query.paymentMode = paymentMode; // Filter by payment mode
+      query.paymentMode = paymentMode; 
     }
 
     if (offerType) {
-      query.offerType = offerType; // Filter by offer type
+      query.offerType = offerType; 
     }
 
     if (clubMembers) {
-      query.clubMembers = parseInt(clubMembers); // Filter by club member count
+      query.clubMembers = parseInt(clubMembers); 
     }
 
     if (size) {
-      query.size = size; // Filter by size
+      query.size = size; 
     }
 
-    // Apply sorting dynamically
     if (sortBy === "price_high_to_low") {
       sortOptions.price = -1;
     } else if (sortBy === "price_low_to_high") {
@@ -517,10 +550,8 @@ exports.unifiedSearch = async (req, res) => {
       sortOptions.createdAt = -1;
     }
 
-    // Fetch filtered products
     const results = await post.find(query).sort(sortOptions);
 
-    // Handle no results
     if (results.length === 0) {
       return res.status(404).json({ message: "No products found" });
     }

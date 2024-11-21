@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 const OfflineCategoryModel = require("./offlineCategorySchema.js");
 const onlineCategoryModel = require("./onlineCategorySchema.js");
 
-
 const postSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -27,7 +26,7 @@ const postSchema = new mongoose.Schema({
       validator: async function (v) {
         const CategoryModel = mongoose.model(this.clubType === "offline" ? "OfflineCategory" : "onlineCategory");
         const category = await CategoryModel.findById(v);
-        return !!category; 
+        return !!category;
       },
       message: "Invalid category for the selected club type.",
     },
@@ -42,24 +41,24 @@ const postSchema = new mongoose.Schema({
       validator: async function (v) {
         const CategoryModel = mongoose.model(this.clubType === "offline" ? "OfflineCategory" : "onlineCategory");
         const subCategory = await CategoryModel.findById(v);
-        return !!subCategory; 
+        return !!subCategory;
       },
       message: "Invalid subcategory for the selected club type.",
     },
   },
-  itemName: { 
-    type: String, 
+  itemName: {
+    type: String,
     required: [true, 'Item name is required'],
     minlength: [3, 'Item name must be at least 3 characters long'],
     maxlength: [70, 'Item name must be less than 70 characters']
   },
-  offerType: { 
-    type: String, 
+  offerType: {
+    type: String,
     required: [true, 'Offer type is required'],
     enum: {
       values: [
-        'Buy one get one free', 
-        'Multi buying discount offer and divide', 
+        'Buy one get one free',
+        'Multi buying discount offer and divide',
         'Minimum value purchase',
         'Brands coupons for minimum purchase',
         'Bank and card offers',
@@ -68,14 +67,14 @@ const postSchema = new mongoose.Schema({
       message: 'Invalid offer type'
     }
   },
-  price: { 
-    type: Number, 
+  price: {
+    type: Number,
     required: [true, 'Price is required'],
     min: [9, 'Price must be greater than 9 rupees']
   },
-  price_type: { 
-    type: String, 
-    required: [true, 'price_type is requierd'],
+  price_type: {
+    type: String,
+    required: [true, 'price_type is required'],
     enum: {
       values: ['Fixed (Price split evenly among club members)', 'Price will split based on the higher-value purchase.'],
       message: 'value should be : Fixed (Price split evenly among club members) or Price will split based on the higher-value purchase.'
@@ -86,53 +85,51 @@ const postSchema = new mongoose.Schema({
     required: [true, 'Number of club members is required'],
     min: [1, 'Club members must be at least 1']
   },
-  store_location_latitude: {
-    type: String,
-    default: null, 
+ 
+  store_location: {
+    type: {
+      type: String,
+      default: 'Point',
+    },
+    coordinates: {
+      type: [Number], 
+      index: '2dsphere', 
+    },
   },
-  store_location_longitude: {
-    type: String,
-    default: null, 
+  delivery_location: {
+    type: {
+      type: String,
+      default: 'Point',
+    },
+    coordinates: {
+      type: [Number], 
+      index: '2dsphere', 
+    },
   },
   additionalInformation: {
-    type: String, 
+    type: String,
     default: null,
   },
   size: {
-    type: String,  
-    default: null, 
+    type: String,
+    default: null,
   },
   itemLink: {
     type: String,
-    default: null, 
-    // validate: {
-    //   validator: function(v) {
-    //     return v ? /^(http|https):\/\/[^ "]+$/.test(v) : true;
-    //   },
-    //   message: 'Item link must be a valid URL'
-    // }
+    default: null,
   },
   platform: {
     type: String,
     default: null,
   },
-  delivery_location_latitude: {
-    type: String,
-    default: null, 
-  },
-  delivery_location_longitude: {
-    type: String,
-    default: null, 
-  },
   paymentMode: {
     type: String,
-    default: null, 
+    default: null,
   },
-  productImage: { 
-    type: String, 
-    default : "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721192873/zhcbblypjd3qg4gohafv.png"
+  productImage: {
+    type: String,
+    default: "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721192873/zhcbblypjd3qg4gohafv.png"
   },
-
   clubStatus: {
     type: String,
     enum: ['Pending', 'Created'],
@@ -150,19 +147,19 @@ const postSchema = new mongoose.Schema({
     type: String,
     validate: [
       {
-        validator: function(v) {
+        validator: function (v) {
           return v.trim().length > 0;
         },
         message: 'Report message cannot be empty.'
       },
       {
-        validator: function(v) {
+        validator: function (v) {
           return v.length >= 10;
         },
         message: 'Report message must be at least 10 characters long.'
       },
       {
-        validator: function(v) {
+        validator: function (v) {
           return v.length <= 300;
         },
         message: 'Report message cannot be longer than 300 characters.'
@@ -170,6 +167,11 @@ const postSchema = new mongoose.Schema({
     ]
   }]
 }, { timestamps: true });
+
+
+postSchema.index({ "store_location.coordinates": "2dsphere" });
+postSchema.index({ "delivery_location.coordinates": "2dsphere" });
+
 
 const Post = mongoose.model("Post", postSchema);
 module.exports = Post;
