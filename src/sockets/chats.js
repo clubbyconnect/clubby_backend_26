@@ -2,6 +2,7 @@
 const socketIO = require("socket.io");
 const { Server } = require("socket.io");
 const { sendSystemMessage } = require("../controllers/user.controller.js");
+const { sendPushNotification } = require('./data.controller');
 
 let io;
 
@@ -19,8 +20,8 @@ const initializeSockets = (server) => {
     console.log("New client connected:", socket.id);
 
     // Handle call request (both voice and video)
-    socket.on("initiateCall", (data) => {
-      const { groupId, callType, initiator } = data;
+    socket.on("initiateCall", async (data) => {
+      const { groupId, callType, initiator ,fcmTokens} = data;
       console.log('Active call in initiateCall ', activeCallRooms)
 
   
@@ -49,6 +50,29 @@ const initializeSockets = (server) => {
         initiator
       });
 
+        // Send push notifications to FCM tokens
+  if (fcmTokens && fcmTokens.length > 0) {
+    const title = `Incoming ${callType === "video" ? "Video" : "Voice"} Call`;
+    const message = `${initiator.userName} is calling you in group ${groupId}`;
+
+    for (const token of fcmTokens) {
+      try {
+       
+        await sendPushNotification(
+          {
+            body: { token, message, title },
+          },
+          {
+            status: () => ({ json: () => {} }), 
+          }
+        );
+      } catch (error) {
+        console.error(`Failed to send notification to token: ${token}`, error);
+      }
+    }
+  } else {
+    console.log("No FCM tokens provided for push notifications.");
+  }
 
       setTimeout(() => {
         const callRoom = activeCallRooms.get(groupId);
@@ -66,7 +90,7 @@ const initializeSockets = (server) => {
     socket.on("acceptCall", (data) => {
       console.log("Server received acceptCall with data:", data);
 
-      const { groupId, userId, userName } = data;
+      const { groupId, userId, userName ,fcmTokens } = data;
       const callRoom = activeCallRooms.get(groupId);
 
       if (!callRoom) {
@@ -99,7 +123,7 @@ const initializeSockets = (server) => {
     });
 
     socket.on("rejectCall", (data) => {
-      const { groupId, userId, userName } = data;
+      const { groupId, userId, userName ,fcmTokens } = data;
 
       socket.to(groupId).emit("callRejected", {
         groupId,
@@ -110,7 +134,7 @@ const initializeSockets = (server) => {
 
     // Handle WebRTC signaling
     socket.on("offer", (data) => {
-      const { to, from, offer } = data;
+      const { to, from, offer ,fcmTokens } = data;
       socket.to(to).emit("offer", {
         from: from,
         offer: offer
@@ -118,7 +142,7 @@ const initializeSockets = (server) => {
     });
 
     socket.on("answer", (data) => {
-      const { to, from, answer } = data;
+      const { to, from, answer ,fcmTokens } = data;
       socket.to(to).emit("answer", {
         from: from,
         answer: answer
@@ -126,7 +150,7 @@ const initializeSockets = (server) => {
     });
 
     socket.on("iceCandidate", (data) => {
-      const { to, candidate } = data;
+      const { to, candidate ,fcmTokens} = data;
       socket.to(to).emit("iceCandidate", {
         from: socket.id,
         candidate: candidate
@@ -135,20 +159,25 @@ const initializeSockets = (server) => {
 
     // Handle call end
     socket.on("endCall", (data) => {
-      const { groupId } = data;
-      console.log('removing the active call')
-
+      const { groupId, fcmTokens } = data;
+      console.log('Ending the call for group:', groupId);
+      
       if (activeCallRooms.has(groupId)) {
-        io.to(groupId).emit("callEnded", {
-          groupId,
-          reason: "ended_by_participant"
-        });
-        console.log('Active call before ', activeCallRooms)
+        io.to(groupId).emit("callEnded", { groupId, reason: "ended_by_participant" });
         activeCallRooms.delete(groupId);
-        console.log('Active call after ', activeCallRooms)
-
+    
+        // Notify via push notification
+        if (fcmTokens && fcmTokens.length > 0) {
+          const title = "Call Ended";
+          const message = `The call in group ${groupId} has ended.`;
+    
+          fcmTokens.forEach(token => {
+            sendPushNotification({ body: { token, title, message } }, { status: () => ({ json: () => {} }) });
+          });
+        }
       }
     });
+    
 
     // Join a group room
     // Join group for chat and here there will be a option to call video/voice both
@@ -160,36 +189,51 @@ const initializeSockets = (server) => {
 
     // Handle group deactivation
     socket.on("deactivateGroup", async (data) => {
-      const { groupId, adminId } = data;
-
+      const { groupId, adminId, fcmTokens } = data;
       const group = await Group.findById(groupId);
-      if (!group) {
-        return;
-      }
-
+    
+      if (!group) return;
+    
       if (group.adminId.equals(adminId)) {
         group.isActive = false;
         await group.save();
-
-        // Notify all members that the group is deactivated
+    
         io.to(groupId).emit("groupDeactivated", { groupId });
+    
+        // Notify via push notification
+        if (fcmTokens && fcmTokens.length > 0) {
+          const title = "Group Deactivated";
+          const message = `Group ${groupId} has been deactivated by the admin.`;
+    
+          fcmTokens.forEach(token => {
+            sendPushNotification({ body: { token, title, message } }, { status: () => ({ json: () => {} }) });
+          });
+        }
       }
     });
-
+    
     // Handle sending a message in the group
     socket.on("sendMessage", (data, callback) => {
-      console.log("Received sendMessage event:", data);
-      const { groupId, content } = data.result;
-      data.result.senderId = { _id: data.result.senderId }
-      console.log("Emitting to group:", groupId, "Message:", content, 'data is', data);
+      const { groupId, content, fcmTokens } = data.result;
       io.to(groupId).emit("newMessage", data.result);
-
+    
+      // Notify via push notification
+      if (fcmTokens && fcmTokens.length > 0) {
+        const title = "New Message";
+        const message = `You have a new message in group ${groupId}: "${content}"`;
+    
+        fcmTokens.forEach(token => {
+          sendPushNotification({ body: { token, title, message } }, { status: () => ({ json: () => {} }) });
+        });
+      }
+    
       callback({ status: content });
     });
+    
 
     // Handle marking a message as read
     socket.on("markMessageAsRead", async (data) => {
-      const { messageId, userId } = data;
+      const { messageId, userId ,fcmTokens} = data;
       try {
         const message = await Message.findById(messageId);
         if (message && !message.readBy.some(read => read.userId.equals(userId))) {
@@ -207,7 +251,7 @@ const initializeSockets = (server) => {
     // Handle sending a system-generated message
     socket.on("sendSystemMessage", async (data) => {
       console.log('I m in the system message...')
-      const { groupId, content } = data;
+      const { groupId, content,fcmTokens } = data;
 
       // Emit the system message to everyone in the group
       io.to(groupId).emit("newMessage", data);
@@ -224,7 +268,7 @@ const initializeSockets = (server) => {
     // Currently no need of voting
     // Handle voting
     socket.on("vote", async (data) => {
-      const { groupId, voterId, vote } = data;
+      const { groupId, voterId, vote,fcmTokens } = data;
 
       // Find the ongoing voting process
       const voting = await Voting.findOne({ groupId, status: "ongoing" });
@@ -272,7 +316,7 @@ const initializeSockets = (server) => {
 
     // Handle vote completion
     socket.on("voteCompleted", (data) => {
-      const { groupId, status, userId } = data;
+      const { groupId, status, userId,fcmTokens } = data;
 
       // Broadcast the final voting result
       io.to(groupId).emit("voteCompleted", { status, userId });
@@ -281,29 +325,31 @@ const initializeSockets = (server) => {
 
     // Handle disconnect
     socket.on("disconnect", () => {
-      console.log("Client disconnected:", socket.id);
-
-      // Check if user was in any active calls
       for (let [groupId, callRoom] of activeCallRooms) {
         for (let participant of callRoom.participants) {
           if (participant.socketId === socket.id) {
             callRoom.participants.delete(participant);
-
-            // Notify others in the call
-            socket.to(groupId).emit("participantLeft", {
-              groupId,
-              participant
-            });
-
+            io.to(groupId).emit("participantLeft", { groupId, participant });
+    
             if (callRoom.participants.size === 0) {
               activeCallRooms.delete(groupId);
+            }
+    
+            // Notify remaining participants
+            if (callRoom.participants.size > 0) {
+              const title = "Participant Left";
+              const message = `${participant.userName} left the call in group ${groupId}`;
+    
+              callRoom.participants.forEach(p => {
+                sendPushNotification({ body: { token: p.fcmToken, title, message } }, { status: () => ({ json: () => {} }) });
+              });
             }
             break;
           }
         }
       }
-
     });
+    
   });
 };
 
