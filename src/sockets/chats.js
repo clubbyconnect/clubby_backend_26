@@ -2,7 +2,7 @@
 const socketIO = require("socket.io");
 const { Server } = require("socket.io");
 const { sendSystemMessage } = require("../controllers/user.controller.js");
-const { sendPushNotification } = require('./data.controller');
+const { sendPushNotification } = require('../controllers/data.controller.js');
 
 let io;
 
