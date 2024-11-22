@@ -20,7 +20,7 @@ const ChatRoom = require("../models/chatRoom.js");
 const Group = require('../models/group.js');
 const Message = require('../models/message.js');
 const Voting = require('../models/voting.js')
-const { getIO } = require("../sockets/chats.js"); // Add this to access the socket instance
+const { getIO } = require("../sockets/chats.js"); 
 
 // Fast2SMS Configuration-----------------------------------
 const fast2SMSapiKey = process.env.FAST2SMS_API_KEY;

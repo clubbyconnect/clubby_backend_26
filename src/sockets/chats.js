@@ -6,7 +6,7 @@ const { sendSystemMessage } = require("../controllers/user.controller.js");
 let io;
 
 // Keep track of active calls and their participants
-const activeCallRooms = new Map(); // groupId -> { type: 'voice'|'video', participants: Set, callState: 'ringing'|'ongoing' }
+const activeCallRooms = new Map();
 
 const initializeSockets = (server) => {
   io = socketIO(server, {
@@ -18,13 +18,12 @@ const initializeSockets = (server) => {
   io.on("connection", (socket) => {
     console.log("New client connected:", socket.id);
 
-    //Prev
     // Handle call request (both voice and video)
     socket.on("initiateCall", (data) => {
       const { groupId, callType, initiator } = data;
       console.log('Active call in initiateCall ', activeCallRooms)
 
-      // Check if there's already an active call in this group
+  
       if (activeCallRooms.has(groupId)) {
         socket.emit("callError", {
           message: "There's already an active call in this group"
@@ -32,7 +31,6 @@ const initializeSockets = (server) => {
         return;
       }
 
-      // Initialize call room
       activeCallRooms.set(groupId, {
         type: callType,
         participants: new Set([{
@@ -51,11 +49,10 @@ const initializeSockets = (server) => {
         initiator
       });
 
-      // Set a timeout for call acceptance (e.g., 30 seconds)
+
       setTimeout(() => {
         const callRoom = activeCallRooms.get(groupId);
         if (callRoom && callRoom.callState === 'ringing') {
-          // Cancel call if no one answered
           io.to(groupId).emit("callEnded", {
             groupId,
             reason: "no_answer"
@@ -91,19 +88,16 @@ const initializeSockets = (server) => {
         callRoom.callState = 'ongoing';
       }
 
-      // Notify all participants about the new joiner
       socket.to(groupId).emit("participantJoined", {
         data
       });
 
-      // Send existing participants to the new joiner
       socket.emit("existingParticipants", {
         participants: Array.from(callRoom.participants)
           .filter(p => p.socketId !== socket.id)
       });
     });
 
-    // Handle call rejection
     socket.on("rejectCall", (data) => {
       const { groupId, userId, userName } = data;
 
@@ -173,7 +167,6 @@ const initializeSockets = (server) => {
         return;
       }
 
-      // Check if the user is the admin
       if (group.adminId.equals(adminId)) {
         group.isActive = false;
         await group.save();
@@ -216,16 +209,6 @@ const initializeSockets = (server) => {
       console.log('I m in the system message...')
       const { groupId, content } = data;
 
-      // // // Call the controller function to save the message
-      // // await sendSystemMessage(groupId, content);
-
-      // // Construct the system message
-      // const systemMessage = {
-      //   content,
-      //   type: "system", // Indicate it's a system message
-      //   timestamp: new Date(),
-      // };
-
       // Emit the system message to everyone in the group
       io.to(groupId).emit("newMessage", data);
       console.log(`System message sent to group ${groupId}:`, content);
@@ -247,7 +230,7 @@ const initializeSockets = (server) => {
       const voting = await Voting.findOne({ groupId, status: "ongoing" });
 
       if (!voting) {
-        return; // No ongoing voting found
+        return; 
       }
 
       // Register the vote
@@ -312,7 +295,6 @@ const initializeSockets = (server) => {
               participant
             });
 
-            // If no participants left, end the call
             if (callRoom.participants.size === 0) {
               activeCallRooms.delete(groupId);
             }

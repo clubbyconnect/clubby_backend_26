@@ -5,10 +5,10 @@ const { sendSystemMessage } = require("../controllers/user.controller.js");
 
 let io;
 // Keep track of active calls and their participants
-const activeCallRooms = new Map(); // groupId -> { type: 'voice'|'video', participants: Set, callState: 'ringing'|'ongoing' }
-const userConnections = new Map(); // socketId -> RTCPeerConnection
-const sfuConnections = new Map(); // groupId -> Map<socketId, RTCPeerConnection>
-const activeStreams = new Map(); // groupId -> Map<socketId, MediaStream>
+const activeCallRooms = new Map(); 
+const userConnections = new Map();
+const sfuConnections = new Map(); 
+const activeStreams = new Map();
 
 const initializeSockets = (server) => {
     io = socketIO(server, {
