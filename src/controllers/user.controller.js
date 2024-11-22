@@ -15,6 +15,7 @@ const onlineCategoryModel = require("../models/onlineCategorySchema.js");
 const CategoryModel = require("../models/categorySchema.js");
 const ClubRequest = require("../models/clubRequest.js");
 const ChatRoom = require("../models/chatRoom.js");
+const { sendPushNotification } = require('../controllers/data.controller.js');
 
 //Group chat
 const Group = require('../models/group.js');
@@ -725,6 +726,33 @@ exports.sendClubRequest = async (req, res) => {
     });
 
     await friendRequest.save();
+
+    const recipient = await User.findById(recipientId);
+    if (recipient && recipient.fcmToken) {
+      const notificationData = {
+        token: recipient.fcmToken, // Recipient's FCM token
+        notification: {
+          title: "New Club Request",
+          body: `You have received a club request for your post "${postData.title}".`,
+        },
+        data: {
+          postId: postId.toString(),
+          requesterId: requesterId.toString(),
+        },
+      };
+
+      // Call the sendPushNotification function to send the notification
+      sendPushNotification(notificationData)
+        .then((response) => {
+          console.log("Notification sent successfully:", response);
+        })
+        .catch((error) => {
+          console.error("Error sending notification:", error);
+        });
+    } else {
+      console.warn("Recipient does not have an FCM token.");
+    }
+
     return res.status(200).json({ message: "Club request sent" });
   } catch (error) {
     return res
@@ -735,58 +763,7 @@ exports.sendClubRequest = async (req, res) => {
 
 exports.acceptClubRequest = async (req, res) => {
   try {
-    const { requesterId, postId } = req.body;
-    const recipientId = req.User._id;
 
-    const postData = await post.findById(postId);
-    if (!postData) {
-      return res.status(404).json({ error: "Post Not Found" });
-    }
-
-    if (postData.userId.equals(requesterId)) {
-      return res.status(400).json({
-        message: "You cannot use your userId as requesterId to Accept ClubRequest",
-      });
-    }
-
-    const requester = await User.findById(requesterId);
-    if (!requester) {
-      return res.status(404).json({ error: "Requester Not Found" });
-    }
-
-    const pendingRequest = await ClubRequest.findOne({
-      requester: requesterId,
-      recipient: recipientId,
-      postId,
-    });
-
-    if (!pendingRequest) {
-      return res.status(400).json({ error: "Pending Request Not Found" });
-    }
-
-    if (pendingRequest.status === "accepted") {
-      return res.status(400).json({ error: "Club request already accepted" });
-    }
-
-
-    let group = await ChatRoom.findOne({ roomId: postData._id });
-    if (!group) {
-      group = new ChatRoom({
-        roomId: postData._id,
-        groupName: postData.title,
-        members: [recipientId, requesterId],
-      });
-    } else {
-      group.members.push(requesterId);
-    }
-
-    pendingRequest.status = "accepted";
-    pendingRequest.updatedAt = Date.now();
-    await pendingRequest.save();
-
-    await group.save();
-
-    return res.status(200).json({ message: "Club request accepted and added to Club chat" });
   } catch (error) {
     serverErrorHandler(error, res);
   }
@@ -887,6 +864,64 @@ exports.createOrJoinGroup = async (req, res) => {
   const { productId, productName, limit, adminId, userId } = req.body;
 
   try {
+    // Accepting club request
+    const { requesterId, postId } = req.body;
+    const recipientId = req.User._id;
+
+    if (requesterId) {
+      const postData = await post.findById(postId);
+      if (!postData) {
+        return res.status(404).json({ error: "Post Not Found" });
+      }
+
+      if (postData.userId.equals(requesterId)) {
+        return res.status(400).json({
+          message: "You cannot use your userId as requesterId to Accept ClubRequest",
+        });
+      }
+
+      const requester = await User.findById(requesterId);
+      if (!requester) {
+        return res.status(404).json({ error: "Requester Not Found" });
+      }
+
+      const pendingRequest = await ClubRequest.findOne({
+        requester: requesterId,
+        recipient: recipientId,
+        postId,
+      });
+
+      if (!pendingRequest) {
+        return res.status(400).json({ error: "Pending Request Not Found" });
+      }
+
+      if (pendingRequest.status === "accepted") {
+        return res.status(400).json({ error: "Club request already accepted" });
+      }
+
+      pendingRequest.status = "accepted";
+      pendingRequest.updatedAt = Date.now();
+      await pendingRequest.save();
+
+      // **Push Notification for Club Request Acceptance**
+      if (requester.fcmToken) {
+        const notificationData = {
+          token: requester.fcmToken, // Send notification to the requester
+          notification: {
+            title: "Club Request Accepted",
+            body: `Your club request for post "${postData.title}" has been accepted.`,
+          },
+          data: {
+            postId: postId.toString(),
+            recipientId: recipientId.toString(),
+          },
+        };
+
+        // Send the push notification
+        await sendPushNotification(notificationData);
+      }
+    }
+
     // Find the group by productId
     let group = await Group.findOne({ productId });
 
@@ -903,6 +938,24 @@ exports.createOrJoinGroup = async (req, res) => {
       // Emit group creation event
       const io = getIO();
       io.emit("groupCreated", { groupId: group._id, productName, adminId: group.adminId });
+
+      // **Push Notification for Group Creation**
+      const admin = await User.findById(adminId || userId); // Find the admin who created the group
+      if (admin && admin.fcmToken) {
+        const notificationData = {
+          token: admin.fcmToken, // Send notification to the admin
+          notification: {
+            title: "Group Created",
+            body: `A new group for product "${productName}" has been created.`,
+          },
+          data: {
+            productId: productId.toString(),
+          },
+        };
+
+        // Send the push notification
+        await sendPushNotification(notificationData);
+      }
 
       return res.status(201).json({ message: "Group created", group });
     }
@@ -939,12 +992,31 @@ exports.createOrJoinGroup = async (req, res) => {
     const io = getIO();
     io.to(group._id).emit("memberJoined", { userId });
 
+    // **Push Notification for User Joining**
+    const user = await User.findById(userId); // Find the user who joined the group
+    if (user && user.fcmToken) {
+      const notificationData = {
+        token: user.fcmToken, // Send notification to the user who joined
+        notification: {
+          title: "New Member Joined",
+          body: `You have successfully joined the group for product "${productName}".`,
+        },
+        data: {
+          productId: productId.toString(),
+        },
+      };
+
+      // Send the push notification
+      await sendPushNotification(notificationData);
+    }
+
     return res.status(200).json({ message: "Joined the group", group });
   } catch (error) {
     console.error("Error in create/join group:", error);
     return res.status(500).json({ message: "Internal server error." });
   }
 };
+
 
 // Deactivate a group (admin only)
 exports.deactivateGroup = async (req, res) => {
