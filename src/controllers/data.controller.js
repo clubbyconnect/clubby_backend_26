@@ -3,7 +3,7 @@ const User = require("../models/user.js");
 const CategoryModel = require("../models/categorySchema.js");
 const OfflineCategoryModel = require("../models/offlineCategorySchema.js");
 const onlineCategoryModel = require("../models/onlineCategorySchema.js")
-const Post = require("../models/post.js");
+const post = require("../models/post.js");
 const admin = require('firebase-admin');
 
 //Firebase-setup
