@@ -208,7 +208,7 @@ exports.facebookAuth = async (req, res) => {
   }
 };
 
-exports.signIn = async (req, res) => {
+exports.signIn = async (req, res) => {   
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -639,6 +639,9 @@ exports.UpdateUserDetails = async (req, res) => {
       phoneNumber,
       userName,
       birthdate,
+      address,
+      latitude,
+      longitude,
     } = req.body;
     const userId = req.User._id;
 
@@ -667,6 +670,9 @@ exports.UpdateUserDetails = async (req, res) => {
     if (gender) updateDetails.gender = gender.trim();
     if (email) updateDetails.email = email.trim();
     if (phoneNumber) updateDetails.phoneNumber = phoneNumber.trim();
+    if (address) updateDetails.address.address_text = address.trim();
+    if (latitude) updateDetails.address.latitude = latitude.trim();
+    if (longitude) updateDetails.address.longitude = longitude.trim();
 
     if (birthdate) {
       const parsedBirthdate = new Date(birthdate);
