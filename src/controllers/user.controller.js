@@ -474,7 +474,7 @@ exports.uploadAvatar = async (req, res) => {
 exports.createPost = async (req, res) => {
   try {
     const {
-      clubType,
+      // clubType,
       category,
       subCategory,
       itemName,
@@ -487,7 +487,7 @@ exports.createPost = async (req, res) => {
       additionalInformation,
       size,
       itemLink,
-      platform,
+      // platform,
       delivery_location_latitude,
       delivery_location_longitude,
       paymentMode,
@@ -495,7 +495,7 @@ exports.createPost = async (req, res) => {
 
     if (
       [
-        clubType,
+        // clubType,
         category,
         subCategory,
         itemName,
@@ -508,40 +508,40 @@ exports.createPost = async (req, res) => {
       return res.status(400).json({ error: "Please fill all required fields." });
     }
 
-    if (clubType === "offline") {
-      if (
-        !store_location_latitude ||
-        !store_location_longitude ||
-        store_location_longitude.trim() === ""
-      ) {
-        return res
-          .status(400)
-          .json({ error: "Offline category type requires a store location." });
-      }
-    } else if (clubType === "online") {
+    // if (clubType === "offline") {
+    //   if (
+    //     !store_location_latitude ||
+    //     !store_location_longitude ||
+    //     store_location_longitude.trim() === ""
+    //   ) {
+    //     return res
+    //       .status(400)
+    //       .json({ error: "Offline category type requires a store location." });
+    //   }
+    // } else if (clubType === "online") {
     
-      if (
-        !platform ||
-        !itemLink ||
-        !delivery_location_latitude ||
-        !delivery_location_longitude ||
-        !paymentMode ||
-        [
-          platform,
-          itemLink,
-          delivery_location_latitude,
-          delivery_location_longitude,
-          paymentMode,
-        ].some((field) => field.trim() === "")
-      ) {
-        return res.status(400).json({
-          error:
-            "Online posts require an item link, platform, delivery location, and payment mode.",
-        });
-      }
-    } else {
-      return res.status(400).json({ error: "Invalid club type." });
-    }
+    //   if (
+    //     !platform ||
+    //     !itemLink ||
+    //     !delivery_location_latitude ||
+    //     !delivery_location_longitude ||
+    //     !paymentMode ||
+    //     [
+    //       platform,
+    //       itemLink,
+    //       delivery_location_latitude,
+    //       delivery_location_longitude,
+    //       paymentMode,
+    //     ].some((field) => field.trim() === "")
+    //   ) {
+    //     return res.status(400).json({
+    //       error:
+    //         "Online posts require an item link, platform, delivery location, and payment mode.",
+    //     });
+    //   }
+    // } else {
+    //   return res.status(400).json({ error: "Invalid club type." });
+    // }
 
     const productImageLocalPath = req.file?.path;
 
@@ -551,8 +551,9 @@ exports.createPost = async (req, res) => {
 
     const productImage = await uploadOnCloudinary(productImageLocalPath);
 
-    const CategoryClubType =
-      clubType === "offline" ? OfflineCategoryModel : onlineCategoryModel;
+    // const CategoryClubType =
+    //   clubType === "offline" ? OfflineCategoryModel : onlineCategoryModel;
+    const CategoryClubType = OfflineCategoryModel;
 
     const categoryObj = await CategoryClubType.findOne({ name: category });
     if (!categoryObj)
@@ -574,7 +575,7 @@ exports.createPost = async (req, res) => {
       category: categoryObj._id,
       subCategory: subcategoryObj._id,
       productImage: productImage.url,
-      clubType,
+      // clubType,
     };
 
     if (size) postData.size = size;
@@ -582,29 +583,29 @@ exports.createPost = async (req, res) => {
       postData.additionalInformation = additionalInformation;
 
 
-    if (clubType === "offline") {
+    // if (clubType === "offline") {
      
-      postData.store_location = {
-        type: "Point",
-        coordinates: [
-          parseFloat(store_location_longitude), 
-          parseFloat(store_location_latitude),  
-        ],
-      };
-    } else if (clubType === "online") {
+    //   postData.store_location = {
+    //     type: "Point",
+    //     coordinates: [
+    //       parseFloat(store_location_longitude), 
+    //       parseFloat(store_location_latitude),  
+    //     ],
+    //   };
+    // } else if (clubType === "online") {
      
-      postData.delivery_location = {
-        type: "Point",
-        coordinates: [
-          parseFloat(delivery_location_longitude), 
-          parseFloat(delivery_location_latitude),  
-        ],
-      };
+    //   postData.delivery_location = {
+    //     type: "Point",
+    //     coordinates: [
+    //       parseFloat(delivery_location_longitude), 
+    //       parseFloat(delivery_location_latitude),  
+    //     ],
+    //   };
 
-      postData.itemLink = itemLink;
-      postData.platform = platform;
-      postData.paymentMode = paymentMode;
-    }
+    //   postData.itemLink = itemLink;
+    //   postData.platform = platform;
+    //   postData.paymentMode = paymentMode;
+    // }
 
     const createdPost = await post.create(postData);
     if (!createdPost._id)
