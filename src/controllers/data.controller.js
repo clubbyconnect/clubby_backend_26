@@ -210,6 +210,7 @@ exports.fetchsubcategory = async (req, res) => {
     serverErrorHandler(error, res);
   }
 };
+
 exports.fetchOfflinecategory = async (req, res) => {
   try {
     const allcategory = await OfflineCategoryModel.aggregate([
@@ -230,6 +231,7 @@ exports.fetchOfflinecategory = async (req, res) => {
         $project: {
           _id: 0,  
           name: 1,
+          type:1,
           image: 1,
           offlineSubcategoriesData: {  
             name: 1,  
@@ -238,11 +240,11 @@ exports.fetchOfflinecategory = async (req, res) => {
       },
     ]);
 
-
     if (allcategory && allcategory.length > 0) {
       const categoryData = allcategory.map((category) => ({
         name: category.name,
         image: category.image,
+        type: category.type,
         offlineSubcategories: category.offlineSubcategoriesData.map((sub) => ({
           name: sub.name,  
         })),
@@ -259,6 +261,56 @@ exports.fetchOfflinecategory = async (req, res) => {
     serverErrorHandler(error, res);  
   }
 };
+
+// exports.fetchOfflinecategory = async (req, res) => {
+//   try {
+//     const allcategory = await OfflineCategoryModel.aggregate([
+//       {
+//         $lookup: {
+//           from: "offlinecategories", 
+//           localField: "offlineSubcategories", 
+//           foreignField: "_id", 
+//           as: "offlineSubcategoriesData",  
+//         },
+//       },
+//       {
+//         $match: {
+//           "offlineSubcategoriesData.0": { $exists: true },  
+//         },
+//       },
+//       {
+//         $project: {
+//           _id: 0,  
+//           name: 1,
+//           image: 1,
+//           offlineSubcategoriesData: {  
+//             name: 1,  
+//           },
+//         },
+//       },
+//     ]);
+
+
+//     if (allcategory && allcategory.length > 0) {
+//       const categoryData = allcategory.map((category) => ({
+//         name: category.name,
+//         image: category.image,
+//         offlineSubcategories: category.offlineSubcategoriesData.map((sub) => ({
+//           name: sub.name,  
+//         })),
+//       }));
+
+//       return res.status(200).json({
+//         message: "Categories fetched successfully",
+//         data: categoryData,
+//       });
+//     } else {
+//       return res.status(404).json({ error: "No categories found" });  
+//     }
+//   } catch (error) {
+//     serverErrorHandler(error, res);  
+//   }
+// };
 
 //serching APi's
 exports.serchByProductName = async (req, res) => {
