@@ -8,23 +8,23 @@ const postSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
-  clubType: {
-    type: String,
-    required: [true, 'Club type is required'],
-    enum: {
-      values: ['online', 'offline'],
-      message: 'Club type must be either online or offline'
-    }
-  },
+  // clubType: {
+  //   type: String,
+  //   required: [true, 'Club type is required'],
+  //   enum: {
+  //     values: ['online', 'offline'],
+  //     message: 'Club type must be either online or offline'
+  //   }
+  // },
   category: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     ref: function () {
-      return this.clubType === "offline" ? "OfflineCategory" : "onlineCategory";
+      return "OfflineCategory";
     },
     validate: {
       validator: async function (v) {
-        const CategoryModel = mongoose.model(this.clubType === "offline" ? "OfflineCategory" : "onlineCategory");
+        const CategoryModel = mongoose.model("OfflineCategory");
         const category = await CategoryModel.findById(v);
         return !!category;
       },
@@ -35,11 +35,11 @@ const postSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     ref: function () {
-      return this.clubType === "offline" ? "OfflineCategory" : "onlineCategory";
+      return "OfflineCategory";
     },
     validate: {
       validator: async function (v) {
-        const CategoryModel = mongoose.model(this.clubType === "offline" ? "OfflineCategory" : "onlineCategory");
+        const CategoryModel = mongoose.model("OfflineCategory");
         const subCategory = await CategoryModel.findById(v);
         return !!subCategory;
       },
@@ -118,10 +118,10 @@ const postSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
-  platform: {
-    type: String,
-    default: null,
-  },
+  // platform: {
+  //   type: String,
+  //   default: null,
+  // },
   paymentMode: {
     type: String,
     default: null,
