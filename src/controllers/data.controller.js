@@ -215,8 +215,7 @@ exports.fetchsubcategory = async (req, res) => {
 
 exports.fetchOfflinecategory = async (req, res) => {
   try {
-    res.send("Kaushal")
-    return
+
     const allcategory = await OfflineCategoryModel.aggregate([
       {
         $lookup: {
