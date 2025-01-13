@@ -696,6 +696,59 @@ exports.UpdateUserDetails = async (req, res) => {
     serverErrorHandler(error, res);
   }
 };
+
+exports.UpdateUserLikePost = async (req, res) => {  
+  try {
+    const {
+      likePostId,
+    } = req.body;
+    const userId = req.User._id;
+    let updateDetails = await User.findById(userId);
+    if(likePostId){
+      if (updateDetails.postLikeId.includes(likePostId)) {
+        let tempData= updateDetails.postLikeId.filter((item)=>{          
+          return item.toString() !== likePostId
+        })
+        updateDetails.postLikeId=tempData
+        updateDetails = await updateDetails.save();
+        return res.status(200).json({message: "Post like removed successfully"});
+      } else {
+        updateDetails.postLikeId.push(likePostId)
+        updateDetails = await updateDetails.save();
+        return res.status(200).json({message: "Post like successfully"});
+      }
+    }
+  } catch (error) {
+    serverErrorHandler(error, res);
+  }
+};
+
+exports.getUserLikePost = async (req, res) => {  
+
+  try {
+    const excludeField = "-store_location -delivery_location -_id   -password -refreshToken -UserRating -store_location_latitude -store_location_longitude -createdAt -updatedAt -__v -reportedBy -reportMessage";
+    const userId = req.User._id;
+    let updateDetails = await User.findById(userId);
+    const allPost = await post.find({ _id: { $in: updateDetails.postLikeId } }).select( `${excludeField}`).populate('category', 'name').populate('subCategory', 'name');
+    return res
+    .status(200)
+    .json({ message: "Post data fetch successfully", data: allPost });
+
+  } catch (error) {
+    serverErrorHandler(error, res);
+  }
+};
+
+exports.getPost = async (req, res) => {
+  try {
+    const userId = req.User._id;
+    const products = await post.find({ userId }).populate('category', 'name').populate('subCategory', 'name');
+
+    res.status(200).json({ post: products });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch products', error });
+  }
+}
 //------------------------------------------User Request---------------------------------------------
 exports.sendClubRequest = async (req, res) => {
   try {

@@ -19,7 +19,10 @@ const { signUp,
     UpdateUserDetails,
     removeUserFromClub,
     sendOtpToVerifyMobileNumber,
-    verifyOtpToVerfiyMobileNumber
+    verifyOtpToVerfiyMobileNumber,
+    UpdateUserLikePost,
+    getUserLikePost,
+    getPost
 } = require('../controllers/user.controller.js');
 const { sendPushNotification,
     fetchallcategory,
@@ -63,6 +66,9 @@ router.post("/resetPassword",resetPassword);
 router.post("/uploadAvatar",verifyJWT ,upload.single('avatar'),uploadAvatar);
 router.post("/createPost",verifyJWT,upload.single('productImage') ,createPost);
 router.post("/UpdateUserDetails",verifyJWT,upload.single('avatar') ,UpdateUserDetails);
+router.post("/UpdateUserLikePost",verifyJWT,UpdateUserLikePost);
+router.get("/getUserLikePost",verifyJWT,getUserLikePost);
+router.get("/getPost",verifyJWT,getPost);
 
 //App data
 //router.post("/fetchallcategory",sendPushNotification);
