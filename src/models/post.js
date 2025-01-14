@@ -96,33 +96,11 @@ const postSchema = new mongoose.Schema({
       index: '2dsphere', 
     },
   },
-  delivery_location: {
-    type: {
-      type: String,
-      default: 'Point',
-    },
-    coordinates: {
-      type: [Number], 
-      index: '2dsphere', 
-    },
-  },
   additionalInformation: {
     type: String,
     default: null,
   },
   size: {
-    type: String,
-    default: null,
-  },
-  itemLink: {
-    type: String,
-    default: null,
-  },
-  // platform: {
-  //   type: String,
-  //   default: null,
-  // },
-  paymentMode: {
     type: String,
     default: null,
   },
@@ -170,7 +148,6 @@ const postSchema = new mongoose.Schema({
 
 
 postSchema.index({ "store_location.coordinates": "2dsphere" });
-postSchema.index({ "delivery_location.coordinates": "2dsphere" });
 
 
 const Post = mongoose.model("Post", postSchema);

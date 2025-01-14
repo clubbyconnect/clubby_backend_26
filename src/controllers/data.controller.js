@@ -327,16 +327,16 @@ exports.searchByDistance = async (req, res) => {
         }
       }
     : {
-        "delivery_location.coordinates": {
-          $nearSphere: {
-            $geometry: {
-              type: "Point",
-              coordinates: [lon, lat], 
-            },
-            $maxDistance: radiusInMeters, 
-          }
+      "store_location.coordinates": {
+        $nearSphere: {
+          $geometry: {
+            type: "Point",
+            coordinates: [lon, lat], 
+          },
+          $maxDistance: radiusInMeters, 
         }
-      };
+      }
+    };
   
     const results = await Post.find(geoQuery);
 
@@ -423,7 +423,7 @@ exports.searchByDate = async (req, res) => {
 };
 exports.searchByFilter = async (req, res) => {
   try {
-    const { offerType, paymentMode, clubMembers, size } = req.query;
+    const { offerType, clubMembers, size } = req.query;
 
     let filter = {};
 
@@ -431,9 +431,6 @@ exports.searchByFilter = async (req, res) => {
       filter.offerType = offerType; 
     }
 
-    if (paymentMode) {
-      filter.paymentMode = paymentMode; 
-    }
 
     if (clubMembers) {
       filter.clubMembers = parseInt(clubMembers);
@@ -486,7 +483,6 @@ exports.unifiedSearch = async (req, res) => {
       latitude,
       longitude,
       radius,
-      paymentMode,
       offerType,
       clubMembers,
       size,
@@ -526,9 +522,6 @@ exports.unifiedSearch = async (req, res) => {
       }
     }
 
-    if (paymentMode) {
-      query.paymentMode = paymentMode; 
-    }
 
     if (offerType) {
       query.offerType = offerType; 
