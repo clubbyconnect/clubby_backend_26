@@ -20,3 +20,4 @@ connectDB()
   .catch((error) => {
     console.log("Unabel to start server", error);
   });
+
