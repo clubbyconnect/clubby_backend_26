@@ -21,7 +21,9 @@ const { sendPushNotification } = require('../controllers/data.controller.js');
 const Group = require('../models/group.js');
 const Message = require('../models/message.js');
 const Voting = require('../models/voting.js')
-const { getIO } = require("../sockets/chats.js"); 
+const { getIO } = require("../sockets/chats.js");
+
+
 
 // Fast2SMS Configuration-----------------------------------
 const fast2SMSapiKey = process.env.FAST2SMS_API_KEY;
@@ -83,7 +85,7 @@ const sendSms = async (phoneNumber, message) => {
         flash: "0",
       },
     });
-  } catch (error) {}
+  } catch (error) { }
 };
 
 // controllers-----------------------------------
@@ -1374,5 +1376,563 @@ exports.castVote = async (req, res) => {
     return res.status(500).json({ message: "Internal server error." });
   }
 };
+
+
+
+
+
+exports.addToFavourites = async (req, res) => {
+  try {
+    const userId = req.User._id;
+
+    const { productId } = req.body;
+
+    if (!userId || !productId) {
+      return res.status(400).json({ message: "User ID and Product ID are required" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if product is already in favourites
+    if (user.favourites.includes(productId)) {
+      return res.status(400).json({ message: "Product already in favourites" });
+    }
+
+    user.favourites.push(productId);
+    await user.save();
+
+    res.status(200).json({ message: "Product added to favourites", favourites: user.favourites });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+exports.getFavoriteProducts = async (req, res) => {
+  try {
+    const userId = req.User._id;
+    const { lat, lon } = req.query;
+
+    // Validate latitude and longitude
+    if (!lat || !lon) {
+      return res.status(400).json({ success: false, message: "Latitude and longitude are required" });
+    }
+
+    const parsedLat = parseFloat(lat);
+    const parsedLon = parseFloat(lon);
+
+    if (isNaN(parsedLat) || isNaN(parsedLon)) {
+      return res.status(400).json({ success: false, message: "Invalid latitude or longitude" });
+    }
+
+    // Fetch user to get their favorite products
+    const user = await User.findById(userId).select("favourites").lean();
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    console.log("User's Favourites:", user.favourites); // Log user's favourite product IDs
+
+    if (!user.favourites || user.favourites.length === 0) {
+      return res.status(404).json({ success: false, message: "No favorite products found" });
+    }
+
+    let aggregatePipeline = [];
+
+    // GeoNear for distance calculation
+    aggregatePipeline.push({
+      $geoNear: {
+        near: {
+          type: "Point",
+          coordinates: [parsedLon, parsedLat],
+        },
+        distanceField: "distance",
+        spherical: true,
+        key: "store_location.coordinates",
+      },
+    });
+
+    // Match user's favorite products
+    aggregatePipeline.push({
+      $match: {
+        _id: { $in: user.favourites.map(id => new mongoose.Types.ObjectId(id)) }, // Ensure correct ID type
+      },
+    });
+
+    // Lookup for category details
+    aggregatePipeline.push(
+      {
+        $lookup: {
+          from: "offlinecategories",
+          localField: "category",
+          foreignField: "_id",
+          as: "categoryDetails",
+        },
+      },
+      {
+        $unwind: {
+          path: "$categoryDetails",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      // Lookup for subcategory details
+      {
+        $lookup: {
+          from: "offlinecategories",
+          localField: "subCategory",
+          foreignField: "_id",
+          as: "subCategoryDetails",
+        },
+      },
+      {
+        $unwind: {
+          path: "$subCategoryDetails",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      // Lookup for group info
+      {
+        $lookup: {
+          from: "groups",
+          let: { productId: { $toString: "$_id" } },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$productId", "$$productId"] } } },
+          ],
+          as: "groupInfo",
+        },
+      },
+      {
+        $unwind: {
+          path: "$groupInfo",
+          preserveNullAndEmptyArrays: true,
+        },
+      }
+    );
+
+    // Project required fields
+    aggregatePipeline.push({
+      $project: {
+        _id: 1,
+        userId: 1,
+        itemName: 1,
+        offerType: 1,
+        price: 1,
+        price_type: 1,
+        clubMembers: 1,
+        clubToJoin: {
+          $cond: {
+            if: { $isArray: "$groupInfo.members" },
+            then: { $subtract: ["$clubMembers", { $size: "$groupInfo.members" }] },
+            else: { $subtract: ["$clubMembers", 1] },
+          },
+        },
+        additionalInformation: 1,
+        size: 1,
+        itemLink: 1,
+        platform: 1,
+        paymentMode: 1,
+        productImage: 1,
+        clubStatus: 1,
+        reportCount: 1,
+        reportedBy: 1,
+        reportMessage: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        store_location: 1,
+        delivery_location: 1,
+        categoryName: "$categoryDetails.name",
+        categoryImage: "$categoryDetails.image",
+        subCategoryName: "$subCategoryDetails.name",
+        subCategoryImage: "$subCategoryDetails.image",
+        distance: {
+          $cond: {
+            if: { $lt: ["$distance", 1] },
+            then: 0,
+            else: { $divide: ["$distance", 1000] },
+          },
+        },
+      },
+    });
+
+    console.log("Aggregation Pipeline:", JSON.stringify(aggregatePipeline, null, 2)); // Log the aggregation pipeline
+
+    const favoriteProducts = await post.aggregate(aggregatePipeline);
+
+    console.log("Favorite Products:", favoriteProducts); // Log the result of the aggregation query
+
+    if (favoriteProducts.length === 0) {
+      return res.status(404).json({ success: false, message: "No favorite products found 2" });
+    }
+
+    res.status(200).json({ success: true, data: favoriteProducts });
+  } catch (error) {
+    console.error("Error fetching favorite products:", error);
+    res.status(500).json({ success: false, message: "Server error", error: error.message });
+  }
+};
+
+
+
+
+exports.getFilteredFavoriteProducts = async (req, res) => {
+  try {
+
+    const userId = req.User._id;
+    const { lat, lon, status } = req.query;
+
+    // Validate latitude and longitude
+    if (!lat || !lon) {
+      return res.status(400).json({ success: false, message: "Latitude and longitude are required" });
+    }
+
+    const parsedLat = parseFloat(lat);
+    const parsedLon = parseFloat(lon);
+
+    if (isNaN(parsedLat) || isNaN(parsedLon)) {
+      return res.status(400).json({ success: false, message: "Invalid latitude or longitude" });
+    }
+
+    // Validate status filter (if provided)
+    const validStatuses = ["Active", "Inactive", "Full", "Pending", "Created"];
+    let statusFilter = {};
+    if (status && validStatuses.includes(status)) {
+      statusFilter = { clubStatus: status };
+    }
+
+    // Fetch user to get their favorite products
+    const user = await User.findById(userId).select("favourites").lean();
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    console.log("User's Favourites:", user.favourites); // Log user's favourite product IDs
+
+    if (!user.favourites || user.favourites.length === 0) {
+      return res.status(404).json({ success: false, message: "No favorite products found" });
+    }
+
+    let aggregatePipeline = [];
+
+    // GeoNear for distance calculation
+    aggregatePipeline.push({
+      $geoNear: {
+        near: {
+          type: "Point",
+          coordinates: [parsedLon, parsedLat],
+        },
+        distanceField: "distance",
+        spherical: true,
+        key: "store_location.coordinates",
+      },
+    });
+
+    // Match user's favorite products and apply status filter if provided
+    aggregatePipeline.push({
+      $match: {
+        _id: { $in: user.favourites.map(id => new mongoose.Types.ObjectId(id)) }, // Ensure correct ID type
+        ...statusFilter, // Apply the status filter if provided
+      },
+    });
+
+    // Lookup for category details
+    aggregatePipeline.push(
+      {
+        $lookup: {
+          from: "offlinecategories",
+          localField: "category",
+          foreignField: "_id",
+          as: "categoryDetails",
+        },
+      },
+      {
+        $unwind: {
+          path: "$categoryDetails",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      // Lookup for subcategory details
+      {
+        $lookup: {
+          from: "offlinecategories",
+          localField: "subCategory",
+          foreignField: "_id",
+          as: "subCategoryDetails",
+        },
+      },
+      {
+        $unwind: {
+          path: "$subCategoryDetails",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      // Lookup for group info
+      {
+        $lookup: {
+          from: "groups",
+          let: { productId: { $toString: "$_id" } },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$productId", "$$productId"] } } },
+          ],
+          as: "groupInfo",
+        },
+      },
+      {
+        $unwind: {
+          path: "$groupInfo",
+          preserveNullAndEmptyArrays: true,
+        },
+      }
+    );
+
+    // Project required fields
+    aggregatePipeline.push({
+      $project: {
+        _id: 1,
+        userId: 1,
+        itemName: 1,
+        offerType: 1,
+        price: 1,
+        price_type: 1,
+        clubMembers: 1,
+        clubToJoin: {
+          $cond: {
+            if: { $isArray: "$groupInfo.members" },
+            then: { $subtract: ["$clubMembers", { $size: "$groupInfo.members" }] },
+            else: { $subtract: ["$clubMembers", 1] },
+          },
+        },
+        additionalInformation: 1,
+        size: 1,
+        itemLink: 1,
+        platform: 1,
+        paymentMode: 1,
+        productImage: 1,
+        clubStatus: 1,
+        reportCount: 1,
+        reportedBy: 1,
+        reportMessage: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        store_location: 1,
+        delivery_location: 1,
+        categoryName: "$categoryDetails.name",
+        categoryImage: "$categoryDetails.image",
+        subCategoryName: "$subCategoryDetails.name",
+        subCategoryImage: "$subCategoryDetails.image",
+        distance: {
+          $cond: {
+            if: { $lt: ["$distance", 1] },
+            then: 0,
+            else: { $divide: ["$distance", 1000] },
+          },
+        },
+      },
+    });
+
+    console.log("Aggregation Pipeline:", JSON.stringify(aggregatePipeline, null, 2)); // Log the aggregation pipeline
+
+    const filteredFavoriteProducts = await post.aggregate(aggregatePipeline);
+
+    console.log("Filtered Favorite Products:", filteredFavoriteProducts); // Log the result of the aggregation query
+
+    if (filteredFavoriteProducts.length === 0) {
+      return res.status(404).json({ success: false, message: "No favorite products found" });
+    }
+
+    res.status(200).json({ success: true, data: filteredFavoriteProducts });
+  } catch (error) {
+    console.error("Error fetching filtered favorite products:", error);
+    res.status(500).json({ success: false, message: "Server error", error: error.message });
+  }
+};
+
+exports.getUserPosts = async (req, res) => {
+  try {
+    const userId = req.User._id;
+    const { lon, lat } = req.query;
+
+    // Validate latitude and longitude
+    if (!lat || !lon) {
+      return res.status(400).json({ success: false, message: "Latitude and longitude are required" });
+    }
+
+    const parsedLat = parseFloat(lat);
+    const parsedLon = parseFloat(lon);
+
+    if (isNaN(parsedLat) || isNaN(parsedLon)) {
+      return res.status(400).json({ success: false, message: "Invalid latitude or longitude" });
+    }
+
+    const userIdObjectId = new mongoose.Types.ObjectId(userId);  // Convert userId to ObjectId
+
+    console.log(`Searching for posts and calculating distance from coordinates: [${parsedLon}, ${parsedLat}]`);
+
+    // Aggregation pipeline to calculate distance, match by userId, and project necessary fields
+    let aggregatePipeline = [
+      {
+        $geoNear: {
+          near: {
+            type: "Point",
+            coordinates: [parsedLon, parsedLat], // Using the provided coordinates
+          },
+          distanceField: "distance", // Field to store the calculated distance
+          spherical: true, // Using spherical geometry to calculate distance on Earth's surface
+          key: "store_location.coordinates", // The field that contains the geographical data
+        },
+      },
+      {
+        $match: {
+          userId: userIdObjectId, // Match only posts where userId matches the provided userId
+        },
+      },
+      // Lookup for category details
+      {
+        $lookup: {
+          from: "offlinecategories",
+          localField: "category",
+          foreignField: "_id",
+          as: "categoryDetails",
+        },
+      },
+      {
+        $unwind: {
+          path: "$categoryDetails",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      // Lookup for subcategory details
+      {
+        $lookup: {
+          from: "offlinecategories",
+          localField: "subCategory",
+          foreignField: "_id",
+          as: "subCategoryDetails",
+        },
+      },
+      {
+        $unwind: {
+          path: "$subCategoryDetails",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      // Lookup for group info
+      {
+        $lookup: {
+          from: "groups",
+          let: { productId: { $toString: "$_id" } },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$productId", "$$productId"] } } },
+          ],
+          as: "groupInfo",
+        },
+      },
+      {
+        $unwind: {
+          path: "$groupInfo",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      // Project required fields, including clubToJoin calculation
+      {
+        $project: {
+          _id: 1,
+          userId: 1,
+          itemName: 1,
+          postStatus: 1,
+          price: 1,
+          price_type: 1,
+          productImage: 1,
+          categoryName: "$categoryDetails.name",
+          categoryImage: "$categoryDetails.image",
+          subCategoryName: "$subCategoryDetails.name",
+          subCategoryImage: "$subCategoryDetails.image",
+          distance: {
+            $cond: {
+              if: { $lt: ["$distance", 1] },
+              then: 0,
+              else: { $divide: ["$distance", 1000] },
+            },
+          },
+          groupInfo: 1, // Include group info if available
+          size: 1,
+          itemLink: 1,
+          platform: 1,
+          delivery_location: 1,
+          store_location: 1,
+          additionalInformation: 1,
+          clubStatus: 1,
+          clubMembers: 1,
+          clubToJoin: {
+            $cond: {
+              if: { $isArray: "$groupInfo.members" },
+              then: { $subtract: ["$clubMembers", { $size: "$groupInfo.members" }] },
+              else: { $subtract: ["$clubMembers", 1] },
+            },
+          }, // Calculating clubToJoin like in the favourite products method
+        },
+      },
+    ];
+
+    console.log("Aggregation Pipeline:", JSON.stringify(aggregatePipeline, null, 2)); // Log the aggregation pipeline
+
+    const posts = await post.aggregate(aggregatePipeline);
+
+    console.log("Fetched Posts with Details:", posts); // Log the result of the aggregation query
+
+    if (posts.length === 0) {
+      return res.status(404).json({ success: false, message: "No posts found" });
+    }
+
+    // Modify post status based on user interaction and membership in groups
+    const modifiedPosts = await Promise.all(
+      posts.map(async (post) => {
+        let postStatus = post.postStatus; // Use existing postStatus initially
+
+        // Check if the userId is the creator of the post
+        if (post.userId && post.userId.toString() === userId.toString()) {
+          postStatus = "I created";
+        } else {
+          // Check if the user is a member of any group for the post's productId
+          const groups = await Group.find({ members: userId, productId: post.productId });
+          const isMember = groups.some(group => group.members.includes(userId));
+
+          if (isMember) {
+            postStatus = "I joined";
+          }
+        }
+
+        return {
+          _id: post._id,
+          itemName: post.itemName,
+          postStatus, // Modified post status
+          distance: post.distance, // Directly return the calculated distance
+          categoryName: post.categoryName,
+          categoryImage: post.categoryImage,
+          subCategoryName: post.subCategoryName,
+          subCategoryImage: post.subCategoryImage,
+          groupInfo: post.groupInfo, // Include group information
+          size: post.size,
+          itemLink: post.itemLink,
+          platform: post.platform,
+          delivery_location: post.delivery_location,
+          store_location: post.store_location,
+          additionalInformation: post.additionalInformation,
+          clubMembers: post.clubMembers,
+          clubToJoin: post.clubToJoin, // Directly include clubToJoin from post schema
+          productImage: post.productImage,
+        };
+      })
+    );
+
+    // Send the response with the modified posts
+    res.status(200).json({ success: true, message: "Posts fetched successfully", posts: modifiedPosts });
+  } catch (error) {
+    console.error("Error fetching posts:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
 
 

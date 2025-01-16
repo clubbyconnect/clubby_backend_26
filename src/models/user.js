@@ -31,27 +31,27 @@ const userSchema = new mongoose.Schema(
     birthdate: {
       type: Date,
       validate: {
-        validator: function(value) {
+        validator: function (value) {
           return value <= new Date();
         },
         message: "Birthdate cannot be in the future",
       },
       default: null,
     },
-    gender : {
+    gender: {
       type: String,
       enum: {
         values: ['Male', 'Female', 'Other'],
         message: "Gender must be either 'Male', 'Female' or 'Other'",
       },
-      default : null
+      default: null
     },
-    homelocation : {
+    homelocation: {
       type: String,
       trim: true,
       minlength: [3, "Location must be at least 3 characters long"],
       maxlength: [50, "Location cannot exceed 50 characters"],
-      default : null
+      default: null
     },
     homelocationChangeCount: {
       type: Number,
@@ -93,7 +93,7 @@ const userSchema = new mongoose.Schema(
         /^[6-9]\d{9}$/,
         "Please enter a valid 10 digits Indian  phoneNumber",
       ],
-      default : null
+      default: null
     },
     phoneNumberVerified: {
       type: Boolean,
@@ -119,22 +119,22 @@ const userSchema = new mongoose.Schema(
     googleAuthId: {
       type: String,
       trim: true,
-      default : null
+      default: null
     },
     avatar: {
       type: String,
-      default : "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721381617/default%20images/lbzfg1b3wzyhru4j9vjw.png",
+      default: "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721381617/default%20images/lbzfg1b3wzyhru4j9vjw.png",
       match: [/^(http|https):\/\/[^ "]+$/, "Avatar must be a valid URL"],
     },
     UserRating: {
       type: Number,
-      default : 0
+      default: 0
     },
     bio: {
       type: String,
       minlength: [3, "Bio must be at least 3 characters long"],
       maxlength: [50, "Bio cannot exceed 50 characters"],
-      default : null
+      default: null
     },
     SocialMediaLink: {
       type: String,
@@ -143,18 +143,22 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
     blockedUsers: [
-      { 
+      {
         type: mongoose.Schema.Types.ObjectId, ref: 'User'
-       }
+      }
     ],
     reportCount: {
       type: Number,
-      default : 0
+      default: 0
     },
     postCount: {
       type: Number,
       default: 0,
     },
+    favourites: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Post" // Assuming Post model is for products
+    }],
     refreshToken: {
       type: String,
     },
@@ -231,7 +235,7 @@ userSchema.methods.generateRefreshToken = function () {
 //spam security Restrictions Functions
 userSchema.pre('save', async function (next) {
   if (this.isNew) return next();
-  
+
   const now = new Date();
   const minChangeInterval = 30 * 24 * 60 * 60 * 1000;
   const errors = {};  // Object to hold validation errors

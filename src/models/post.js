@@ -85,15 +85,15 @@ const postSchema = new mongoose.Schema({
     required: [true, 'Number of club members is required'],
     min: [1, 'Club members must be at least 1']
   },
- 
+
   store_location: {
     type: {
       type: String,
       default: 'Point',
     },
     coordinates: {
-      type: [Number], 
-      index: '2dsphere', 
+      type: [Number],
+      index: '2dsphere',
     },
   },
   additionalInformation: {
@@ -110,7 +110,7 @@ const postSchema = new mongoose.Schema({
   },
   clubStatus: {
     type: String,
-    enum: ['Pending', 'Created'],
+    enum: ['Pending', 'Created', 'Full', 'Inactive', 'Active'],
     default: 'Pending'
   },
   reportCount: {

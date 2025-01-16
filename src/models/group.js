@@ -4,27 +4,27 @@ const Schema = mongoose.Schema;
 
 const GroupSchema = new Schema({
   productId: {
-    type: String,  // Unique for each product
+    type: mongoose.Schema.Types.ObjectId,  // Change to ObjectId for reference to Product
+    ref: 'Product',  // Reference to the Product model
     required: true,
-    unique: true,
-    index: true // Index for fast retrieval by productId
+    index: true  // Index for fast retrieval by productId
   },
   productName: {
     type: String,
     required: true,
-    index: true // Index for fast retrieval by productName
+    index: true  // Index for fast retrieval by productName
   },
   adminId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    index: true // Index for fast retrieval of groups by adminId
+    index: true  // Index for fast retrieval of groups by adminId
   },
   members: [
     {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      index: true // Index for fast querying of groups by member ID
+      index: true  // Index for fast querying of groups by member ID
     },
   ],
   limit: {
@@ -35,7 +35,7 @@ const GroupSchema = new Schema({
   isActive: {
     type: Boolean,
     default: true,
-    index: true // Index for filtering active groups
+    index: true  // Index for filtering active groups
   },
   votes: [String],  // Used for voting logic (e.g., 'yes', 'no')
   messages: [{  // Add this field to store message IDs

@@ -50,7 +50,12 @@ const {
   getMessagesForGroup,
   sendSystemMessage,
   getGroupMembersAndAdmin,
-  markMessageAsRead
+  markMessageAsRead,
+  addToFavourites,
+  getFavoriteProducts,
+  getFilteredFavoriteProducts,
+  getUserPosts,
+  filterUserPosts
 } = require("../controllers/user.controller.js");
 
 //user
@@ -135,6 +140,17 @@ router.get("/getAdminUser/:groupId", getGroupMembersAndAdmin);
 
 //system message
 router.post("/sendSystemMessage", sendSystemMessage);
+
+router.post("/addToFav", verifyJWT, addToFavourites);
+
+//getFavoriteProducts
+router.get("/getFavoriteProducts", verifyJWT, getFavoriteProducts);
+//getFilteredFavoriteProducts
+router.get("/getFilteredFavoriteProducts", verifyJWT, getFilteredFavoriteProducts);
+//getUserPosts
+router.get("/getUserPosts", verifyJWT, getUserPosts);
+//filterUserPosts
+router.get("/filterUserPosts", verifyJWT, filterUserPosts);
 
 // Route for admin to leave the group
 router.post("/castVote", castVote);
