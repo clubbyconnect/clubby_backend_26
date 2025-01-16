@@ -5,20 +5,22 @@ const OfflineCategoryModel = require("../models/offlineCategorySchema.js");
 const onlineCategoryModel = require("../models/onlineCategorySchema.js")
 const post = require("../models/post.js");
 const admin = require('firebase-admin');
+const mongoose = require('mongoose');
+
 
 //Firebase-setup
 const serviceAccount = {
-  type : process.env.type,
-  project_id : process.env.project_id,
-  private_key_id :process.env.private_key_id,
-  private_key :process.env.private_key,
-  client_email : process.env.client_email,
-  client_id : process.env.client_id,
-  auth_uri : process.env.auth_uri,
-  token_uri : process.env.token_uri,
-  auth_provider_x509_cert_url : process.env.auth_provider_x509_cert_url,
-  client_x509_cert_url : process.env.client_x509_cert_url,
-  universe_domain : process.env.universe_domain
+  type: process.env.type,
+  project_id: process.env.project_id,
+  private_key_id: process.env.private_key_id,
+  private_key: process.env.private_key,
+  client_email: process.env.client_email,
+  client_id: process.env.client_id,
+  auth_uri: process.env.auth_uri,
+  token_uri: process.env.token_uri,
+  auth_provider_x509_cert_url: process.env.auth_provider_x509_cert_url,
+  client_x509_cert_url: process.env.client_x509_cert_url,
+  universe_domain: process.env.universe_domain
 }
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -28,20 +30,20 @@ admin.initializeApp({
 exports.sendPushNotification = async (req, res) => {
   const { token, message, title } = req.body;
   try {
-      const payload = {
-        notification: {
-          title,
-          body: message,
-        },
-      };
-    
-      admin.messaging().sendToDevice(token, payload)
-        .then(response => {
-          return res.status(200).json({message: "Successfully sent message", data : response});
-        })
-        .catch(error => {
-          return res.status(404).json({ error: "Error sending message" });
-        });
+    const payload = {
+      notification: {
+        title,
+        body: message,
+      },
+    };
+
+    admin.messaging().sendToDevice(token, payload)
+      .then(response => {
+        return res.status(200).json({ message: "Successfully sent message", data: response });
+      })
+      .catch(error => {
+        return res.status(404).json({ error: "Error sending message" });
+      });
   } catch (error) {
     serverErrorHandler(error, res);
   }
@@ -51,15 +53,15 @@ exports.fetchallcategory = async (req, res) => {
     const allcategory = await CategoryModel.aggregate([
       {
         $lookup: {
-          from: "categories", 
-          localField: "subcategories", 
-          foreignField: "_id", 
-          as: "subcategoriesData", 
+          from: "categories",
+          localField: "subcategories",
+          foreignField: "_id",
+          as: "subcategoriesData",
         },
       },
       {
         $lookup: {
-          from: "categories", 
+          from: "categories",
           localField: "_id",
           foreignField: "subcategories",
           as: "parentCategories",
@@ -67,7 +69,7 @@ exports.fetchallcategory = async (req, res) => {
       },
       {
         $match: {
-          parentCategories: { $size: 0 }, 
+          parentCategories: { $size: 0 },
         },
       },
       {
@@ -75,7 +77,7 @@ exports.fetchallcategory = async (req, res) => {
           name: 1,
           image: 1,
           subcategoriesData: {
-            name: 1, 
+            name: 1,
           },
         },
       },
@@ -86,11 +88,11 @@ exports.fetchallcategory = async (req, res) => {
         name: category.name,
         image: category.image,
         subcategories: category.subcategoriesData.map((sub) => ({
-          name: sub.name, 
+          name: sub.name,
         })),
       }));
 
-      
+
       return res.status(200).json({
         message: "Categories fetched successfully",
         data: categoryData,
@@ -110,15 +112,15 @@ exports.fetchOnlinecategory = async (req, res) => {
     const allcategory = await onlineCategoryModel.aggregate([
       {
         $lookup: {
-          from: "onlinecategories", 
-          localField: "onlineSubcategories", 
-          foreignField: "_id", 
-          as: "subcategoriesData", 
+          from: "onlinecategories",
+          localField: "onlineSubcategories",
+          foreignField: "_id",
+          as: "subcategoriesData",
         },
       },
       {
         $lookup: {
-          from: "onlinecategories", 
+          from: "onlinecategories",
           localField: "_id",
           foreignField: "onlineSubcategories",
           as: "parentCategories",
@@ -126,7 +128,7 @@ exports.fetchOnlinecategory = async (req, res) => {
       },
       {
         $match: {
-          parentCategories: { $size: 0 }, 
+          parentCategories: { $size: 0 },
         },
       },
       {
@@ -134,7 +136,7 @@ exports.fetchOnlinecategory = async (req, res) => {
           name: 1,
           image: 1,
           subcategoriesData: {
-            name: 1, 
+            name: 1,
           },
         },
       },
@@ -145,11 +147,11 @@ exports.fetchOnlinecategory = async (req, res) => {
         name: category.name,
         image: category.image,
         subcategories: category.subcategoriesData.map((sub) => ({
-          name: sub.name, 
+          name: sub.name,
         })),
       }));
 
-      
+
       return res.status(200).json({
         message: "Categories fetched successfully",
         data: categoryData,
@@ -210,41 +212,44 @@ exports.fetchsubcategory = async (req, res) => {
     serverErrorHandler(error, res);
   }
 };
+
 exports.fetchOfflinecategory = async (req, res) => {
   try {
+
     const allcategory = await OfflineCategoryModel.aggregate([
       {
         $lookup: {
-          from: "offlinecategories", 
-          localField: "offlineSubcategories", 
-          foreignField: "_id", 
-          as: "offlineSubcategoriesData",  
+          from: "offlinecategories",
+          localField: "offlineSubcategories",
+          foreignField: "_id",
+          as: "offlineSubcategoriesData",
         },
       },
       {
         $match: {
-          "offlineSubcategoriesData.0": { $exists: true },  
+          "offlineSubcategoriesData.0": { $exists: true },
         },
       },
       {
         $project: {
-          _id: 0,  
+          _id: 0,
           name: 1,
+          type: 1,
           image: 1,
-          offlineSubcategoriesData: {  
-            name: 1,  
+          offlineSubcategoriesData: {
+            name: 1,
           },
         },
       },
     ]);
 
-
     if (allcategory && allcategory.length > 0) {
       const categoryData = allcategory.map((category) => ({
         name: category.name,
         image: category.image,
+        type: category.type,
         offlineSubcategories: category.offlineSubcategoriesData.map((sub) => ({
-          name: sub.name,  
+          name: sub.name,
         })),
       }));
 
@@ -253,25 +258,67 @@ exports.fetchOfflinecategory = async (req, res) => {
         data: categoryData,
       });
     } else {
-      return res.status(404).json({ error: "No categories found" });  
+      return res.status(404).json({ error: "No categories found" });
     }
   } catch (error) {
-    serverErrorHandler(error, res);  
+    serverErrorHandler(error, res);
   }
 };
 
+// exports.fetchOfflinecategory = async (req, res) => {
+//   try {
+//     const allcategory = await OfflineCategoryModel.aggregate([
+//       {
+//         $lookup: {
+//           from: "offlinecategories", 
+//           localField: "offlineSubcategories", 
+//           foreignField: "_id", 
+//           as: "offlineSubcategoriesData",  
+//         },
+//       },
+//       {
+//         $match: {
+//           "offlineSubcategoriesData.0": { $exists: true },  
+//         },
+//       },
+//       {
+//         $project: {
+//           _id: 0,  
+//           name: 1,
+//           image: 1,
+//           offlineSubcategoriesData: {  
+//             name: 1,  
+//           },
+//         },
+//       },
+//     ]);
+
+
+//     if (allcategory && allcategory.length > 0) {
+//       const categoryData = allcategory.map((category) => ({
+//         name: category.name,
+//         image: category.image,
+//         offlineSubcategories: category.offlineSubcategoriesData.map((sub) => ({
+//           name: sub.name,  
+//         })),
+//       }));
+
+//       return res.status(200).json({
+//         message: "Categories fetched successfully",
+//         data: categoryData,
+//       });
+//     } else {
+//       return res.status(404).json({ error: "No categories found" });  
+//     }
+//   } catch (error) {
+//     serverErrorHandler(error, res);  
+//   }
+// };
+
 //serching APi's
-exports.serchByProductName = async (req, res) => {
+exports.getAllProducts = async (req, res) => {
   try {
-    const { productName } = req.query;
-
-    if (!productName) {
-      return res.status(400).json({ message: "Product name is required" });
-    }
-
-    const products = await post.find({
-      itemName: { $regex: productName, $options: "i" } 
-    });
+    const products = await post.find(); // Get all products
 
     if (products.length === 0) {
       return res.status(404).json({ message: "No products found" });
@@ -279,20 +326,105 @@ exports.serchByProductName = async (req, res) => {
 
     res.status(200).json({ products });
   } catch (error) {
-    serverErrorHandler(error, res);  
+    serverErrorHandler(error, res); // Handle server errors
+  }
+};
+
+exports.searchByProductName = async (req, res) => {
+  try {
+    const { productName, lon, lat } = req.query;
+
+    if (!productName) {
+      return res.status(400).json({ message: "Product name is required" });
+    }
+
+    if (!lon || !lat) {
+      return res.status(400).json({ message: "Longitude and latitude are required" });
+    }
+
+    const products = await post.aggregate([
+      {
+        $geoNear: {
+          near: {
+            type: "Point",
+            coordinates: [parseFloat(lon), parseFloat(lat)],
+          },
+          distanceField: "distance",
+          spherical: true,
+          maxDistance: 5000000,
+          key: "store_location.coordinates",
+        },
+      },
+      {
+        $match: {
+          itemName: { $regex: productName, $options: "i" },
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          userId: 1,
+          clubType: 1,
+          category: 1,
+          subCategory: 1,
+          itemName: 1,
+          offerType: 1,
+          price: 1,
+          price_type: 1,
+          clubMembers: 1,
+          additionalInformation: 1,
+          size: 1,
+          itemLink: 1,
+          platform: 1,
+          paymentMode: 1,
+          productImage: 1,
+          clubStatus: 1,
+          reportCount: 1,
+          reportedBy: 1,
+          reportMessage: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          __v: 1,
+          store_location: 1,
+          delivery_location: 1,
+          distance: {
+            $cond: {
+              if: { $lt: ["$distance", 1] },
+              then: 0,
+              else: { $divide: ["$distance", 1000] },
+            },
+          },
+        },
+      },
+    ]);
+
+    if (products.length === 0) {
+      return res.status(404).json({ message: "No products found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: products.map((product) => ({
+        ...product,
+        distance: product.distance,
+      })),
+    });
+  } catch (error) {
+    serverErrorHandler(error, res);
   }
 };
 
 exports.searchByDistance = async (req, res) => {
   try {
-    const { latitude, longitude, radius, locationType } = req.query;
+    const { latitude, longitude, radius } = req.query;
 
-    if (!latitude || !longitude || !radius || !locationType) {
+    if (!latitude || !longitude || !radius) {
       return res.status(400).json({
         success: false,
-        message: "Latitude, longitude, radius, and locationType are required.",
+        message: "Latitude, longitude, radius,  are required.",
       });
     }
+    console.log('latitude, longitude, radius ', latitude, longitude, radius)
 
     const lat = parseFloat(latitude);
     const lon = parseFloat(longitude);
@@ -307,33 +439,17 @@ exports.searchByDistance = async (req, res) => {
 
     const radiusInMeters = kmRadius * 1000;
 
-    if (locationType !== 'store' && locationType !== 'delivery') {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid locationType. It must be 'store' or 'delivery'.",
-      });
-    }
 
-    const geoQuery = locationType === 'store'
-    ? {
-        "store_location.coordinates": {
-          $nearSphere: {
-            $geometry: {
-              type: "Point",
-              coordinates: [lon, lat], 
-            },
-            $maxDistance: radiusInMeters, 
-          }
-        }
-      }
-    : {
-      "store_location.coordinates": {
+    const locationKey = 'store_location';
+
+    const geoQuery = {
+      [`${locationKey}.coordinates`]: {
         $nearSphere: {
           $geometry: {
             type: "Point",
-            coordinates: [lon, lat], 
+            coordinates: [lon, lat],
           },
-          $maxDistance: radiusInMeters, 
+          $maxDistance: radiusInMeters,
         }
       }
     };
@@ -375,7 +491,7 @@ exports.searchByGender = async (req, res) => {
     for (const product of products) {
       const user = await User.findById(product.userId);
 
-      if (user && user.gender === gender) {
+      if (user && user.gender.toLowerCase() === gender.toLowerCase()) {
         filteredProducts.push(product);
       }
     }
@@ -391,7 +507,7 @@ exports.searchByGender = async (req, res) => {
 };
 exports.searchByDate = async (req, res) => {
   try {
-    const { date } = req.query; 
+    const { date } = req.query;
 
     if (!date) {
       return res.status(400).json({
@@ -401,6 +517,7 @@ exports.searchByDate = async (req, res) => {
     }
 
     const startDate = new Date(date);
+    console.log('START DATE I S', startDate)
 
     if (isNaN(startDate.getTime())) {
       return res.status(400).json({
@@ -410,8 +527,8 @@ exports.searchByDate = async (req, res) => {
     }
 
     const results = await post.find({
-      createdAt: { $gte: startDate }, 
-    }).sort({ createdAt: -1 }); 
+      createdAt: { $gte: startDate },
+    }).sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
@@ -427,17 +544,17 @@ exports.searchByFilter = async (req, res) => {
 
     let filter = {};
 
-    if (offerType) {
-      filter.offerType = offerType; 
+    // Only add the offerType to the filter if it's not 'Any'
+    if (offerType && offerType !== 'Any') {
+      filter.offerType = offerType;
     }
-
 
     if (clubMembers) {
       filter.clubMembers = parseInt(clubMembers);
     }
 
     if (size) {
-      filter.size = size; 
+      filter.size = size;
     }
 
     const results = await post.find(filter);
@@ -450,17 +567,18 @@ exports.searchByFilter = async (req, res) => {
     serverErrorHandler(error, res);
   }
 };
+
 exports.searchBySort = async (req, res) => {
   try {
-    const { sortBy } = req.query; 
+    const { sortBy } = req.query;
 
     let sortOptions = {};
     if (sortBy === "price_high_to_low") {
-      sortOptions.price = -1; 
+      sortOptions.price = -1;
     } else if (sortBy === "price_low_to_high") {
-      sortOptions.price = 1; 
+      sortOptions.price = 1;
     } else if (sortBy === "newest") {
-      sortOptions.createdAt = -1; 
+      sortOptions.createdAt = -1;
     }
 
     const results = await post.find().sort(sortOptions);
@@ -468,6 +586,277 @@ exports.searchBySort = async (req, res) => {
     res.status(200).json({
       success: true,
       data: results,
+    });
+  } catch (error) {
+    serverErrorHandler(error, res);
+  }
+};
+
+
+exports.searchProducts = async (req, res) => {
+  try {
+    const {
+      productName,
+      lon,
+      lat,
+      gender,
+      date,
+      offerType,
+      clubMembers,
+      size,
+      sortBy,
+      rangeLat,
+      rangeLon,
+      rangeRadius,
+      category,
+      subCategory,
+    } = req.query;
+
+    let matchStage = {};
+    let aggregatePipeline = [];
+
+    if (rangeLat && rangeLon && rangeRadius) {
+      const lat = parseFloat(rangeLat);
+      const lon = parseFloat(rangeLon);
+      const kmRadius = parseFloat(rangeRadius);
+
+      if (!isNaN(lat) && !isNaN(lon) && !isNaN(kmRadius) && kmRadius > 0) {
+        const radiusInMeters = kmRadius * 1000;
+        aggregatePipeline.push({
+          $geoNear: {
+            near: {
+              type: "Point",
+              coordinates: [lon, lat],
+            },
+            distanceField: "distance",
+            spherical: true,
+            maxDistance: radiusInMeters,
+            key: "store_location.coordinates",
+          },
+        });
+      }
+    } else if (lon && lat) {
+      aggregatePipeline.push({
+        $geoNear: {
+          near: {
+            type: "Point",
+            coordinates: [parseFloat(lon), parseFloat(lat)],
+          },
+          distanceField: "distance",
+          spherical: true,
+          key: "store_location.coordinates",
+        },
+      });
+    }
+
+    if (productName) {
+      matchStage.itemName = { $regex: productName, $options: "i" };
+    }
+
+    if (offerType) {
+      const offerTypes = offerType.split(',').map(type => type.trim());
+      matchStage.offerType = { $in: offerTypes };
+    }
+
+    if (clubMembers) {
+      matchStage.clubMembers = parseInt(clubMembers);
+    }
+
+    if (size) {
+      matchStage.size = size;
+    }
+
+    if (date) {
+      const startDate = new Date(date);
+      if (!isNaN(startDate.getTime())) {
+        matchStage.createdAt = { $gte: startDate };
+      }
+    }
+
+    if (gender && gender != 'Any') {
+      const users = await User.find({ gender: { $regex: gender, $options: "i" } }).select('_id');
+      const userIds = users.map(user => user._id);
+      matchStage.userId = { $in: userIds };
+    }
+
+    if (category) {
+      if (!/^[0-9a-fA-F]{24}$/.test(category)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid category ID format',
+          providedId: category
+        });
+      }
+
+      try {
+        matchStage.category = new mongoose.Types.ObjectId(category);
+        const categoryExists = await mongoose.model('OfflineCategory').findById(category);
+
+        if (!categoryExists) {
+          return res.status(404).json({
+            success: false,
+            message: 'Category not found',
+            providedId: category
+          });
+        }
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          message: 'Error processing category ID',
+          error: e.message,
+          providedId: category
+        });
+      }
+    }
+
+    if (subCategory) {
+      try {
+        matchStage.subCategory = new mongoose.Types.ObjectId(subCategory);
+      } catch (e) {
+        console.error('Error converting subCategory to ObjectId:', e.message);
+      }
+    }
+
+    if (Object.keys(matchStage).length > 0) {
+      aggregatePipeline.push({ $match: matchStage });
+    }
+
+    // Add lookups for category and subcategory names
+    aggregatePipeline.push(
+      // Lookup for main category from offlinecategories collection
+      {
+        $lookup: {
+          from: "offlinecategories",
+          localField: "category",
+          foreignField: "_id",
+          as: "categoryDetails"
+        }
+      },
+      {
+        $unwind: {
+          path: "$categoryDetails",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      // Lookup for subcategory from offlinecategories collection
+      {
+        $lookup: {
+          from: "offlinecategories",
+          localField: "subCategory",
+          foreignField: "_id",
+          as: "subCategoryDetails"
+        }
+      },
+      {
+        $unwind: {
+          path: "$subCategoryDetails",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      // Add lookup for group information
+      {
+        $lookup: {
+          from: "groups",
+          let: { productId: { $toString: "$_id" } },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$productId", "$$productId"] }
+              }
+            }
+          ],
+          as: "groupInfo"
+        }
+      },
+      {
+        $unwind: {
+          path: "$groupInfo",
+          preserveNullAndEmptyArrays: true
+        }
+      }
+    );
+
+
+    aggregatePipeline.push({
+      $project: {
+        _id: 1,
+        userId: 1,
+        clubType: 1,
+        category: 1,
+        categoryName: "$categoryDetails.name",
+        categoryImage: "$categoryDetails.image",
+        categoryType: "$categoryDetails.type",
+        subCategory: 1,
+        subCategoryName: "$subCategoryDetails.name",
+        subCategoryImage: "$subCategoryDetails.image",
+        subCategoryType: "$subCategoryDetails.type",
+        itemName: 1,
+        offerType: 1,
+        price: 1,
+        price_type: 1,
+        clubMembers: 1,
+        clubToJoin: {
+          $cond: {
+            if: { $isArray: "$groupInfo.members" },
+            then: {
+              $subtract: [
+                "$clubMembers",
+                { $size: "$groupInfo.members" }
+              ]
+            },
+            else: { $subtract: ["$clubMembers", 1] }
+          }
+        },
+
+        additionalInformation: 1,
+        size: 1,
+        itemLink: 1,
+        platform: 1,
+        paymentMode: 1,
+        productImage: 1,
+        clubStatus: 1,
+        reportCount: 1,
+        reportedBy: 1,
+        reportMessage: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        __v: 1,
+        store_location: 1,
+        delivery_location: 1,
+        distance: {
+          $cond: {
+            if: { $lt: ["$distance", 1] },
+            then: 0,
+            else: { $divide: ["$distance", 1000] },
+          },
+        },
+      },
+    });
+
+    if (sortBy) {
+      let sortOptions = {};
+      if (sortBy === "price_high_to_low") {
+        sortOptions.price = -1;
+      } else if (sortBy === "price_low_to_high") {
+        sortOptions.price = 1;
+      } else if (sortBy === "newest") {
+        sortOptions.createdAt = -1;
+      }
+      aggregatePipeline.push({ $sort: sortOptions });
+    }
+
+    const products = await post.aggregate(aggregatePipeline);
+
+    if (products.length === 0) {
+      return res.status(404).json({ message: "No products found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: products.map((product) => ({
+        ...product,
+        distance: product.distance,
+      })),
     });
   } catch (error) {
     serverErrorHandler(error, res);
@@ -489,19 +878,19 @@ exports.unifiedSearch = async (req, res) => {
       sortBy,
     } = req.query;
 
-    let query = {}; 
+    let query = {};
     let sortOptions = {};
 
-    
-    if (gender) {
-      const users = await User.find({ gender }); 
-      const userIds = users.map((user) => user._id); 
 
-      query.userId = { $in: userIds }; 
+    if (gender) {
+      const users = await User.find({ gender });
+      const userIds = users.map((user) => user._id);
+
+      query.userId = { $in: userIds };
     }
 
     if (productName) {
-      query.itemName = { $regex: productName, $options: "i" }; 
+      query.itemName = { $regex: productName, $options: "i" };
     }
 
     if (latitude && longitude && radius) {
@@ -522,17 +911,20 @@ exports.unifiedSearch = async (req, res) => {
       }
     }
 
+    if (paymentMode) {
+      query.paymentMode = paymentMode;
+    }
 
     if (offerType) {
-      query.offerType = offerType; 
+      query.offerType = offerType;
     }
 
     if (clubMembers) {
-      query.clubMembers = parseInt(clubMembers); 
+      query.clubMembers = parseInt(clubMembers);
     }
 
     if (size) {
-      query.size = size; 
+      query.size = size;
     }
 
     if (sortBy === "price_high_to_low") {

@@ -25,31 +25,33 @@ const { signUp,
     getPost
 } = require('../controllers/user.controller.js');
 const { sendPushNotification,
-    fetchallcategory,
-    fetchsubcategory,
-    fetchOfflinecategory,
-    fetchOnlinecategory,
-    serchByProductName,
-    searchByDistance,
-    searchByGender,
-    searchByDate,
-    searchByFilter,
-    searchBySort,
-    unifiedSearch
+  fetchallcategory,
+  fetchsubcategory,
+  fetchOfflinecategory,
+  fetchOnlinecategory,
+  searchByProductName,
+  searchByDistance,
+  searchByGender,
+  searchByDate,
+  searchByFilter,
+  searchBySort,
+  unifiedSearch,
+  getAllProducts,
+  searchProducts
 } = require('../controllers/data.controller.js');
 
 
 const {
-    createOrJoinGroup,
-    leaveGroup,
-    castVote,
-    getGroupsForUser,
-    sendMessage,
-    getMessagesForGroup,
-    sendSystemMessage,
-    getGroupMembersAndAdmin,
-    markMessageAsRead
-  } = require("../controllers/user.controller.js");
+  createOrJoinGroup,
+  leaveGroup,
+  castVote,
+  getGroupsForUser,
+  sendMessage,
+  getMessagesForGroup,
+  sendSystemMessage,
+  getGroupMembersAndAdmin,
+  markMessageAsRead
+} = require("../controllers/user.controller.js");
 
 //user
 router.post("/signUp",signUp);
@@ -72,26 +74,31 @@ router.get("/getPost",verifyJWT,getPost);
 
 //App data
 //router.post("/fetchallcategory",sendPushNotification);
-router.post("/fetchallcategory",verifyJWT,fetchallcategory);
-router.post("/fetchsubcategory",verifyJWT,fetchsubcategory);
-router.post("/fetchOfflinecategory",fetchOfflinecategory);
-router.post("/fetchOnlinecategory",fetchOnlinecategory);
+router.post("/fetchallcategory", verifyJWT, fetchallcategory);
+router.post("/fetchsubcategory", verifyJWT, fetchsubcategory);
+router.post("/fetchOfflinecategory", fetchOfflinecategory);
+router.post("/fetchOnlinecategory", fetchOnlinecategory);
 
-//serch & filter 
-router.get("/serchByProductName", serchByProductName);
+//serch & filter
+//getAllProducts
+router.get("/getAllProducts", getAllProducts);
+
+router.get("/serchByProductName", searchByProductName);
 router.get("/searchByDistance", searchByDistance);
 router.get("/searchByGender", searchByGender);
 router.get("/searchByDate", searchByDate);
 router.get("/searchByFilter", searchByFilter);
 router.get("/searchBySort", searchBySort);
+router.get("/searchProducts", searchProducts);
+
 //testing searchProducts
 router.get("/unifiedSearch", unifiedSearch);
 
 //clubRequest
-router.post("/sendClubRequest",verifyJWT,sendClubRequest);
-router.post("/acceptClubRequest",verifyJWT,acceptClubRequest);
-router.post("/declineClubRequest",verifyJWT,declineClubRequest);
-router.post("/removeUserFromClub",verifyJWT,removeUserFromClub);
+router.post("/sendClubRequest", verifyJWT, sendClubRequest);
+router.post("/acceptClubRequest", verifyJWT, acceptClubRequest);
+router.post("/declineClubRequest", verifyJWT, declineClubRequest);
+router.post("/removeUserFromClub", verifyJWT, removeUserFromClub);
 
 
 //---------------------chat Routes-------------------------------------------------
