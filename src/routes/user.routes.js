@@ -55,7 +55,7 @@ const {
   getFavoriteProducts,
   getFilteredFavoriteProducts,
   getUserPosts,
-  filterUserPosts
+  // filterUserPosts
 } = require("../controllers/user.controller.js");
 
 //user
@@ -150,7 +150,7 @@ router.get("/getFilteredFavoriteProducts", verifyJWT, getFilteredFavoriteProduct
 //getUserPosts
 router.get("/getUserPosts", verifyJWT, getUserPosts);
 //filterUserPosts
-router.get("/filterUserPosts", verifyJWT, filterUserPosts);
+// router.get("/filterUserPosts", verifyJWT, filterUserPosts);
 
 // Route for admin to leave the group
 router.post("/castVote", castVote);
