@@ -453,7 +453,7 @@ exports.searchByDistance = async (req, res) => {
         }
       }
     };
-  
+
     const results = await Post.find(geoQuery);
 
     if (results.length === 0) {
@@ -611,6 +611,8 @@ exports.searchProducts = async (req, res) => {
       category,
       subCategory,
     } = req.query;
+
+    const userId = req.User._id;
 
     let matchStage = {};
     let aggregatePipeline = [];
@@ -776,7 +778,6 @@ exports.searchProducts = async (req, res) => {
       }
     );
 
-
     aggregatePipeline.push({
       $project: {
         _id: 1,
@@ -807,7 +808,6 @@ exports.searchProducts = async (req, res) => {
             else: { $subtract: ["$clubMembers", 1] }
           }
         },
-
         additionalInformation: 1,
         size: 1,
         itemLink: 1,
@@ -830,6 +830,9 @@ exports.searchProducts = async (req, res) => {
             else: { $divide: ["$distance", 1000] },
           },
         },
+        isLiked: {
+          $in: ["$_id", userId ? (await User.findById(userId).select("favourites")).favourites : []]
+        }
       },
     });
 
@@ -862,6 +865,7 @@ exports.searchProducts = async (req, res) => {
     serverErrorHandler(error, res);
   }
 };
+
 
 //-------------------All filters in One Api--------------------------------
 exports.unifiedSearch = async (req, res) => {

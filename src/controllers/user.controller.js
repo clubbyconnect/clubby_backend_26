@@ -171,7 +171,7 @@ exports.googleAuth = async (req, res) => {
         message: user
           ? "User signed in successfully"
           : "User Created and signed in successfully",
-        data: loggedInUser,
+        data: accessToken,
       });
   } catch (error) {
     serverErrorHandler(error, res);
@@ -203,6 +203,7 @@ exports.facebookAuth = async (req, res) => {
 
       return res.json({
         message: "User signed up successfully using Facebook!",
+        data: accessToken
       });
     });
   } catch (error) {
@@ -210,7 +211,7 @@ exports.facebookAuth = async (req, res) => {
   }
 };
 
-exports.signIn = async (req, res) => {   
+exports.signIn = async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -242,7 +243,7 @@ exports.signIn = async (req, res) => {
     res.cookie("refreshToken", refreshToken, options);
     return res
       .status(200)
-      .json({ message: "User signed in successfully", data: loggedInUser });
+      .json({ message: "User signed in successfully", data: accessToken });
   } catch (error) {
     serverErrorHandler(error, res);
   }
@@ -513,7 +514,7 @@ exports.createPost = async (req, res) => {
 
     const productImage = await uploadOnCloudinary(productImageLocalPath);
 
-   const CategoryClubType = OfflineCategoryModel;
+    const CategoryClubType = OfflineCategoryModel;
 
     const categoryObj = await CategoryClubType.findOne({ name: category });
     if (!categoryObj)
@@ -631,25 +632,25 @@ exports.UpdateUserDetails = async (req, res) => {
   }
 };
 
-exports.UpdateUserLikePost = async (req, res) => {  
+exports.UpdateUserLikePost = async (req, res) => {
   try {
     const {
       likePostId,
     } = req.body;
     const userId = req.User._id;
     let updateDetails = await User.findById(userId);
-    if(likePostId){
+    if (likePostId) {
       if (updateDetails.postLikeId.includes(likePostId)) {
-        let tempData= updateDetails.postLikeId.filter((item)=>{          
+        let tempData = updateDetails.postLikeId.filter((item) => {
           return item.toString() !== likePostId
         })
-        updateDetails.postLikeId=tempData
+        updateDetails.postLikeId = tempData
         updateDetails = await updateDetails.save();
-        return res.status(200).json({message: "Post like removed successfully"});
+        return res.status(200).json({ message: "Post like removed successfully" });
       } else {
         updateDetails.postLikeId.push(likePostId)
         updateDetails = await updateDetails.save();
-        return res.status(200).json({message: "Post like successfully"});
+        return res.status(200).json({ message: "Post like successfully" });
       }
     }
   } catch (error) {
@@ -657,16 +658,16 @@ exports.UpdateUserLikePost = async (req, res) => {
   }
 };
 
-exports.getUserLikePost = async (req, res) => {  
+exports.getUserLikePost = async (req, res) => {
 
   try {
     const excludeField = "-store_location  -_id   -password -refreshToken -UserRating -store_location_latitude -store_location_longitude -createdAt -updatedAt -__v -reportedBy -reportMessage";
     const userId = req.User._id;
     let updateDetails = await User.findById(userId);
-    const allPost = await post.find({ _id: { $in: updateDetails.postLikeId } }).select( `${excludeField}`).populate('category', 'name').populate('subCategory', 'name');
+    const allPost = await post.find({ _id: { $in: updateDetails.postLikeId } }).select(`${excludeField}`).populate('category', 'name').populate('subCategory', 'name');
     return res
-    .status(200)
-    .json({ message: "Post data fetch successfully", data: allPost });
+      .status(200)
+      .json({ message: "Post data fetch successfully", data: allPost });
 
   } catch (error) {
     serverErrorHandler(error, res);
@@ -1384,7 +1385,6 @@ exports.castVote = async (req, res) => {
 exports.addToFavourites = async (req, res) => {
   try {
     const userId = req.User._id;
-
     const { productId } = req.body;
 
     if (!userId || !productId) {
@@ -1397,10 +1397,16 @@ exports.addToFavourites = async (req, res) => {
     }
 
     // Check if product is already in favourites
-    if (user.favourites.includes(productId)) {
-      return res.status(400).json({ message: "Product already in favourites" });
+    const productIndex = user.favourites.indexOf(productId);
+
+    if (productIndex !== -1) {
+      // Remove product from favourites
+      user.favourites.splice(productIndex, 1);
+      await user.save();
+      return res.status(200).json({ message: "Product removed from favourites", favourites: user.favourites });
     }
 
+    // Add product to favourites
     user.favourites.push(productId);
     await user.save();
 
