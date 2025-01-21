@@ -165,9 +165,9 @@ const userSchema = new mongoose.Schema(
     address: {
       address_text: {
         type: String,
-        trim: true,
-        minlength: [3, "Address text must be at least 3 characters long"],
-        maxlength: [100, "Address text cannot exceed 100 characters"],
+        // trim: true,
+        // minlength: [3, "Address text must be at least 3 characters long"],
+        // maxlength: [100, "Address text cannot exceed 100 characters"],
         default: null,
       },
       latitude: {
