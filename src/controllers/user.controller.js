@@ -542,6 +542,14 @@ exports.createPost = async (req, res) => {
     if (additionalInformation)
       postData.additionalInformation = additionalInformation;
 
+      postData.store_location = {
+        type: "Point",
+        coordinates: [
+          parseFloat(store_location_longitude), 
+          parseFloat(store_location_latitude),  
+        ],
+      };
+
     const createdPost = await post.create(postData);
     if (!createdPost._id)
       return res.status(500).json({ error: "Unable to create post." });
