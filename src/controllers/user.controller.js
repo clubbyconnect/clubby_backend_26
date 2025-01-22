@@ -125,9 +125,15 @@ exports.signUp = async (req, res) => {
         .status(500)
         .json({ error: "Something went wrong while registering the user" });
     }
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+      user._id
+    );
+
     return res
       .status(200)
-      .json({ message: "User registered successfully", data: user });
+      .json({
+        message: "User registered successfully", data: { accessToken: accessToken, userInfo: user },
+      });
   } catch (error) {
     serverErrorHandler(error, res);
   }
@@ -171,7 +177,7 @@ exports.googleAuth = async (req, res) => {
         message: user
           ? "User signed in successfully"
           : "User Created and signed in successfully",
-        data: accessToken,
+        data: { accessToken: accessToken, userInfo: loggedInUser },
       });
   } catch (error) {
     serverErrorHandler(error, res);
@@ -243,7 +249,7 @@ exports.signIn = async (req, res) => {
     res.cookie("refreshToken", refreshToken, options);
     return res
       .status(200)
-      .json({ message: "User signed in successfully", data: accessToken });
+      .json({ message: "User signed in successfully", data: { accessToken: accessToken, userInfo: loggedInUser } });
   } catch (error) {
     serverErrorHandler(error, res);
   }
