@@ -25,12 +25,12 @@ const deleteCategoryRecursive = async (categoryId) => {
 //--------------------------------Category----------------------------------
 exports.createCategory = async (req, res) => {
   try {
-    const { category } = req.body;
-
+    const { category , isPremium } = req.body;
+    console.log(req.body)
     const isCategoryexist = await CategoryModel.findOne({name :category});
     if (isCategoryexist) return res.status(404).json({ message: 'category already exist' });
 
-    const newCategory = await CategoryModel.create({name :category});
+    const newCategory = await CategoryModel.create({name :category,isPremium});
     if (newCategory) return res.status(200).json({ message: "category created" });
      
   } catch (error) {
@@ -41,12 +41,12 @@ exports.createCategory = async (req, res) => {
 //new-----------------------------
 exports.createOnlineCategory = async (req, res) => {
   try {
-    const { category } = req.body;
+    const { category,isPremium} = req.body;
 
     const isCategoryexist = await onlineCategoryModel.findOne({name :category});
     if (isCategoryexist) return res.status(404).json({ message: 'category already exist' });
 
-    const newCategory = await onlineCategoryModel.create({name :category});
+    const newCategory = await onlineCategoryModel.create({name :category,isPremium});
     if (newCategory) return res.status(200).json({ message: "category created" });
      
   } catch (error) {
@@ -61,14 +61,17 @@ exports.addSubcategory = async (req, res) => {
 
     if (!pCategory) return res.status(404).json({ message: 'Parent category not found' });
 
-    const sCategory = await CategoryModel.findOne({name:SubcategoryName});
-    if (sCategory) return res.status(404).json({ message: 'this subCategory name already exist' });
+    let subcategory = await CategoryModel.findOne({ name: SubcategoryName });
 
-    const newSubcategory = await CategoryModel.create({name : SubcategoryName });
-
-    pCategory.subcategories.push(newSubcategory._id);
+    if (subcategory) {
+      if (pCategory.subcategories.includes(subcategory._id)) {
+        return res.status(400).json({ message: 'This subCategory is already linked to the parent category' });
+      }
+    } else {
+      subcategory = await CategoryModel.create({ name: SubcategoryName });
+    }
+    pCategory.subcategories.push(subcategory._id);
     await pCategory.save();
-
     return res.status(200).json({ message: 'subCategory created' });
   } catch (error) {
     serverErrorHandler(error, res);
@@ -83,12 +86,15 @@ exports.addOnlineSubcategory = async (req, res) => {
 
     if (!pCategory) return res.status(404).json({ message: 'Parent category not found' });
 
-    const sCategory = await onlineCategoryModel.findOne({name:SubcategoryName});
-    if (sCategory) return res.status(404).json({ message: 'this subCategory name already exist' });
-
-    const newSubcategory = await onlineCategoryModel.create({name : SubcategoryName });
-
-    pCategory.onlineSubcategories.push(newSubcategory._id);
+    let subcategory = await onlineCategoryModel.findOne({ name: SubcategoryName });
+    if (subcategory) {
+      if (pCategory.onlineSubcategories.includes(subcategory._id)) {
+        return res.status(400).json({ message: 'This subCategory is already linked to the parent category' });
+      }
+    } else {
+      subcategory = await onlineCategoryModel.create({ name: SubcategoryName });
+    }
+    pCategory.onlineSubcategories.push(subcategory._id);
     await pCategory.save();
 
     return res.status(200).json({ message: 'subCategory created' });
@@ -175,13 +181,19 @@ exports.addOfflineSubcategory = async (req, res) => {
     const pCategory = await OfflineCategoryModel.findOne({name: parentCategory});
 
     if (!pCategory) return res.status(404).json({ message: 'Parent offline category not found' });
+    
+    let subcategory = await OfflineCategoryModel.findOne({ name: SubcategoryName });
 
-    const sCategory = await OfflineCategoryModel.findOne({name:SubcategoryName});
-    if (sCategory) return res.status(404).json({ message: 'this offline subCategory name already exist' });
+    if (subcategory) {
+  
+      if (pCategory.offlineSubcategories.includes(subcategory._id)) {
+        return res.status(400).json({ message: 'This offline subCategory is already linked to the parent category' });
+      }
+    } else {
+      subcategory = await OfflineCategoryModel.create({ name: SubcategoryName });
+    }
 
-    const newSubcategory = await OfflineCategoryModel.create({name : SubcategoryName });
-
-    pCategory.offlineSubcategories.push(newSubcategory._id);
+    pCategory.offlineSubcategories.push(subcategory._id);
     await pCategory.save();
 
     return res.status(200).json({ message: 'offline subCategory created' });

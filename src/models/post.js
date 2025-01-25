@@ -20,11 +20,11 @@ const postSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     ref: function () {
-      return "OfflineCategory";
+      return "Category";
     },
     validate: {
       validator: async function (v) {
-        const CategoryModel = mongoose.model("OfflineCategory");
+        const CategoryModel = mongoose.model("Category");
         const category = await CategoryModel.findById(v);
         return !!category;
       },
@@ -35,11 +35,11 @@ const postSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     ref: function () {
-      return "OfflineCategory";
+      return "Category";
     },
     validate: {
       validator: async function (v) {
-        const CategoryModel = mongoose.model("OfflineCategory");
+        const CategoryModel = mongoose.model("Category");
         const subCategory = await CategoryModel.findById(v);
         return !!subCategory;
       },

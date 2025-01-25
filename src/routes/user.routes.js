@@ -71,18 +71,18 @@ router.post("/verifyOtp", verifyOtp);
 router.post("/logout", verifyJWT, logout);
 router.post("/resetPassword", resetPassword);
 router.post("/uploadAvatar", verifyJWT, upload.single('avatar'), uploadAvatar);
-router.post("/createPost", verifyJWT, upload.single('productImage'), createPost);
+router.post("/createPost",verifyJWT, upload.single('productImage'), createPost);
 router.post("/UpdateUserDetails", verifyJWT, upload.single('avatar'), UpdateUserDetails);
 router.post("/UpdateUserLikePost", verifyJWT, UpdateUserLikePost);
 router.get("/getUserLikePost", verifyJWT, getUserLikePost);
-router.get("/getPost", verifyJWT, getPost);
+router.get("/getPost", getPost);
 
 //App data
 //router.post("/fetchallcategory",sendPushNotification);
-router.post("/fetchallcategory", verifyJWT, fetchallcategory);
-router.post("/fetchsubcategory", verifyJWT, fetchsubcategory);
-router.post("/fetchOfflinecategory", fetchOfflinecategory);
-router.post("/fetchOnlinecategory", fetchOnlinecategory);
+router.post("/fetchallcategory",verifyJWT,  fetchallcategory);
+router.post("/fetchsubcategory",verifyJWT,  fetchsubcategory);
+router.post("/fetchOfflinecategory",verifyJWT, fetchOfflinecategory);
+router.post("/fetchOnlinecategory",verifyJWT, fetchOnlinecategory);
 
 //serch & filter
 //getAllProducts

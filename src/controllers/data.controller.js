@@ -57,6 +57,9 @@ exports.fetchallcategory = async (req, res) => {
           localField: "subcategories",
           foreignField: "_id",
           as: "subcategoriesData",
+          pipeline: [
+            { $sort: { _id: 1 } },
+          ],
         },
       },
       {
@@ -76,6 +79,7 @@ exports.fetchallcategory = async (req, res) => {
         $project: {
           name: 1,
           image: 1,
+          isPremium: 1,
           subcategoriesData: {
             name: 1,
           },
@@ -84,13 +88,26 @@ exports.fetchallcategory = async (req, res) => {
     ]);
 
     if (allcategory && allcategory.length > 0) {
-      const categoryData = allcategory.map((category) => ({
-        name: category.name,
-        image: category.image,
-        subcategories: category.subcategoriesData.map((sub) => ({
-          name: sub.name,
-        })),
-      }));
+      const categoryData = allcategory.map((category) => {
+  
+        const sortedSubcategories = category.subcategoriesData.sort((a, b) => {
+          const isAOther = a.name.toLowerCase().includes("other");
+          const isBOther = b.name.toLowerCase().includes("other");
+          if (isAOther && isBOther) return 0;
+          if (isAOther) return 1;
+          if (isBOther) return -1;
+          return 0;
+        });
+    
+        return {
+          name: category.name,
+          image: category.image,
+          subcategories: sortedSubcategories.map((sub) => ({
+            name: sub.name,
+          })),
+          isPremium: category.isPremium,
+        };
+      });
 
 
       return res.status(200).json({
@@ -109,6 +126,7 @@ exports.fetchallcategory = async (req, res) => {
 //new
 exports.fetchOnlinecategory = async (req, res) => {
   try {
+    console.log("online")
     const allcategory = await onlineCategoryModel.aggregate([
       {
         $lookup: {
@@ -135,6 +153,7 @@ exports.fetchOnlinecategory = async (req, res) => {
         $project: {
           name: 1,
           image: 1,
+          isPremium: 1,
           subcategoriesData: {
             name: 1,
           },
@@ -149,6 +168,7 @@ exports.fetchOnlinecategory = async (req, res) => {
         subcategories: category.subcategoriesData.map((sub) => ({
           name: sub.name,
         })),
+        isPremium:category.isPremium
       }));
 
 
@@ -215,7 +235,7 @@ exports.fetchsubcategory = async (req, res) => {
 
 exports.fetchOfflinecategory = async (req, res) => {
   try {
-
+    console.log('offline')
     const allcategory = await OfflineCategoryModel.aggregate([
       {
         $lookup: {

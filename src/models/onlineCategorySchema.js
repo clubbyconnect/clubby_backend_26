@@ -13,6 +13,10 @@ const onlineCategorySchema = new mongoose.Schema({
     default: "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721381426/default%20images/y9yzagqvwgeyk2g1o0bj.png",
     trim: true 
   },
+  isPremium:{
+    type:Boolean,
+    default:false
+  },
   onlineSubcategories: [
     {
       type: mongoose.Schema.Types.ObjectId,
