@@ -48,6 +48,7 @@ exports.sendPushNotification = async (req, res) => {
     serverErrorHandler(error, res);
   }
 };
+
 exports.fetchallcategory = async (req, res) => {
   try {
     const allcategory = await CategoryModel.aggregate([
@@ -57,9 +58,7 @@ exports.fetchallcategory = async (req, res) => {
           localField: "subcategories",
           foreignField: "_id",
           as: "subcategoriesData",
-          pipeline: [
-            { $sort: { _id: 1 } },
-          ],
+          pipeline: [{ $sort: { _id: 1 } }],
         },
       },
       {
@@ -81,6 +80,7 @@ exports.fetchallcategory = async (req, res) => {
           image: 1,
           isPremium: 1,
           subcategoriesData: {
+            _id: 1, 
             name: 1,
           },
         },
@@ -100,15 +100,16 @@ exports.fetchallcategory = async (req, res) => {
         });
     
         return {
+          _id: category._id,
           name: category.name,
           image: category.image,
+          isPremium: category.isPremium,
           subcategories: sortedSubcategories.map((sub) => ({
+            _id: sub._id, 
             name: sub.name,
           })),
-          isPremium: category.isPremium,
         };
       });
-
 
       return res.status(200).json({
         message: "Categories fetched successfully",
@@ -123,7 +124,7 @@ exports.fetchallcategory = async (req, res) => {
   }
 };
 
-//new
+
 exports.fetchOnlinecategory = async (req, res) => {
   try {
     console.log("online")
@@ -352,6 +353,7 @@ exports.getAllProducts = async (req, res) => {
 
 exports.searchByProductName = async (req, res) => {
   try {
+    console.log("")
     const { productName, lon, lat } = req.query;
 
     if (!productName) {
@@ -417,7 +419,7 @@ exports.searchByProductName = async (req, res) => {
         },
       },
     ]);
-
+    console.log(products)
     if (products.length === 0) {
       return res.status(404).json({ message: "No products found" });
     }
@@ -430,6 +432,7 @@ exports.searchByProductName = async (req, res) => {
       })),
     });
   } catch (error) {
+    console.log(error)
     serverErrorHandler(error, res);
   }
 };
@@ -631,7 +634,7 @@ exports.searchProducts = async (req, res) => {
       category,
       subCategory,
     } = req.query;
-
+    console.log("hit")
     const userId = req.User._id;
 
     let matchStage = {};

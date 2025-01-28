@@ -22,7 +22,9 @@ const { signUp,
   verifyOtpToVerfiyMobileNumber,
   UpdateUserLikePost,
   getUserLikePost,
-  getPost
+  getPost,
+  getProductDetails,
+  getRequestList
 } = require('../controllers/user.controller.js');
 const { sendPushNotification,
   fetchallcategory,
@@ -75,11 +77,11 @@ router.post("/createPost",verifyJWT, upload.single('productImage'), createPost);
 router.post("/UpdateUserDetails", verifyJWT, upload.single('avatar'), UpdateUserDetails);
 router.post("/UpdateUserLikePost", verifyJWT, UpdateUserLikePost);
 router.get("/getUserLikePost", verifyJWT, getUserLikePost);
-router.get("/getPost", getPost);
+router.get("/getPost",verifyJWT, getPost);
 
 //App data
 //router.post("/fetchallcategory",sendPushNotification);
-router.post("/fetchallcategory",verifyJWT,  fetchallcategory);
+router.post("/fetchallcategory",verifyJWT, fetchallcategory);
 router.post("/fetchsubcategory",verifyJWT,  fetchsubcategory);
 router.post("/fetchOfflinecategory",verifyJWT, fetchOfflinecategory);
 router.post("/fetchOnlinecategory",verifyJWT, fetchOnlinecategory);
@@ -95,7 +97,7 @@ router.get("/searchByDate", searchByDate);
 router.get("/searchByFilter", searchByFilter);
 router.get("/searchBySort", searchBySort);
 router.get("/searchProducts", verifyJWT, searchProducts);
-
+router.get('/productDetails/:productId',verifyJWT,getProductDetails)
 //testing searchProducts
 router.get("/unifiedSearch", unifiedSearch);
 
@@ -104,6 +106,7 @@ router.post("/sendClubRequest", verifyJWT, sendClubRequest);
 router.post("/acceptClubRequest", verifyJWT, acceptClubRequest);
 router.post("/declineClubRequest", verifyJWT, declineClubRequest);
 router.post("/removeUserFromClub", verifyJWT, removeUserFromClub);
+router.get("/postRequestList/:productId",verifyJWT,getRequestList)
 
 
 //---------------------chat Routes-------------------------------------------------

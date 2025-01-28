@@ -480,6 +480,97 @@ exports.uploadAvatar = async (req, res) => {
   }
 };
 
+const images = {
+  "Fashion": {
+    "Men": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/qmfhhaqrr3xpewext2kj.jpg",
+    "Women": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/qmfhhaqrr3xpewext2kj.jpg",
+    "Kids": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/qmfhhaqrr3xpewext2kj.jpg",
+    "Accessories": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/qmfhhaqrr3xpewext2kj.jpg",
+    "Footwear": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/qmfhhaqrr3xpewext2kj.jpg",
+    "Others": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/qmfhhaqrr3xpewext2kj.jpg",
+  },
+  "Grocery": {
+    "Fresh Produce": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/na3jgujro7ekhc3kxcnn.jpg",
+    "Dairy Products": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/na3jgujro7ekhc3kxcnn.jpg",
+    "Packaged Foods": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/na3jgujro7ekhc3kxcnn.jpg",
+    "Frozen Foods": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/na3jgujro7ekhc3kxcnn.jpg",
+    "Beverages": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/na3jgujro7ekhc3kxcnn.jpg",
+    "Others": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/na3jgujro7ekhc3kxcnn.jpg",
+  },
+  "Body Care": {
+    "Skincare": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/ob6wbqokv4bsv2nqcg5t.png",
+    "Haircare": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/ob6wbqokv4bsv2nqcg5t.png",
+    "Oral Care": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/ob6wbqokv4bsv2nqcg5t.png",
+    "Body Hygiene": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/ob6wbqokv4bsv2nqcg5t.png",
+    "Fragrance": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/ob6wbqokv4bsv2nqcg5t.png",
+    "Others": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/ob6wbqokv4bsv2nqcg5t.png",
+  },
+  "Fit & Sport": {
+    "Fitness Apparel": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/pd9xd6qdqfijbpgla7s6.jpg",
+    "Exercise Equipment": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/pd9xd6qdqfijbpgla7s6.jpg",
+    "Sports Gear": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/pd9xd6qdqfijbpgla7s6.jpg",
+    "Outdoor Equipment": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/pd9xd6qdqfijbpgla7s6.jpg",
+    "Nutrition": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/pd9xd6qdqfijbpgla7s6.jpg",
+    "Others": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/pd9xd6qdqfijbpgla7s6.jpg",
+  },
+  "Kitchenware": {
+    "Cookware": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/pvmhybhxdi9lkd290rtc.jpg",
+    "Utensils": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/pvmhybhxdi9lkd290rtc.jpg",
+    "Storage Solutions": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/pvmhybhxdi9lkd290rtc.jpg",
+    "Small Appliances": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/pvmhybhxdi9lkd290rtc.jpg",
+    "Tableware": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/pvmhybhxdi9lkd290rtc.jpg",
+    "Others": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/pvmhybhxdi9lkd290rtc.jpg",
+  },
+  "Bags & Travel": {
+    "Luggage": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/ipvggoowhouuqu2mejkq.jpg",
+    "Travel Accessories": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/ipvggoowhouuqu2mejkq.jpg",
+    "Outdoor Bags": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/ipvggoowhouuqu2mejkq.jpg",
+    "Tech Accessories": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/ipvggoowhouuqu2mejkq.jpg",
+    "Safety Items": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/ipvggoowhouuqu2mejkq.jpg",
+    "Others": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/ipvggoowhouuqu2mejkq.jpg",
+  },
+  "Gadgets": {
+    "Smartphones & Accessories": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/vo25i61selyntyxceet1.jpg",
+    "Home Appliances": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/vo25i61selyntyxceet1.jpg",
+    "Wearable Tech": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/vo25i61selyntyxceet1.jpg",
+    "Gaming Gear": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/vo25i61selyntyxceet1.jpg",
+    "Others": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/vo25i61selyntyxceet1.jpg",
+  },
+  "DIY Supplies": {
+    "Tools": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/nzems4sn0jnsog1fiiuh.png",
+    "Materials": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/nzems4sn0jnsog1fiiuh.png",
+    "Crafting Supplies": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/nzems4sn0jnsog1fiiuh.png",
+    "Gardening Supplies": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/nzems4sn0jnsog1fiiuh.png",
+    "Home Improvement": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/nzems4sn0jnsog1fiiuh.png",
+    "Others": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500943/default%20images/categories/nzems4sn0jnsog1fiiuh.png",
+  },
+  "Pet Accessories": {
+    "Food & Treats": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/ekkqtpitirw8fxaputay.png",
+    "Bedding & Housing": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/ekkqtpitirw8fxaputay.png",
+    "Toys": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/ekkqtpitirw8fxaputay.png",
+    "Grooming Supplies": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/ekkqtpitirw8fxaputay.png",
+    "Health & Care": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/ekkqtpitirw8fxaputay.png",
+    "Others": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/ekkqtpitirw8fxaputay.png",
+  },
+  "Learning Resources": {
+    "Books": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/fgkeqvpaecvkke4ecgqb.jpg",
+    "Classes Courses": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/fgkeqvpaecvkke4ecgqb.jpg",
+    "Stationery": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/fgkeqvpaecvkke4ecgqb.jpg",
+    "Educational Tools": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/fgkeqvpaecvkke4ecgqb.jpg",
+    "Children's Learning Materials": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/fgkeqvpaecvkke4ecgqb.jpg",
+    "Others": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/fgkeqvpaecvkke4ecgqb.jpg",
+  },
+  "Wooden Goods": {
+    "Living Room": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/mgbfz7ebxcys4tomvet4.png",
+    "Bedroom": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/mgbfz7ebxcys4tomvet4.png",
+    "Storage": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/mgbfz7ebxcys4tomvet4.png",
+    "Dining": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/mgbfz7ebxcys4tomvet4.png",
+    "Shelves": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/mgbfz7ebxcys4tomvet4.png",
+    "Others": "https://res.cloudinary.com/dlb8pmzph/image/upload/v1729500942/default%20images/categories/mgbfz7ebxcys4tomvet4.png",
+  },
+};
+
+
 exports.createPost = async (req, res) => {
   try {
     const {
@@ -496,7 +587,7 @@ exports.createPost = async (req, res) => {
       additionalInformation,
       size,
     } = req.body;
-
+    console.log(req.headers,req.body)
     if (
       [
         category,
@@ -511,14 +602,18 @@ exports.createPost = async (req, res) => {
       return res.status(400).json({ error: "Please fill all required fields." });
     }
 
-
     const productImageLocalPath = req.file?.path;
+    let productImage;
 
-    if (!productImageLocalPath) {
-      return res.status(400).json({ error: "Product Image is required." });
+    if (productImageLocalPath) {
+      productImage = await uploadOnCloudinary(productImageLocalPath);
+    } else {
+      // Select default image based on category and subcategory
+      if (!images[category] || !images[category][subCategory]) {
+        return res.status(400).json({ error: "Invalid category or subcategory." });
+      }
+      productImage = { url: images[category][subCategory] }; // Use default image
     }
-
-    const productImage = await uploadOnCloudinary(productImageLocalPath);
 
     const CategoryClubType = CategoryModel;
 
@@ -526,9 +621,7 @@ exports.createPost = async (req, res) => {
     if (!categoryObj)
       return res.status(400).json({ error: "Invalid category." });
 
-    const subcategoryObj = await CategoryClubType.findOne({
-      name: subCategory,
-    });
+    const subcategoryObj = await CategoryClubType.findOne({ name: subCategory });
     if (!subcategoryObj)
       return res.status(400).json({ error: "Invalid subcategory." });
 
@@ -548,13 +641,13 @@ exports.createPost = async (req, res) => {
     if (additionalInformation)
       postData.additionalInformation = additionalInformation;
 
-      postData.store_location = {
-        type: "Point",
-        coordinates: [
-          parseFloat(store_location_longitude), 
-          parseFloat(store_location_latitude),  
-        ],
-      };
+    postData.store_location = {
+      type: "Point",
+      coordinates: [
+        parseFloat(store_location_longitude),
+        parseFloat(store_location_latitude),
+      ],
+    };
 
     const createdPost = await post.create(postData);
     if (!createdPost._id)
@@ -564,7 +657,7 @@ exports.createPost = async (req, res) => {
       .findById(createdPost._id)
       .populate("category", "name")
       .populate("subCategory", "name");
-
+    console.log(populatedPost,"LLLLLLLLLLLL")
     return res.status(200).json({
       message: "Post created successfully.",
       post: {
@@ -574,6 +667,7 @@ exports.createPost = async (req, res) => {
       },
     });
   } catch (error) {
+    console.log(error)
     serverErrorHandler(error, res);
   }
 };
@@ -689,7 +783,7 @@ exports.getUserLikePost = async (req, res) => {
 
 exports.getPost = async (req, res) => {
   try {
-    const userId = req.User._id;
+    const userId = req.User._id
     const products = await post.find({ userId }).populate('category', 'name').populate('subCategory', 'name');
 
     res.status(200).json({ post: products });
@@ -726,7 +820,6 @@ exports.sendClubRequest = async (req, res) => {
     if (existingRequest) {
       return res.status(400).json({ error: "Club request already sent" });
     }
-
     const friendRequest = await ClubRequest.create({
       requester: requesterId,
       recipient: recipientId,
@@ -734,11 +827,10 @@ exports.sendClubRequest = async (req, res) => {
     });
 
     await friendRequest.save();
-
     const recipient = await User.findById(recipientId);
     if (recipient && recipient.fcmToken) {
       const notificationData = {
-        token: recipient.fcmToken, // Recipient's FCM token
+        token: recipient.fcmToken, 
         notification: {
           title: "New Club Request",
           body: `You have received a club request for your post "${postData.title}".`,
@@ -748,8 +840,6 @@ exports.sendClubRequest = async (req, res) => {
           requesterId: requesterId.toString(),
         },
       };
-
-      // Call the sendPushNotification function to send the notification
       sendPushNotification(notificationData)
         .then((response) => {
           console.log("Notification sent successfully:", response);
@@ -760,12 +850,50 @@ exports.sendClubRequest = async (req, res) => {
     } else {
       console.warn("Recipient does not have an FCM token.");
     }
-
     return res.status(200).json({ message: "Club request sent" });
   } catch (error) {
     return res
       .status(500)
       .json({ error: "Error sending Club request", error });
+  }
+};
+
+exports.getRequestList = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    if (!productId) {
+      return res.status(400).json({ error: "productId is required" });
+    }
+    const userId = req.User._id; 
+    const postData = await post.findById(productId);
+
+    if (!postData) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+   /*  if (!postData.userId.equals(userId)) {
+      return res.status(403).json({ error: "You are not authorized to view requests for this post" });
+    } */
+    const clubRequests = await ClubRequest.find({ postId: productId })
+      .populate("requester", "name email avatar")
+    if (!clubRequests.length) {
+      return res.status(404).json({ error: "No requests found for this post" });
+    }
+
+    return res.status(200).json({
+      message: "Request list retrieved successfully",
+      requests: clubRequests.map((request) => ({
+        _id: request._id,
+        requester: request.requester,
+/*         postId: request.postId,
+        createdAt: request.createdAt, */
+      })),
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      error: "Error retrieving request list",
+      details: error.message,
+    });
   }
 };
 
@@ -1952,6 +2080,44 @@ exports.getUserPosts = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
+exports.getProductDetails = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    if (!productId) {
+      return res.status(400).json({ success: false, message: "Product ID is required" });
+    }
+    const userId = req.User._id;
+    const product = await post.findById(productId)
+      .populate({
+        path: "category",
+        select: "name description",
+      })
+      .populate({
+        path: "subCategory",
+        select: "name description",
+      })
+      .populate({
+        path: "reportedBy",
+        select: "name email",
+      });
+    if (!product) {
+      return res.status(404).json({ success: false, message: "Product not found" });
+    }
+    const productData = product.toObject(); 
+    console.log(userId)
+    if (userId == product.userId.toString()) {
+      productData.isAdmin = true;
+    }
+
+    // Send the response
+    res.status(200).json({ success: true, data: productData });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
 
 
 
