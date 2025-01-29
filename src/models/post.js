@@ -143,7 +143,12 @@ const postSchema = new mongoose.Schema({
         message: 'Report message cannot be longer than 300 characters.'
       }
     ]
-  }]
+  }],
+  groupId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Group", 
+    default: null,
+  }
 }, { timestamps: true });
 
 

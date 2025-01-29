@@ -608,11 +608,11 @@ exports.createPost = async (req, res) => {
     if (productImageLocalPath) {
       productImage = await uploadOnCloudinary(productImageLocalPath);
     } else {
-      // Select default image based on category and subcategory
+
       if (!images[category] || !images[category][subCategory]) {
         return res.status(400).json({ error: "Invalid category or subcategory." });
       }
-      productImage = { url: images[category][subCategory] }; // Use default image
+      productImage = { url: images[category][subCategory] }; 
     }
 
     const CategoryClubType = CategoryModel;
@@ -648,15 +648,37 @@ exports.createPost = async (req, res) => {
         parseFloat(store_location_latitude),
       ],
     };
-
     const createdPost = await post.create(postData);
+
     if (!createdPost._id)
       return res.status(500).json({ error: "Unable to create post." });
+
+    const memberLimit = parseInt(clubMembers, 10);
+    if (isNaN(memberLimit) || memberLimit <= 0) {
+      return res.status(400).json({ error: "Invalid value for clubMembers." });
+    } 
+
+    const groupData = {
+      productId: createdPost._id,
+      productName: itemName,
+      adminId: req.User._id, 
+      members: [req.User._id], 
+      limit: memberLimit,
+      isActive: true,
+    };
+
+    const createdGroup = await Group.create(groupData);
+    if (!createdGroup._id)
+      return res.status(500).json({ error: "Unable to create group." });
+
+    createdPost.groupId = createdGroup._id;
+    await createdPost.save();
 
     const populatedPost = await post
       .findById(createdPost._id)
       .populate("category", "name")
       .populate("subCategory", "name");
+
     console.log(populatedPost,"LLLLLLLLLLLL")
     return res.status(200).json({
       message: "Post created successfully.",
@@ -664,6 +686,7 @@ exports.createPost = async (req, res) => {
         ...populatedPost._doc,
         category: populatedPost.category.name,
         subCategory: populatedPost.subCategory.name,
+        group: createdGroup._id
       },
     });
   } catch (error) {
@@ -870,11 +893,12 @@ exports.getRequestList = async (req, res) => {
     if (!postData) {
       return res.status(404).json({ error: "Post not found" });
     }
-   /*  if (!postData.userId.equals(userId)) {
+
+    if (!postData.userId.equals(userId)) {
       return res.status(403).json({ error: "You are not authorized to view requests for this post" });
-    } */
+    } 
     const clubRequests = await ClubRequest.find({ postId: productId })
-      .populate("requester", "name email avatar")
+      .populate("requester", "firstName lastName email avatar")
     if (!clubRequests.length) {
       return res.status(404).json({ error: "No requests found for this post" });
     }
@@ -884,8 +908,8 @@ exports.getRequestList = async (req, res) => {
       requests: clubRequests.map((request) => ({
         _id: request._id,
         requester: request.requester,
-/*         postId: request.postId,
-        createdAt: request.createdAt, */
+        createdAt: request.createdAt, 
+        status:request.status
       })),
     });
   } catch (error) {
@@ -899,16 +923,82 @@ exports.getRequestList = async (req, res) => {
 
 exports.acceptClubRequest = async (req, res) => {
   try {
+    const { requesterId, postId } = req.body;
+    const recipientId = req.User._id;
+    if (!requesterId || !postId) {
+      return res.status(400).json({ error: "requesterId and postId are required." });
+    }
+    const postData = await post.findById(postId);
+    if (!postData) {
+      return res.status(404).json({ error: "Post Not Found" });
+    }
+    const requester = await User.findById(requesterId);
+    if (!requester) {
+      return res.status(404).json({ error: "Requester Not Found" });
+    }
+    const pendingRequest = await ClubRequest.findOne({
+      requester: requesterId,
+      recipient: recipientId,
+      postId,
+    });
+    if (!pendingRequest) {
+      return res.status(400).json({ error: "Pending Request Not Found" });
+    }
+    if (pendingRequest.status === "accepted") {
+      return res.status(400).json({ error: "Club request already accepted." });
+    } 
+    pendingRequest.status = "accepted";
+    pendingRequest.updatedAt = Date.now();
+    await pendingRequest.save();
+    const group = await Group.findOne({ productId: postId });
+    
+    if (!group) {
+      return res.status(404).json({ error: "Group not found for this post." });
+    }
+    if (group.members.includes(requesterId)) {
+      return res.status(400).json({ error: "Requester is already a member of the group." });
+    }
+    group.members.push(requesterId);
+    await group.save();
+    const requesterFirstName = requester.firstName || "User";
+    await exports.sendSystemMessage(group._id, `${requesterFirstName} has been added to the group.`);
 
+    return res.status(200).json({
+      message: "Club request accepted and user added to the group.",
+      group,
+    });
   } catch (error) {
-    serverErrorHandler(error, res);
+    console.error("Error in acceptClubRequest:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+exports.fetchGroupMembers = async (req, res) => {
+  try {
+    const { postId } = req.body;
+    if (!postId) {
+      return res.status(400).json({ message: "PostId is required." });
+    }
+    const group = await Group.findOne({ productId: postId }).populate("members", "firstName lastName email avatar" ); // Populate member details (e.g., name, email)
+    if (!group) {
+      return res.status(404).json({ message: "Group not found for this post." });
+    }
+    const membersExcludingOwner = group.members.filter(
+      (member) => !member._id.equals(group.adminId)
+    );
+    return res.status(200).json({
+      message: "Group members fetched successfully.",
+      members: membersExcludingOwner,
+    });
+  } catch (error) {
+    console.error("Error in fetchGroupMembers:", error);
+    return res.status(500).json({ message: "Internal server error." });
   }
 };
 
 exports.declineClubRequest = async (req, res) => {
   try {
     const { requesterId, postId } = req.body;
-
     const recipientId = req.User._id;
     //postId = "669df8d76aa6d05e12291940";
     //requesterId = "669defbe9dba6cc174c04f0a";
@@ -925,7 +1015,6 @@ exports.declineClubRequest = async (req, res) => {
     if (!requester) {
       return res.status(404).json({ error: "requester Not Found" });
     }
-
     const pendingRequest = await ClubRequest.findOne({
       requester: requesterId,
       recipient: recipientId,
@@ -945,15 +1034,12 @@ exports.declineClubRequest = async (req, res) => {
     return res.status(200).json({ message: "club request declined" });
   } catch (error) {
     serverErrorHandler(error, res);
-
   }
 };
 
 exports.removeUserFromClub = async (req, res) => {
   try {
-
     const { roomId, userId } = req.body;
-
     const room = await ChatRoom.findOne({ roomId });
     if (!room) {
       return res.status(404).json({ error: 'Chat room not found' });
@@ -1157,34 +1243,27 @@ exports.createOrJoinGroup = async (req, res) => {
 // Deactivate a group (admin only)
 exports.deactivateGroup = async (req, res) => {
   const { groupId, adminId } = req.body;
-
   try {
     const group = await Group.findById(groupId);
-
     if (!group) {
       return res.status(404).json({ message: "Group not found." });
     }
-
     // Check if the user making the request is the admin
     if (!group.adminId.equals(adminId)) {
       return res.status(403).json({ message: "Only the admin can deactivate the group." });
     }
-
     // Mark the group as inactive
     group.isActive = false;
     await group.save();
-
     // Emit the group deactivation event to notify all members
     const io = getIO();
     io.to(group._id).emit("groupDeactivated", { groupId });
-
     return res.status(200).json({ message: "Group has been deactivated", group });
   } catch (error) {
     console.error("Error deactivating group:", error);
     return res.status(500).json({ message: "Internal server error." });
   }
 };
-
 // Send a message in the group
 exports.sendMessage = async (req, res) => {
   console.log('Request body:', req.body);
@@ -1289,19 +1368,15 @@ exports.sendMessage = async (req, res) => {
     return res.status(500).json({ message: "Internal server error." });
   }
 };
-
 // New function to mark a message as read
 exports.markMessageAsRead = async (req, res) => {
   const { messageId } = req.body;
   const userId = req.User._id;
-
   try {
     const message = await Message.findById(messageId);
-
     if (!message) {
       return res.status(404).json({ message: "Message not found." });
     }
-
     // Check if the user has already read the message
     if (!message.readBy.some(read => read.userId.equals(userId))) {
       message.readBy.push({ userId, readAt: new Date() });
@@ -1324,7 +1399,6 @@ exports.leaveGroup = async (req, res) => {
   if (!groupId || !userId) {
     return res.status(400).json({ message: 'groupId and userId are required.' });
   }
-
   try {
     const group = await Group.findById(groupId);
     console.log('groupId, userId, newAdminId  group.adminId', groupId, userId, newAdminId, group.adminId)
@@ -1332,12 +1406,10 @@ exports.leaveGroup = async (req, res) => {
     if (!group) {
       return res.status(404).json({ message: "Group not found." });
     }
-    // Check if the user is a member of the group
     const isMember = group.members.includes(userId);
     if (!isMember) {
       return res.status(403).json({ message: "You are not a member of this group." });
     }
-
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: "User not found." });
@@ -1347,23 +1419,16 @@ exports.leaveGroup = async (req, res) => {
     const userObjectId = new mongoose.Types.ObjectId(userId);
     const newAdminObjectId = new mongoose.Types.ObjectId(newAdminId);
 
-    // Check if the user leaving is the admin
     if (group.adminId.equals(userObjectId)) {
-      // Check if the group is active
       if (!group.isActive) {
         return res.status(403).json({ message: "No action can perform as Group is deactivated." });
       }
-
-      // Admin is leaving, handle admin transfer or group deactivation
       if (newAdminId) {
-
         const newAdmin = await User.findById(newAdminId);
         if (!newAdmin) {
           return res.status(404).json({ message: "new Admin not found." });
         }
         const newAdminFirstName = newAdmin.firstName || "User";
-
-        // Transfer admin rights
         console.log('Making Admin working')
         group.adminId = newAdminObjectId;
         ;
@@ -1371,7 +1436,6 @@ exports.leaveGroup = async (req, res) => {
         await group.save();
         await exports.sendSystemMessage(group._id, `${userFirstName} transferred admin rights to ${newAdminFirstName}.`);
         await exports.sendSystemMessage(group._id, `${userFirstName} left the group.`);
-
         // const io = getIO(); // Emit the updated admin to the group members
         // io.to(group._id).emit("sendSystemMessage", { newAdminId });
         return res.status(200).json({ message: "Admin rights transferred", group });
@@ -1381,7 +1445,6 @@ exports.leaveGroup = async (req, res) => {
         group.isActive = false;
         await group.save();
         await exports.sendSystemMessage(group._id, `${userFirstName} deactivate the group. No one can send message now.`);
-
         // const io = getIO(); // Emit group deactivation
         // io.to(group._id).emit("groupDeactivated", { groupId });
         return res.status(200).json({ message: "Group deactivated" });
@@ -1391,11 +1454,8 @@ exports.leaveGroup = async (req, res) => {
       group.members = group.members.filter(member => !member.equals(userObjectId));
       await group.save();
       await exports.sendSystemMessage(group._id, `${userFirstName} has left the group.`);
-
-
       // const io = getIO(); // Emit user leave event to the group members
       // io.to(group._id).emit("memberLeft", { userId });
-
       return res.status(200).json({ message: "User has left the group", group });
     }
   } catch (error) {
@@ -1404,9 +1464,67 @@ exports.leaveGroup = async (req, res) => {
   }
 };
 
-// Get all groups for a user
+exports.isConnected = async (req, res) => {
+  try {
+    const { postId } = req.body;
+    if (!postId) {
+      return res.status(400).json({ message: "PostId is required." });
+    }
+    const group = await Group.findOne({ productId: postId });
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found for this post." });
+    }
+    const otherMembers = group.members.filter(
+      (memberId) => !memberId.equals(group.adminId)
+    );
+    if (otherMembers.length > 0) {
+      return res.status(200).json({ isConnected: true });
+    } else {
+      return res.status(200).json({ isConnected: false });
+    }
+  } catch (error) {
+    console.error("Error in isConnected:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+exports.deletePost = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const { postId } = req.body;
+    if (!postId) {
+      return res.status(400).json({ message: "PostId is required." });
+    }
+    const existingPost = await post.findById(postId).session(session);
+    if (!existingPost) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ message: "Post not found." });
+    }
+    const associatedGroup = await Group.findOne({ postId }).session(session);
+    await post.findByIdAndDelete(postId).session(session);
+   /*  if (associatedGroup) {
+      await Group.findByIdAndDelete(associatedGroup._id).session(session);
+    } */
+    await session.commitTransaction();
+    session.endSession();
+    return res.status(200).json({
+      message: "Post and associated group deleted successfully.",
+      postId,
+      groupId: associatedGroup ? associatedGroup._id : null,
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error("Error in deletePost:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
 exports.getGroupsForUser = async (req, res) => {
-  const { userId } = req.params;  // Access userId from query string
+  const { userId } = req.params;
 
   try {
     const groups = await Group.find({ members: new mongoose.Types.ObjectId(userId) });
@@ -2017,7 +2135,7 @@ exports.getUserPosts = async (req, res) => {
               then: { $subtract: ["$clubMembers", { $size: "$groupInfo.members" }] },
               else: { $subtract: ["$clubMembers", 1] },
             },
-          }, // Calculating clubToJoin like in the favourite products method
+          },
         },
       },
     ];
@@ -2088,6 +2206,9 @@ exports.getProductDetails = async (req, res) => {
       return res.status(400).json({ success: false, message: "Product ID is required" });
     }
     const userId = req.User._id;
+    if(!userId){
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
     const product = await post.findById(productId)
       .populate({
         path: "category",

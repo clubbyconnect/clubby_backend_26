@@ -5,6 +5,7 @@ const serverErrorHandler = require("../utils/serverErrorHandler.js");
 
 exports.verifyJWT = async (req, res, next) => {
   try {
+    console.log(req.headers)
     const token = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "");
     console.log('is this ', req.header("Authorization")?.replace("Bearer ", ""))
 

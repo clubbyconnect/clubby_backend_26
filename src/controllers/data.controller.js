@@ -339,7 +339,8 @@ exports.fetchOfflinecategory = async (req, res) => {
 //serching APi's
 exports.getAllProducts = async (req, res) => {
   try {
-    const products = await post.find(); // Get all products
+    console.log("hitssssssssss")
+    const products = await post.find().sort({ createdAt: -1 }); // Get all products
 
     if (products.length === 0) {
       return res.status(404).json({ message: "No products found" });
