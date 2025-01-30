@@ -27,7 +27,8 @@ const { signUp,
   getRequestList,
   deletePost,
   isConnected,
-  fetchGroupMembers
+  fetchGroupMembers,
+  getCategoryName
 } = require('../controllers/user.controller.js');
 const { sendPushNotification,
   fetchallcategory,
@@ -91,7 +92,7 @@ router.post("/fetchOnlinecategory",verifyJWT, fetchOnlinecategory);
 
 //serch & filter
 //getAllProducts
-router.get("/getAllProducts", getAllProducts);
+router.get("/getAllProducts",verifyJWT, getAllProducts);
 
 router.get("/serchByProductName", searchByProductName);
 router.get("/searchByDistance", searchByDistance);
@@ -114,6 +115,8 @@ router.get("/postRequestList/:productId",verifyJWT,getRequestList);
 router.delete("/deletePost",verifyJWT,deletePost)
 router.post ("/isConnected",verifyJWT,isConnected)
 router.post("/fetchGroupMembers",fetchGroupMembers)
+
+router.get("/categoryname/:categoryId", getCategoryName);
 
 //---------------------chat Routes-------------------------------------------------
 //Group Message 

@@ -817,17 +817,19 @@ exports.getPost = async (req, res) => {
 //------------------------------------------User Request---------------------------------------------
 exports.sendClubRequest = async (req, res) => {
   try {
+    console.log("hittttt")
     const { postId } = req.body
     const requesterId = req.User._id;
-
+    console.log(requesterId,"LLLLLLL")
     const postData = await post.findById(postId);
     if (!postData) {
       return res.status(404).json({ error: "Post Not Found" });
     }
 
-    if (postData.userId.equals(requesterId)) {
-      return res.status(404).json({ error: "You can not send ClubRequest to your own Post" });
+    if (postData.userId.toString() === requesterId.toString()) {
+      return res.status(400).json({ error: "You cannot send a ClubRequest to your own Post" });
     }
+
     const recipientId = postData.userId;
 
     if (!requesterId || !recipientId) {
@@ -898,7 +900,7 @@ exports.getRequestList = async (req, res) => {
       return res.status(403).json({ error: "You are not authorized to view requests for this post" });
     } 
     const clubRequests = await ClubRequest.find({ postId: productId })
-      .populate("requester", "firstName lastName email avatar")
+      .populate("requester", "firstName lastName email avatar gender")
     if (!clubRequests.length) {
       return res.status(404).json({ error: "No requests found for this post" });
     }
@@ -1396,12 +1398,13 @@ exports.markMessageAsRead = async (req, res) => {
 
 exports.leaveGroup = async (req, res) => {
   const { groupId, userId, newAdminId } = req.body;
+  console.log(groupId,userId,newAdminId,"LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL")
   if (!groupId || !userId) {
     return res.status(400).json({ message: 'groupId and userId are required.' });
   }
   try {
     const group = await Group.findById(groupId);
-    console.log('groupId, userId, newAdminId  group.adminId', groupId, userId, newAdminId, group.adminId)
+    console.log('groupId, userId, newAdminId  group.adminId', groupId, userId, newAdminId, group?.adminId)
 
     if (!group) {
       return res.status(404).json({ message: "Group not found." });
@@ -1415,10 +1418,9 @@ exports.leaveGroup = async (req, res) => {
       return res.status(404).json({ message: "User not found." });
     }
     const userFirstName = user.firstName || "User";
-
     const userObjectId = new mongoose.Types.ObjectId(userId);
+    console.log(userObjectId,"LLLLLLLLLLLLLLLLLLLLLLLLLLLsssssssssss")
     const newAdminObjectId = new mongoose.Types.ObjectId(newAdminId);
-
     if (group.adminId.equals(userObjectId)) {
       if (!group.isActive) {
         return res.status(403).json({ message: "No action can perform as Group is deactivated." });
@@ -1433,6 +1435,12 @@ exports.leaveGroup = async (req, res) => {
         group.adminId = newAdminObjectId;
         ;
         group.members = group.members.filter(member => !member.equals(userObjectId));
+        const postToUpdate = await post.findOne({ groupId });
+        if (postToUpdate) {
+          postToUpdate.userId = newAdminObjectId;
+          await postToUpdate.save();
+          console.log("admin updated")
+        }
         await group.save();
         await exports.sendSystemMessage(group._id, `${userFirstName} transferred admin rights to ${newAdminFirstName}.`);
         await exports.sendSystemMessage(group._id, `${userFirstName} left the group.`);
@@ -1450,6 +1458,7 @@ exports.leaveGroup = async (req, res) => {
         return res.status(200).json({ message: "Group deactivated" });
       }
     } else {
+      console.log("hsitttttttttt")
       // Normal user leaving the group without voting
       group.members = group.members.filter(member => !member.equals(userObjectId));
       await group.save();
@@ -1505,9 +1514,9 @@ exports.deletePost = async (req, res) => {
     }
     const associatedGroup = await Group.findOne({ postId }).session(session);
     await post.findByIdAndDelete(postId).session(session);
-   /*  if (associatedGroup) {
+    if (associatedGroup) {
       await Group.findByIdAndDelete(associatedGroup._id).session(session);
-    } */
+    }
     await session.commitTransaction();
     session.endSession();
     return res.status(200).json({
@@ -1589,7 +1598,6 @@ exports.sendVotingMessage = async (groupId, userId) => {
 // Cast vote process
 exports.castVote = async (req, res) => {
   const { votingId, voterId, vote } = req.body;
-
   try {
     const voting = await Voting.findById(votingId);
 
@@ -2205,11 +2213,17 @@ exports.getProductDetails = async (req, res) => {
     if (!productId) {
       return res.status(400).json({ success: false, message: "Product ID is required" });
     }
+
     const userId = req.User._id;
     if(!userId){
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
+
     const product = await post.findById(productId)
+    .populate({
+      path: "userId",
+      select: "firstName lastName", // Fetch user name and email along with userId
+    })
       .populate({
         path: "category",
         select: "name description",
@@ -2222,23 +2236,44 @@ exports.getProductDetails = async (req, res) => {
         path: "reportedBy",
         select: "name email",
       });
+
     if (!product) {
       return res.status(404).json({ success: false, message: "Product not found" });
     }
+
     const productData = product.toObject(); 
+
     console.log(userId)
-    if (userId == product.userId.toString()) {
+
+    if (userId.toString() === product.userId._id.toString()) {
       productData.isAdmin = true;
     }
 
-    // Send the response
     res.status(200).json({ success: true, data: productData });
+
   } catch (e) {
     console.error(e);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-
-
-
+exports.getCategoryName = async (req, res) => {
+  try {
+    const { categoryId } = req.params;
+    if (!categoryId) {
+      return res.status(400).json({ success: false, message: "Category ID is required" });
+    }
+    const category = await CategoryModel.findById(categoryId);
+    if (!category) {
+      return res.status(404).json({ success: false, message: "Category not found"})
+      }
+      const categoryResponse = {
+        id: category._id,
+        name: category.name,
+      }
+      res.status(200).json({ success: true, data: [categoryResponse] });
+  }catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
