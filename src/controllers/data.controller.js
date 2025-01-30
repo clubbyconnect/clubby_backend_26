@@ -80,7 +80,7 @@ exports.fetchallcategory = async (req, res) => {
           image: 1,
           isPremium: 1,
           subcategoriesData: {
-            _id: 1, 
+            _id: 1,
             name: 1,
           },
         },
@@ -89,7 +89,7 @@ exports.fetchallcategory = async (req, res) => {
 
     if (allcategory && allcategory.length > 0) {
       const categoryData = allcategory.map((category) => {
-  
+
         const sortedSubcategories = category.subcategoriesData.sort((a, b) => {
           const isAOther = a.name.toLowerCase().includes("other");
           const isBOther = b.name.toLowerCase().includes("other");
@@ -98,14 +98,14 @@ exports.fetchallcategory = async (req, res) => {
           if (isBOther) return -1;
           return 0;
         });
-    
+
         return {
           _id: category._id,
           name: category.name,
           image: category.image,
           isPremium: category.isPremium,
           subcategories: sortedSubcategories.map((sub) => ({
-            _id: sub._id, 
+            _id: sub._id,
             name: sub.name,
           })),
         };
@@ -169,7 +169,7 @@ exports.fetchOnlinecategory = async (req, res) => {
         subcategories: category.subcategoriesData.map((sub) => ({
           name: sub.name,
         })),
-        isPremium:category.isPremium
+        isPremium: category.isPremium
       }));
 
 
@@ -634,7 +634,7 @@ exports.searchProducts = async (req, res) => {
       category,
       subCategory,
     } = req.query;
-    console.log("hit")
+
     const userId = req.User._id;
 
     let matchStage = {};
@@ -715,8 +715,8 @@ exports.searchProducts = async (req, res) => {
 
       try {
         matchStage.category = new mongoose.Types.ObjectId(category);
-        const categoryExists = await mongoose.model('OfflineCategory').findById(category);
-
+        const categoryExists = await mongoose.model('Category').findById(category);
+        console.log('Category is ', categoryExists)
         if (!categoryExists) {
           return res.status(404).json({
             success: false,
@@ -737,6 +737,8 @@ exports.searchProducts = async (req, res) => {
     if (subCategory) {
       try {
         matchStage.subCategory = new mongoose.Types.ObjectId(subCategory);
+        console.log('subCategory is ', matchStage.subCategory)
+
       } catch (e) {
         console.error('Error converting subCategory to ObjectId:', e.message);
       }
@@ -751,7 +753,7 @@ exports.searchProducts = async (req, res) => {
       // Lookup for main category from offlinecategories collection
       {
         $lookup: {
-          from: "offlinecategories",
+          from: "categories",
           localField: "category",
           foreignField: "_id",
           as: "categoryDetails"
@@ -763,12 +765,12 @@ exports.searchProducts = async (req, res) => {
           preserveNullAndEmptyArrays: true
         }
       },
-      // Lookup for subcategory from offlinecategories collection
+      // Direct lookup for subcategory as a category document
       {
         $lookup: {
-          from: "offlinecategories",
-          localField: "subCategory",
-          foreignField: "_id",
+          from: "categories",
+          localField: "subCategory",  // This is the subcategory ID in your product
+          foreignField: "_id",        // This will match directly with category documents
           as: "subCategoryDetails"
         }
       },
@@ -777,7 +779,8 @@ exports.searchProducts = async (req, res) => {
           path: "$subCategoryDetails",
           preserveNullAndEmptyArrays: true
         }
-      },
+      }
+      ,
       // Add lookup for group information
       {
         $lookup: {
@@ -808,14 +811,14 @@ exports.searchProducts = async (req, res) => {
         clubType: 1,
         category: 1,
         categoryName: "$categoryDetails.name",
-        categoryImage: "$categoryDetails.image",
-        categoryType: "$categoryDetails.type",
-        subCategory: 1,
-        subCategoryName: "$subCategoryDetails.name",
-        subCategoryImage: "$subCategoryDetails.image",
-        subCategoryType: "$subCategoryDetails.type",
+        // categoryImage: "$categoryDetails.image",
+        // categoryType: "$categoryDetails.type",
+        // subCategory: 1,
+        // subCategories: "$subCategoryDetails.id",
+        // subCategoryName: "$subCategoryDetails.name",
+        // subCategoryImage: "$subCategoryDetails.name.image",
         itemName: 1,
-        offerType: 1,
+        // offerType: 1,
         price: 1,
         price_type: 1,
         clubMembers: 1,
@@ -831,21 +834,21 @@ exports.searchProducts = async (req, res) => {
             else: { $subtract: ["$clubMembers", 1] }
           }
         },
-        additionalInformation: 1,
+        // additionalInformation: 1,
         size: 1,
-        itemLink: 1,
-        platform: 1,
-        paymentMode: 1,
-        productImage: 1,
+        // itemLink: 1,
+        // platform: 1,
+        // paymentMode: 1,
+        // productImage: 1,
         clubStatus: 1,
-        reportCount: 1,
-        reportedBy: 1,
-        reportMessage: 1,
-        createdAt: 1,
-        updatedAt: 1,
+        // reportCount: 1,
+        // reportedBy: 1,
+        // reportMessage: 1,
+        // createdAt: 1,
+        // updatedAt: 1,
         __v: 1,
-        store_location: 1,
-        delivery_location: 1,
+        // store_location: 1,
+        // delivery_location: 1,
         distance: {
           $cond: {
             if: { $lt: ["$distance", 1] },
@@ -877,6 +880,14 @@ exports.searchProducts = async (req, res) => {
       return res.status(404).json({ message: "No products found" });
     }
 
+    if (products.length > 0) {
+      console.log('Debug - First product after aggregation:', {
+        categoryName: products[0].categoryName,
+        subCategoryName: products[0].subCategoryName,
+        subCategory: products[0].subCategory
+      });
+    }
+
     res.status(200).json({
       success: true,
       data: products.map((product) => ({
@@ -888,6 +899,7 @@ exports.searchProducts = async (req, res) => {
     serverErrorHandler(error, res);
   }
 };
+
 
 
 //-------------------All filters in One Api--------------------------------

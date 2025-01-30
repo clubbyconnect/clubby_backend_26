@@ -587,7 +587,7 @@ exports.createPost = async (req, res) => {
       additionalInformation,
       size,
     } = req.body;
-    console.log(req.headers,req.body)
+    console.log(req.headers, req.body)
     if (
       [
         category,
@@ -657,7 +657,7 @@ exports.createPost = async (req, res) => {
       .findById(createdPost._id)
       .populate("category", "name")
       .populate("subCategory", "name");
-    console.log(populatedPost,"LLLLLLLLLLLL")
+    console.log(populatedPost, "LLLLLLLLLLLL")
     return res.status(200).json({
       message: "Post created successfully.",
       post: {
@@ -712,7 +712,7 @@ exports.UpdateUserDetails = async (req, res) => {
     if (gender) updateDetails.gender = gender.trim();
     if (email) updateDetails.email = email.trim();
     if (phoneNumber) updateDetails.phoneNumber = phoneNumber.trim();
-    if (address){ 
+    if (address) {
       updateDetails.address.address_text = address.address_text;
       updateDetails.address.latitude = address.latitude;
       updateDetails.address.longitude = address.longitude;
@@ -830,7 +830,7 @@ exports.sendClubRequest = async (req, res) => {
     const recipient = await User.findById(recipientId);
     if (recipient && recipient.fcmToken) {
       const notificationData = {
-        token: recipient.fcmToken, 
+        token: recipient.fcmToken,
         notification: {
           title: "New Club Request",
           body: `You have received a club request for your post "${postData.title}".`,
@@ -864,15 +864,15 @@ exports.getRequestList = async (req, res) => {
     if (!productId) {
       return res.status(400).json({ error: "productId is required" });
     }
-    const userId = req.User._id; 
+    const userId = req.User._id;
     const postData = await post.findById(productId);
 
     if (!postData) {
       return res.status(404).json({ error: "Post not found" });
     }
-   /*  if (!postData.userId.equals(userId)) {
-      return res.status(403).json({ error: "You are not authorized to view requests for this post" });
-    } */
+    /*  if (!postData.userId.equals(userId)) {
+       return res.status(403).json({ error: "You are not authorized to view requests for this post" });
+     } */
     const clubRequests = await ClubRequest.find({ postId: productId })
       .populate("requester", "name email avatar")
     if (!clubRequests.length) {
@@ -884,8 +884,8 @@ exports.getRequestList = async (req, res) => {
       requests: clubRequests.map((request) => ({
         _id: request._id,
         requester: request.requester,
-/*         postId: request.postId,
-        createdAt: request.createdAt, */
+        /*         postId: request.postId,
+                createdAt: request.createdAt, */
       })),
     });
   } catch (error) {
@@ -1612,32 +1612,32 @@ exports.getFavoriteProducts = async (req, res) => {
     aggregatePipeline.push(
       {
         $lookup: {
-          from: "offlinecategories",
+          from: "categories",
           localField: "category",
           foreignField: "_id",
-          as: "categoryDetails",
-        },
+          as: "categoryDetails"
+        }
       },
       {
         $unwind: {
           path: "$categoryDetails",
-          preserveNullAndEmptyArrays: true,
-        },
+          preserveNullAndEmptyArrays: true
+        }
       },
-      // Lookup for subcategory details
+      // Direct lookup for subcategory as a category document
       {
         $lookup: {
-          from: "offlinecategories",
-          localField: "subCategory",
-          foreignField: "_id",
-          as: "subCategoryDetails",
-        },
+          from: "categories",
+          localField: "subCategory",  // This is the subcategory ID in your product
+          foreignField: "_id",        // This will match directly with category documents
+          as: "subCategoryDetails"
+        }
       },
       {
         $unwind: {
           path: "$subCategoryDetails",
-          preserveNullAndEmptyArrays: true,
-        },
+          preserveNullAndEmptyArrays: true
+        }
       },
       // Lookup for group info
       {
@@ -1664,9 +1664,9 @@ exports.getFavoriteProducts = async (req, res) => {
         _id: 1,
         userId: 1,
         itemName: 1,
-        offerType: 1,
-        price: 1,
-        price_type: 1,
+        // offerType: 1,
+        // price: 1,
+        // price_type: 1,
         clubMembers: 1,
         clubToJoin: {
           $cond: {
@@ -1675,24 +1675,24 @@ exports.getFavoriteProducts = async (req, res) => {
             else: { $subtract: ["$clubMembers", 1] },
           },
         },
-        additionalInformation: 1,
+        // additionalInformation: 1,
         size: 1,
-        itemLink: 1,
-        platform: 1,
-        paymentMode: 1,
+        // itemLink: 1,
+        // platform: 1,
+        // paymentMode: 1,
         productImage: 1,
         clubStatus: 1,
-        reportCount: 1,
-        reportedBy: 1,
-        reportMessage: 1,
-        createdAt: 1,
-        updatedAt: 1,
-        store_location: 1,
-        delivery_location: 1,
+        // reportCount: 1,
+        // reportedBy: 1,
+        // reportMessage: 1,
+        // createdAt: 1,
+        // updatedAt: 1,
+        // store_location: 1,
+        // delivery_location: 1,
         categoryName: "$categoryDetails.name",
-        categoryImage: "$categoryDetails.image",
-        subCategoryName: "$subCategoryDetails.name",
-        subCategoryImage: "$subCategoryDetails.image",
+        // categoryImage: "$categoryDetails.image",
+        // subCategoryName: "$subCategoryDetails.name",
+        // subCategoryImage: "$subCategoryDetails.image",
         distance: {
           $cond: {
             if: { $lt: ["$distance", 1] },
@@ -1719,9 +1719,6 @@ exports.getFavoriteProducts = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 };
-
-
-
 
 exports.getFilteredFavoriteProducts = async (req, res) => {
   try {
@@ -1787,32 +1784,32 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
     aggregatePipeline.push(
       {
         $lookup: {
-          from: "offlinecategories",
+          from: "categories",
           localField: "category",
           foreignField: "_id",
-          as: "categoryDetails",
-        },
+          as: "categoryDetails"
+        }
       },
       {
         $unwind: {
           path: "$categoryDetails",
-          preserveNullAndEmptyArrays: true,
-        },
+          preserveNullAndEmptyArrays: true
+        }
       },
-      // Lookup for subcategory details
+      // Direct lookup for subcategory as a category document
       {
         $lookup: {
-          from: "offlinecategories",
-          localField: "subCategory",
-          foreignField: "_id",
-          as: "subCategoryDetails",
-        },
+          from: "categories",
+          localField: "subCategory",  // This is the subcategory ID in your product
+          foreignField: "_id",        // This will match directly with category documents
+          as: "subCategoryDetails"
+        }
       },
       {
         $unwind: {
           path: "$subCategoryDetails",
-          preserveNullAndEmptyArrays: true,
-        },
+          preserveNullAndEmptyArrays: true
+        }
       },
       // Lookup for group info
       {
@@ -1839,9 +1836,9 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
         _id: 1,
         userId: 1,
         itemName: 1,
-        offerType: 1,
-        price: 1,
-        price_type: 1,
+        // offerType: 1,
+        // price: 1,
+        // price_type: 1,
         clubMembers: 1,
         clubToJoin: {
           $cond: {
@@ -1850,24 +1847,24 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
             else: { $subtract: ["$clubMembers", 1] },
           },
         },
-        additionalInformation: 1,
+        // additionalInformation: 1,
         size: 1,
-        itemLink: 1,
-        platform: 1,
-        paymentMode: 1,
+        // itemLink: 1,
+        // platform: 1,
+        // paymentMode: 1,
         productImage: 1,
         clubStatus: 1,
-        reportCount: 1,
-        reportedBy: 1,
-        reportMessage: 1,
-        createdAt: 1,
-        updatedAt: 1,
-        store_location: 1,
-        delivery_location: 1,
+        // reportCount: 1,
+        // reportedBy: 1,
+        // reportMessage: 1,
+        // createdAt: 1,
+        // updatedAt: 1,
+        // store_location: 1,
+        // delivery_location: 1,
         categoryName: "$categoryDetails.name",
-        categoryImage: "$categoryDetails.image",
-        subCategoryName: "$subCategoryDetails.name",
-        subCategoryImage: "$subCategoryDetails.image",
+        // categoryImage: "$categoryDetails.image",
+        // subCategoryName: "$subCategoryDetails.name",
+        // subCategoryImage: "$subCategoryDetails.image",
         distance: {
           $cond: {
             if: { $lt: ["$distance", 1] },
@@ -1898,9 +1895,8 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
 exports.getUserPosts = async (req, res) => {
   try {
     const userId = req.User._id;
-    const { lon, lat } = req.query;
+    const { lon, lat, status } = req.query;
 
-    // Validate latitude and longitude
     if (!lat || !lon) {
       return res.status(400).json({ success: false, message: "Latitude and longitude are required" });
     }
@@ -1912,32 +1908,26 @@ exports.getUserPosts = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid latitude or longitude" });
     }
 
-    const userIdObjectId = new mongoose.Types.ObjectId(userId);  // Convert userId to ObjectId
+    const userIdObjectId = new mongoose.Types.ObjectId(userId);
 
-    console.log(`Searching for posts and calculating distance from coordinates: [${parsedLon}, ${parsedLat}]`);
-
-    // Aggregation pipeline to calculate distance, match by userId, and project necessary fields
     let aggregatePipeline = [
       {
         $geoNear: {
           near: {
             type: "Point",
-            coordinates: [parsedLon, parsedLat], // Using the provided coordinates
+            coordinates: [parsedLon, parsedLat],
           },
-          distanceField: "distance", // Field to store the calculated distance
-          spherical: true, // Using spherical geometry to calculate distance on Earth's surface
-          key: "store_location.coordinates", // The field that contains the geographical data
+          distanceField: "distance",
+          spherical: true,
+          key: "store_location.coordinates",
         },
       },
       {
-        $match: {
-          userId: userIdObjectId, // Match only posts where userId matches the provided userId
-        },
+        $match: { userId: userIdObjectId },
       },
-      // Lookup for category details
       {
         $lookup: {
-          from: "offlinecategories",
+          from: "categories",
           localField: "category",
           foreignField: "_id",
           as: "categoryDetails",
@@ -1949,10 +1939,9 @@ exports.getUserPosts = async (req, res) => {
           preserveNullAndEmptyArrays: true,
         },
       },
-      // Lookup for subcategory details
       {
         $lookup: {
-          from: "offlinecategories",
+          from: "categories",
           localField: "subCategory",
           foreignField: "_id",
           as: "subCategoryDetails",
@@ -1964,7 +1953,6 @@ exports.getUserPosts = async (req, res) => {
           preserveNullAndEmptyArrays: true,
         },
       },
-      // Lookup for group info
       {
         $lookup: {
           from: "groups",
@@ -1981,7 +1969,6 @@ exports.getUserPosts = async (req, res) => {
           preserveNullAndEmptyArrays: true,
         },
       },
-      // Project required fields, including clubToJoin calculation
       {
         $project: {
           _id: 1,
@@ -2002,7 +1989,7 @@ exports.getUserPosts = async (req, res) => {
               else: { $divide: ["$distance", 1000] },
             },
           },
-          groupInfo: 1, // Include group info if available
+          groupInfo: 1,
           size: 1,
           itemLink: 1,
           platform: 1,
@@ -2017,31 +2004,24 @@ exports.getUserPosts = async (req, res) => {
               then: { $subtract: ["$clubMembers", { $size: "$groupInfo.members" }] },
               else: { $subtract: ["$clubMembers", 1] },
             },
-          }, // Calculating clubToJoin like in the favourite products method
+          },
         },
       },
     ];
 
-    console.log("Aggregation Pipeline:", JSON.stringify(aggregatePipeline, null, 2)); // Log the aggregation pipeline
-
     const posts = await post.aggregate(aggregatePipeline);
-
-    console.log("Fetched Posts with Details:", posts); // Log the result of the aggregation query
 
     if (posts.length === 0) {
       return res.status(404).json({ success: false, message: "No posts found" });
     }
 
-    // Modify post status based on user interaction and membership in groups
     const modifiedPosts = await Promise.all(
       posts.map(async (post) => {
-        let postStatus = post.postStatus; // Use existing postStatus initially
+        let postStatus = post.postStatus;
 
-        // Check if the userId is the creator of the post
         if (post.userId && post.userId.toString() === userId.toString()) {
           postStatus = "I created";
         } else {
-          // Check if the user is a member of any group for the post's productId
           const groups = await Group.find({ members: userId, productId: post.productId });
           const isMember = groups.some(group => group.members.includes(userId));
 
@@ -2053,33 +2033,50 @@ exports.getUserPosts = async (req, res) => {
         return {
           _id: post._id,
           itemName: post.itemName,
-          postStatus, // Modified post status
-          distance: post.distance, // Directly return the calculated distance
+          postStatus,
+          distance: post.distance,
           categoryName: post.categoryName,
-          categoryImage: post.categoryImage,
-          subCategoryName: post.subCategoryName,
-          subCategoryImage: post.subCategoryImage,
-          groupInfo: post.groupInfo, // Include group information
+          // categoryImage: post.categoryImage,
+          // subCategoryName: post.subCategoryName,
+          // subCategoryImage: post.subCategoryImage,
+          groupInfo: post.groupInfo,
           size: post.size,
-          itemLink: post.itemLink,
-          platform: post.platform,
-          delivery_location: post.delivery_location,
-          store_location: post.store_location,
-          additionalInformation: post.additionalInformation,
+          // itemLink: post.itemLink,
+          // platform: post.platform,
+          // delivery_location: post.delivery_location,
+          // store_location: post.store_location,
+          // additionalInformation: post.additionalInformation,
           clubMembers: post.clubMembers,
-          clubToJoin: post.clubToJoin, // Directly include clubToJoin from post schema
+          clubToJoin: post.clubToJoin,
           productImage: post.productImage,
+          status: post.clubStatus,
         };
       })
     );
 
-    // Send the response with the modified posts
-    res.status(200).json({ success: true, message: "Posts fetched successfully", posts: modifiedPosts });
+    // Apply status filters
+    let filteredPosts = modifiedPosts;
+
+    if (status) {
+      if (status === "I created") {
+        filteredPosts = modifiedPosts.filter(post => post.postStatus === "I created");
+      } else if (status === "I joined") {
+        filteredPosts = modifiedPosts.filter(post => post.postStatus === "I joined");
+      } else if (status === "Active" || status === "Inactive" || status === "WrapDeal") {
+        filteredPosts = modifiedPosts.filter(post => post.status === status);
+      } else if (status === "Full") {
+        filteredPosts = modifiedPosts.filter(post => post.clubToJoin === 0);
+      }
+      // If status is "All", no filter is applied, all posts are returned
+    }
+
+    res.status(200).json({ success: true, message: "Posts fetched successfully", posts: filteredPosts });
   } catch (error) {
     console.error("Error fetching posts:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
 
 exports.getProductDetails = async (req, res) => {
   try {
@@ -2104,7 +2101,7 @@ exports.getProductDetails = async (req, res) => {
     if (!product) {
       return res.status(404).json({ success: false, message: "Product not found" });
     }
-    const productData = product.toObject(); 
+    const productData = product.toObject();
     console.log(userId)
     if (userId == product.userId.toString()) {
       productData.isAdmin = true;
