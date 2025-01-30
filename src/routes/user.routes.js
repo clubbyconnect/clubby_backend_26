@@ -24,7 +24,11 @@ const { signUp,
   getUserLikePost,
   getPost,
   getProductDetails,
-  getRequestList
+  getRequestList,
+  deletePost,
+  isConnected,
+  fetchGroupMembers,
+  getCategoryName
 } = require('../controllers/user.controller.js');
 const { sendPushNotification,
   fetchallcategory,
@@ -88,7 +92,7 @@ router.post("/fetchOnlinecategory",verifyJWT, fetchOnlinecategory);
 
 //serch & filter
 //getAllProducts
-router.get("/getAllProducts", getAllProducts);
+router.get("/getAllProducts",verifyJWT, getAllProducts);
 
 router.get("/serchByProductName", searchByProductName);
 router.get("/searchByDistance", searchByDistance);
@@ -106,11 +110,16 @@ router.post("/sendClubRequest", verifyJWT, sendClubRequest);
 router.post("/acceptClubRequest", verifyJWT, acceptClubRequest);
 router.post("/declineClubRequest", verifyJWT, declineClubRequest);
 router.post("/removeUserFromClub", verifyJWT, removeUserFromClub);
-router.get("/postRequestList/:productId",verifyJWT,getRequestList)
+router.get("/postRequestList/:productId",verifyJWT,getRequestList);
 
+router.delete("/deletePost",verifyJWT,deletePost)
+router.post ("/isConnected",verifyJWT,isConnected)
+router.post("/fetchGroupMembers",fetchGroupMembers)
+
+router.get("/categoryname/:categoryId", getCategoryName);
 
 //---------------------chat Routes-------------------------------------------------
-//Group Message
+//Group Message 
 
 //http://localhost:8000/api/user/myGroups
 

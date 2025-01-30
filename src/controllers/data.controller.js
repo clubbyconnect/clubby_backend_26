@@ -6,7 +6,7 @@ const onlineCategoryModel = require("../models/onlineCategorySchema.js")
 const post = require("../models/post.js");
 const admin = require('firebase-admin');
 const mongoose = require('mongoose');
-
+const Group = require('../models/group.js');
 
 //Firebase-setup
 const serviceAccount = {
@@ -339,18 +339,41 @@ exports.fetchOfflinecategory = async (req, res) => {
 //serching APi's
 exports.getAllProducts = async (req, res) => {
   try {
-    const products = await post.find(); // Get all products
+    const userId = req.User?._id;
+    console.log("Fetching all active group products...");
+    const activeGroups = await Group.find({ isActive: true }).select("productId limit members");
+    
+    if (activeGroups.length === 0) {
+      return res.status(404).json({ message: "No active group products found" });
+    }
+    const activeProductIds = activeGroups.map(group => group.productId);
+    const products = await post.find({ _id: { $in: activeProductIds } }).sort({ createdAt: -1 });
 
     if (products.length === 0) {
-      return res.status(404).json({ message: "No products found" });
+      return res.status(404).json({ message: "No products found for active groups" });
     }
 
-    res.status(200).json({ products });
+    let likedProductIds = [];
+    if (userId) {
+      const user = await User.findById(userId).select("favourites");
+      likedProductIds = user?.favourites || [];
+    }
+
+    const productsWithGroupInfo = products.map(product => {
+      const group = activeGroups.find(g => g.productId.equals(product._id));
+      return {
+        ...product._doc,
+        totalMembers: group ? group.limit : 0,
+        membersLeft: group ? group.limit - (group?.members?.length || 0) : 0,
+        isLiked: likedProductIds.some(likedId => likedId.equals(product._id)),
+      };
+    });
+
+    return res.status(200).json({ products: productsWithGroupInfo });
   } catch (error) {
-    serverErrorHandler(error, res); // Handle server errors
+    serverErrorHandler(error, res);
   }
 };
-
 exports.searchByProductName = async (req, res) => {
   try {
     console.log("")
