@@ -862,7 +862,7 @@ exports.searchProducts = async (req, res) => {
         // itemLink: 1,
         // platform: 1,
         // paymentMode: 1,
-        // productImage: 1,
+        productImage: 1,
         clubStatus: 1,
         // reportCount: 1,
         // reportedBy: 1,
