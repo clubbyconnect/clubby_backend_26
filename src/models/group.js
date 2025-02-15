@@ -49,5 +49,6 @@ const GroupSchema = new Schema({
 // Create a compound index for frequently queried combinations, if needed
 GroupSchema.index({ adminId: 1, isActive: 1 });
 
-const Group = mongoose.model('Group', GroupSchema);
+// Prevent Overwrite
+const Group = mongoose.models.Group || mongoose.model('Group', GroupSchema);
 module.exports = Group;
