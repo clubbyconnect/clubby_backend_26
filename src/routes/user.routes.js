@@ -12,7 +12,6 @@ const { signUp,
   logout,
   resetPassword,
   uploadAvatar,
-  createPost,
   sendClubRequest,
   acceptClubRequest,
   declineClubRequest,
@@ -23,15 +22,11 @@ const { signUp,
   UpdateUserLikePost,
   getUserLikePost,
   getPost,
-  getProductDetails,
-  getRequestList,
-  deletePost,
   isConnected,
   fetchGroupMembers,
   getCategoryName
 } = require('../controllers/user.controller.js');
 const { sendPushNotification,
-  fetchallcategory,
   fetchsubcategory,
   fetchOfflinecategory,
   fetchOnlinecategory,
@@ -45,6 +40,8 @@ const { sendPushNotification,
   getAllProducts,
   searchProducts
 } = require('../controllers/data.controller.js');
+
+const CategoryController = require('../controllers/CategoryController.js');
 
 
 const {
@@ -64,6 +61,12 @@ const {
   // filterUserPosts
 } = require("../controllers/user.controller.js");
 
+
+const PostController = require("../controllers/PostController");
+const ClubRequestController = require("../controllers/ClubRequestController");
+const GroupController = require("../controllers/GroupController");
+const {createPost} = require("../controllers/user.controller");
+
 //user
 router.post("/signUp", signUp);
 router.post("/googleAuth", googleAuth);
@@ -77,7 +80,30 @@ router.post("/verifyOtp", verifyOtp);
 router.post("/logout", verifyJWT, logout);
 router.post("/resetPassword", resetPassword);
 router.post("/uploadAvatar", verifyJWT, upload.single('avatar'), uploadAvatar);
+
+// POST ROUTES
+// router.post("/post/create", verifyJWT, upload.single('productImage'), PostController.create);
+router.get('/post/:productId', verifyJWT, PostController.read)
+router.delete("/post/:postId", verifyJWT, PostController.delete)
+router.post("/posts", verifyJWT, PostController.getPost)
+router.post("/post/transfer",verifyJWT, PostController.transfer);
+
+// router.delete("/deletePost",verifyJWT,deletePost)
 router.post("/createPost",verifyJWT, upload.single('productImage'), createPost);
+//router.get('/productDetails/:productId',verifyJWT,getProductDetails)
+
+
+// CLUB ROUTES
+router.get("/club/:productId",verifyJWT, ClubRequestController.list);
+router.get("/club/join/:postId",verifyJWT, ClubRequestController.sendClubRequest);
+router.post("/club-request/action",verifyJWT,  ClubRequestController.handleClubRequest);
+
+
+
+// GROUP ROUTES
+router.get("/group/member/:postId",verifyJWT, GroupController.member);
+
+
 router.post("/UpdateUserDetails", verifyJWT, upload.single('avatar'), UpdateUserDetails);
 router.post("/UpdateUserLikePost", verifyJWT, UpdateUserLikePost);
 router.get("/getUserLikePost", verifyJWT, getUserLikePost);
@@ -85,7 +111,8 @@ router.get("/getPost",verifyJWT, getPost);
 
 //App data
 //router.post("/fetchallcategory",sendPushNotification);
-router.post("/fetchallcategory",verifyJWT, fetchallcategory);
+//router.post("/fetchallcategory",verifyJWT, fetchallcategory);
+router.post("/fetchallcategory",verifyJWT, CategoryController.getAllCategories);
 router.post("/fetchsubcategory",verifyJWT,  fetchsubcategory);
 router.post("/fetchOfflinecategory",verifyJWT, fetchOfflinecategory);
 router.post("/fetchOnlinecategory",verifyJWT, fetchOnlinecategory);
@@ -101,7 +128,7 @@ router.get("/searchByDate", searchByDate);
 router.get("/searchByFilter", searchByFilter);
 router.get("/searchBySort", searchBySort);
 router.get("/searchProducts", verifyJWT, searchProducts);
-router.get('/productDetails/:productId',verifyJWT,getProductDetails)
+
 //testing searchProducts
 router.get("/unifiedSearch", unifiedSearch);
 
@@ -110,16 +137,14 @@ router.post("/sendClubRequest", verifyJWT, sendClubRequest);
 router.post("/acceptClubRequest", verifyJWT, acceptClubRequest);
 router.post("/declineClubRequest", verifyJWT, declineClubRequest);
 router.post("/removeUserFromClub", verifyJWT, removeUserFromClub);
-router.get("/postRequestList/:productId",verifyJWT,getRequestList);
 
-router.delete("/deletePost",verifyJWT,deletePost)
 router.post ("/isConnected",verifyJWT,isConnected)
 router.post("/fetchGroupMembers",fetchGroupMembers)
 
 router.get("/categoryname/:categoryId", getCategoryName);
 
 //---------------------chat Routes-------------------------------------------------
-//Group Message 
+//Group Message
 
 //http://localhost:8000/api/user/myGroups
 

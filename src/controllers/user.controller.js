@@ -9,7 +9,7 @@ const uploadOnCloudinary = require("../utils/cloudinary.js");
 const serverErrorHandler = require("../utils/serverErrorHandler.js");
 const User = require("../models/user.js");
 const OTP = require("../models/otp.js");
-const post = require("../models/post.js");
+const post = require("../models/Post.js");
 const OfflineCategoryModel = require("../models/offlineCategorySchema.js");
 const onlineCategoryModel = require("../models/onlineCategorySchema.js");
 const CategoryModel = require("../models/categorySchema.js");
@@ -17,11 +17,14 @@ const ClubRequest = require("../models/clubRequest.js");
 const ChatRoom = require("../models/chatRoom.js");
 const { sendPushNotification } = require('../controllers/data.controller.js');
 
+const SubcategoryModel = require("../models/Subcategory");
+
 //Group chat
 const Group = require('../models/group.js');
 const Message = require('../models/message.js');
 const Voting = require('../models/voting.js')
 const { getIO } = require("../sockets/chats.js");
+const PostModel = require("../models/Post");
 
 
 
@@ -605,28 +608,29 @@ exports.createPost = async (req, res) => {
     const productImageLocalPath = req.file?.path;
     let productImage;
 
-    if (productImageLocalPath) {
-      productImage = await uploadOnCloudinary(productImageLocalPath);
-    } else {
-
-      if (!images[category] || !images[category][subCategory]) {
-        return res.status(400).json({ error: "Invalid category or subcategory." });
-      }
-      productImage = { url: images[category][subCategory] }; 
-    }
-
-    const CategoryClubType = CategoryModel;
-
-    const categoryObj = await CategoryClubType.findOne({ name: category });
+    const categoryObj = await CategoryModel.findOne({ name: category });
     if (!categoryObj)
       return res.status(400).json({ error: "Invalid category." });
 
-    const subcategoryObj = await CategoryClubType.findOne({ name: subCategory });
+
+    const subcategoryObj = await SubcategoryModel.findOne({ name: subCategory });
     if (!subcategoryObj)
       return res.status(400).json({ error: "Invalid subcategory." });
 
+    if (productImageLocalPath) {
+      productImage = await uploadOnCloudinary(productImageLocalPath);
+    } else {
+      if (subcategoryObj.image){
+        productImage = { url: subcategoryObj.image };
+      }
+    }
+
+    const expiryAt = new Date();
+    expiryAt.setDate(expiryAt.getDate() + 30);
+
     const postData = {
       userId: req.User._id,
+      postOwnerId: req.User._id, // Initially, user and post owner are the same
       itemName,
       offerType,
       price,
@@ -635,6 +639,7 @@ exports.createPost = async (req, res) => {
       category: categoryObj._id,
       subCategory: subcategoryObj._id,
       productImage: productImage.url,
+      expiryAt
     };
 
     if (size) postData.size = size;
@@ -648,6 +653,18 @@ exports.createPost = async (req, res) => {
         parseFloat(store_location_latitude),
       ],
     };
+
+    // Generate unique Post ID
+    const generatePostId = async () => {
+      const timestamp = Date.now().toString().slice(-9);
+      const randomDigit = Math.floor(Math.random() * 9) + 1;
+      const postId = `CLA${randomDigit}${timestamp}`;
+      const existingPost = await PostModel.findOne({postId});
+      return existingPost ? generatePostId() : postId;
+    };
+
+    postData.postId = await generatePostId();
+
     const createdPost = await post.create(postData);
 
     if (!createdPost._id)
@@ -656,13 +673,13 @@ exports.createPost = async (req, res) => {
     const memberLimit = parseInt(clubMembers, 10);
     if (isNaN(memberLimit) || memberLimit <= 0) {
       return res.status(400).json({ error: "Invalid value for clubMembers." });
-    } 
+    }
 
     const groupData = {
       productId: createdPost._id,
       productName: itemName,
-      adminId: req.User._id, 
-      members: [req.User._id], 
+      adminId: req.User._id,
+      members: [req.User._id],
       limit: memberLimit,
       isActive: true,
     };
@@ -883,47 +900,7 @@ exports.sendClubRequest = async (req, res) => {
   }
 };
 
-exports.getRequestList = async (req, res) => {
-  try {
-    const { productId } = req.params;
-    if (!productId) {
-      return res.status(400).json({ error: "productId is required" });
-    }
-    const userId = req.User._id;
-    const postData = await post.findById(productId);
 
-    if (!postData) {
-      return res.status(404).json({ error: "Post not found" });
-    }
-
-    if (!postData.userId.equals(userId)) {
-      return res.status(403).json({ error: "You are not authorized to view requests for this post" });
-    } 
-
-    const clubRequests = await ClubRequest.find({ postId: productId })
-      .populate("requester", "firstName lastName email avatar gender")
-    if (!clubRequests.length) {
-      return res.status(404).json({ error: "No requests found for this post" });
-    }
-
-    return res.status(200).json({
-      message: "Request list retrieved successfully",
-      requests: clubRequests.map((request) => ({
-        _id: request._id,
-        requester: request.requester,
-        createdAt: request.createdAt, 
-        status:request.status
-
-      })),
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      error: "Error retrieving request list",
-      details: error.message,
-    });
-  }
-};
 
 exports.acceptClubRequest = async (req, res) => {
   try {
@@ -950,12 +927,12 @@ exports.acceptClubRequest = async (req, res) => {
     }
     if (pendingRequest.status === "accepted") {
       return res.status(400).json({ error: "Club request already accepted." });
-    } 
+    }
     pendingRequest.status = "accepted";
     pendingRequest.updatedAt = Date.now();
     await pendingRequest.save();
     const group = await Group.findOne({ productId: postId });
-    
+
     if (!group) {
       return res.status(404).json({ error: "Group not found for this post." });
     }
@@ -2219,10 +2196,10 @@ exports.getProductDetails = async (req, res) => {
     }
 
     const product = await post.findById(productId)
-    .populate({
-      path: "userId",
-      select: "firstName lastName", // Fetch user name and email along with userId
-    })
+      .populate({
+        path: "userId",
+        select: "firstName lastName", // Fetch user name and email along with userId
+      })
       .populate({
         path: "category",
         select: "name description",
@@ -2231,16 +2208,12 @@ exports.getProductDetails = async (req, res) => {
         path: "subCategory",
         select: "name description",
       })
-      .populate({
-        path: "reportedBy",
-        select: "name email",
-      });
 
     if (!product) {
       return res.status(404).json({ success: false, message: "Product not found" });
     }
 
-    const productData = product.toObject(); 
+    const productData = product.toObject();
 
     console.log(userId)
 
@@ -2265,12 +2238,12 @@ exports.getCategoryName = async (req, res) => {
     const category = await CategoryModel.findById(categoryId);
     if (!category) {
       return res.status(404).json({ success: false, message: "Category not found"})
-      }
-      const categoryResponse = {
-        id: category._id,
-        name: category.name,
-      }
-      res.status(200).json({ success: true, data: [categoryResponse] });
+    }
+    const categoryResponse = {
+      id: category._id,
+      name: category.name,
+    }
+    res.status(200).json({ success: true, data: [categoryResponse] });
   }catch (e) {
     console.error(e);
     res.status(500).json({ success: false, message: "Server error" });

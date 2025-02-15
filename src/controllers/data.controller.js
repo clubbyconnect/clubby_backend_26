@@ -3,7 +3,7 @@ const User = require("../models/user.js");
 const CategoryModel = require("../models/categorySchema.js");
 const OfflineCategoryModel = require("../models/offlineCategorySchema.js");
 const onlineCategoryModel = require("../models/onlineCategorySchema.js")
-const post = require("../models/post.js");
+const post = require("../models/Post.js");
 const admin = require('firebase-admin');
 const mongoose = require('mongoose');
 const Group = require('../models/group.js');
@@ -28,7 +28,7 @@ admin.initializeApp({
 
 // controllers-----------------------------------
 exports.sendPushNotification = async (req, res) => {
-  const { token, message, title } = req.body;
+  const {token, message, title} = req.body;
   try {
     const payload = {
       notification: {
@@ -39,10 +39,10 @@ exports.sendPushNotification = async (req, res) => {
 
     admin.messaging().sendToDevice(token, payload)
       .then(response => {
-        return res.status(200).json({ message: "Successfully sent message", data: response });
+        return res.status(200).json({message: "Successfully sent message", data: response});
       })
       .catch(error => {
-        return res.status(404).json({ error: "Error sending message" });
+        return res.status(404).json({error: "Error sending message"});
       });
   } catch (error) {
     serverErrorHandler(error, res);
@@ -58,7 +58,7 @@ exports.fetchallcategory = async (req, res) => {
           localField: "subcategories",
           foreignField: "_id",
           as: "subcategoriesData",
-          pipeline: [{ $sort: { _id: 1 } }],
+          pipeline: [{$sort: {_id: 1}}],
         },
       },
       {
@@ -71,7 +71,7 @@ exports.fetchallcategory = async (req, res) => {
       },
       {
         $match: {
-          parentCategories: { $size: 0 },
+          parentCategories: {$size: 0},
         },
       },
       {
@@ -117,7 +117,7 @@ exports.fetchallcategory = async (req, res) => {
       });
 
     } else {
-      return res.status(404).json({ error: "Categories found" });
+      return res.status(404).json({error: "Categories found"});
     }
   } catch (error) {
     serverErrorHandler(error, res);
@@ -147,7 +147,7 @@ exports.fetchOnlinecategory = async (req, res) => {
       },
       {
         $match: {
-          parentCategories: { $size: 0 },
+          parentCategories: {$size: 0},
         },
       },
       {
@@ -179,7 +179,7 @@ exports.fetchOnlinecategory = async (req, res) => {
       });
 
     } else {
-      return res.status(404).json({ error: "Categories found" });
+      return res.status(404).json({error: "Categories found"});
     }
   } catch (error) {
     serverErrorHandler(error, res);
@@ -187,7 +187,7 @@ exports.fetchOnlinecategory = async (req, res) => {
 };
 exports.fetchsubcategory = async (req, res) => {
   try {
-    const { parentCategoryName } = req.body;
+    const {parentCategoryName} = req.body;
 
     const subcategories = await CategoryModel.aggregate([
       {
@@ -248,7 +248,7 @@ exports.fetchOfflinecategory = async (req, res) => {
       },
       {
         $match: {
-          "offlineSubcategoriesData.0": { $exists: true },
+          "offlineSubcategoriesData.0": {$exists: true},
         },
       },
       {
@@ -279,7 +279,7 @@ exports.fetchOfflinecategory = async (req, res) => {
         data: categoryData,
       });
     } else {
-      return res.status(404).json({ error: "No categories found" });
+      return res.status(404).json({error: "No categories found"});
     }
   } catch (error) {
     serverErrorHandler(error, res);
@@ -291,24 +291,24 @@ exports.fetchOfflinecategory = async (req, res) => {
 //     const allcategory = await OfflineCategoryModel.aggregate([
 //       {
 //         $lookup: {
-//           from: "offlinecategories", 
-//           localField: "offlineSubcategories", 
-//           foreignField: "_id", 
-//           as: "offlineSubcategoriesData",  
+//           from: "offlinecategories",
+//           localField: "offlineSubcategories",
+//           foreignField: "_id",
+//           as: "offlineSubcategoriesData",
 //         },
 //       },
 //       {
 //         $match: {
-//           "offlineSubcategoriesData.0": { $exists: true },  
+//           "offlineSubcategoriesData.0": { $exists: true },
 //         },
 //       },
 //       {
 //         $project: {
-//           _id: 0,  
+//           _id: 0,
 //           name: 1,
 //           image: 1,
-//           offlineSubcategoriesData: {  
-//             name: 1,  
+//           offlineSubcategoriesData: {
+//             name: 1,
 //           },
 //         },
 //       },
@@ -320,7 +320,7 @@ exports.fetchOfflinecategory = async (req, res) => {
 //         name: category.name,
 //         image: category.image,
 //         offlineSubcategories: category.offlineSubcategoriesData.map((sub) => ({
-//           name: sub.name,  
+//           name: sub.name,
 //         })),
 //       }));
 
@@ -329,10 +329,10 @@ exports.fetchOfflinecategory = async (req, res) => {
 //         data: categoryData,
 //       });
 //     } else {
-//       return res.status(404).json({ error: "No categories found" });  
+//       return res.status(404).json({ error: "No categories found" });
 //     }
 //   } catch (error) {
-//     serverErrorHandler(error, res);  
+//     serverErrorHandler(error, res);
 //   }
 // };
 
@@ -341,16 +341,17 @@ exports.getAllProducts = async (req, res) => {
   try {
     const userId = req.User?._id;
     console.log("Fetching all active group products...");
-    const activeGroups = await Group.find({ isActive: true }).select("productId limit members");
-    
+    const activeGroups = await Group.find({isActive: true}).select("productId limit members");
+
     if (activeGroups.length === 0) {
-      return res.status(404).json({ message: "No active group products found" });
+      return res.status(201).json({message: "No active group products found", products: []});
     }
+
     const activeProductIds = activeGroups.map(group => group.productId);
-    const products = await post.find({ _id: { $in: activeProductIds } }).sort({ createdAt: -1 });
+    const products = await post.find({_id: {$in: activeProductIds}}).sort({createdAt: -1});
 
     if (products.length === 0) {
-      return res.status(404).json({ message: "No products found for active groups" });
+      return res.status(404).json({message: "No products found for active groups"});
     }
 
     let likedProductIds = [];
@@ -369,7 +370,7 @@ exports.getAllProducts = async (req, res) => {
       };
     });
 
-    return res.status(200).json({ products: productsWithGroupInfo });
+    return res.status(200).json({products: productsWithGroupInfo});
   } catch (error) {
     serverErrorHandler(error, res);
   }
@@ -377,14 +378,14 @@ exports.getAllProducts = async (req, res) => {
 exports.searchByProductName = async (req, res) => {
   try {
     console.log("")
-    const { productName, lon, lat } = req.query;
+    const {productName, lon, lat} = req.query;
 
     if (!productName) {
-      return res.status(400).json({ message: "Product name is required" });
+      return res.status(400).json({message: "Product name is required"});
     }
 
     if (!lon || !lat) {
-      return res.status(400).json({ message: "Longitude and latitude are required" });
+      return res.status(400).json({message: "Longitude and latitude are required"});
     }
 
     const products = await post.aggregate([
@@ -402,7 +403,7 @@ exports.searchByProductName = async (req, res) => {
       },
       {
         $match: {
-          itemName: { $regex: productName, $options: "i" },
+          itemName: {$regex: productName, $options: "i"},
         },
       },
       {
@@ -434,9 +435,9 @@ exports.searchByProductName = async (req, res) => {
           delivery_location: 1,
           distance: {
             $cond: {
-              if: { $lt: ["$distance", 1] },
+              if: {$lt: ["$distance", 1]},
               then: 0,
-              else: { $divide: ["$distance", 1000] },
+              else: {$divide: ["$distance", 1000]},
             },
           },
         },
@@ -444,7 +445,7 @@ exports.searchByProductName = async (req, res) => {
     ]);
     console.log(products)
     if (products.length === 0) {
-      return res.status(404).json({ message: "No products found" });
+      return res.status(404).json({message: "No products found"});
     }
 
     res.status(200).json({
@@ -462,7 +463,7 @@ exports.searchByProductName = async (req, res) => {
 
 exports.searchByDistance = async (req, res) => {
   try {
-    const { latitude, longitude, radius } = req.query;
+    const {latitude, longitude, radius} = req.query;
 
     if (!latitude || !longitude || !radius) {
       return res.status(400).json({
@@ -525,10 +526,10 @@ exports.searchByDistance = async (req, res) => {
 
 exports.searchByGender = async (req, res) => {
   try {
-    const { gender } = req.query;
+    const {gender} = req.query;
 
     if (!gender) {
-      return res.status(400).json({ message: "Gender is required" });
+      return res.status(400).json({message: "Gender is required"});
     }
 
     const products = await post.find();
@@ -543,17 +544,17 @@ exports.searchByGender = async (req, res) => {
     }
 
     if (filteredProducts.length === 0) {
-      return res.status(404).json({ message: "No products found for the specified gender" });
+      return res.status(404).json({message: "No products found for the specified gender"});
     }
 
-    res.status(200).json({ products: filteredProducts });
+    res.status(200).json({products: filteredProducts});
   } catch (error) {
     serverErrorHandler(error, res);
   }
 };
 exports.searchByDate = async (req, res) => {
   try {
-    const { date } = req.query;
+    const {date} = req.query;
 
     if (!date) {
       return res.status(400).json({
@@ -573,8 +574,8 @@ exports.searchByDate = async (req, res) => {
     }
 
     const results = await post.find({
-      createdAt: { $gte: startDate },
-    }).sort({ createdAt: -1 });
+      createdAt: {$gte: startDate},
+    }).sort({createdAt: -1});
 
     res.status(200).json({
       success: true,
@@ -586,7 +587,7 @@ exports.searchByDate = async (req, res) => {
 };
 exports.searchByFilter = async (req, res) => {
   try {
-    const { offerType, clubMembers, size } = req.query;
+    const {offerType, clubMembers, size} = req.query;
 
     let filter = {};
 
@@ -616,7 +617,7 @@ exports.searchByFilter = async (req, res) => {
 
 exports.searchBySort = async (req, res) => {
   try {
-    const { sortBy } = req.query;
+    const {sortBy} = req.query;
 
     let sortOptions = {};
     if (sortBy === "price_high_to_low") {
@@ -698,12 +699,12 @@ exports.searchProducts = async (req, res) => {
     }
 
     if (productName) {
-      matchStage.itemName = { $regex: productName, $options: "i" };
+      matchStage.itemName = {$regex: productName, $options: "i"};
     }
 
     if (offerType) {
       const offerTypes = offerType.split(',').map(type => type.trim());
-      matchStage.offerType = { $in: offerTypes };
+      matchStage.offerType = {$in: offerTypes};
     }
 
     if (clubMembers) {
@@ -717,14 +718,14 @@ exports.searchProducts = async (req, res) => {
     if (date) {
       const startDate = new Date(date);
       if (!isNaN(startDate.getTime())) {
-        matchStage.createdAt = { $gte: startDate };
+        matchStage.createdAt = {$gte: startDate};
       }
     }
 
     if (gender && gender != 'Any') {
-      const users = await User.find({ gender: { $regex: gender, $options: "i" } }).select('_id');
+      const users = await User.find({gender: {$regex: gender, $options: "i"}}).select('_id');
       const userIds = users.map(user => user._id);
-      matchStage.userId = { $in: userIds };
+      matchStage.userId = {$in: userIds};
     }
 
     if (category) {
@@ -768,7 +769,7 @@ exports.searchProducts = async (req, res) => {
     }
 
     if (Object.keys(matchStage).length > 0) {
-      aggregatePipeline.push({ $match: matchStage });
+      aggregatePipeline.push({$match: matchStage});
     }
 
     // Add lookups for category and subcategory names
@@ -808,11 +809,11 @@ exports.searchProducts = async (req, res) => {
       {
         $lookup: {
           from: "groups",
-          let: { productId: { $toString: "$_id" } },
+          let: {productId: {$toString: "$_id"}},
           pipeline: [
             {
               $match: {
-                $expr: { $eq: ["$productId", "$$productId"] }
+                $expr: {$eq: ["$productId", "$$productId"]}
               }
             }
           ],
@@ -847,14 +848,14 @@ exports.searchProducts = async (req, res) => {
         clubMembers: 1,
         clubToJoin: {
           $cond: {
-            if: { $isArray: "$groupInfo.members" },
+            if: {$isArray: "$groupInfo.members"},
             then: {
               $subtract: [
                 "$clubMembers",
-                { $size: "$groupInfo.members" }
+                {$size: "$groupInfo.members"}
               ]
             },
-            else: { $subtract: ["$clubMembers", 1] }
+            else: {$subtract: ["$clubMembers", 1]}
           }
         },
         // additionalInformation: 1,
@@ -874,9 +875,9 @@ exports.searchProducts = async (req, res) => {
         // delivery_location: 1,
         distance: {
           $cond: {
-            if: { $lt: ["$distance", 1] },
+            if: {$lt: ["$distance", 1]},
             then: 0,
-            else: { $divide: ["$distance", 1000] },
+            else: {$divide: ["$distance", 1000]},
           },
         },
         isLiked: {
@@ -894,13 +895,13 @@ exports.searchProducts = async (req, res) => {
       } else if (sortBy === "newest") {
         sortOptions.createdAt = -1;
       }
-      aggregatePipeline.push({ $sort: sortOptions });
+      aggregatePipeline.push({$sort: sortOptions});
     }
 
     const products = await post.aggregate(aggregatePipeline);
 
     if (products.length === 0) {
-      return res.status(404).json({ message: "No products found" });
+      return res.status(404).json({message: "No products found"});
     }
 
     if (products.length > 0) {
@@ -924,7 +925,6 @@ exports.searchProducts = async (req, res) => {
 };
 
 
-
 //-------------------All filters in One Api--------------------------------
 exports.unifiedSearch = async (req, res) => {
   try {
@@ -945,14 +945,14 @@ exports.unifiedSearch = async (req, res) => {
 
 
     if (gender) {
-      const users = await User.find({ gender });
+      const users = await User.find({gender});
       const userIds = users.map((user) => user._id);
 
-      query.userId = { $in: userIds };
+      query.userId = {$in: userIds};
     }
 
     if (productName) {
-      query.itemName = { $regex: productName, $options: "i" };
+      query.itemName = {$regex: productName, $options: "i"};
     }
 
     if (latitude && longitude && radius) {
@@ -1000,10 +1000,10 @@ exports.unifiedSearch = async (req, res) => {
     const results = await post.find(query).sort(sortOptions);
 
     if (results.length === 0) {
-      return res.status(404).json({ message: "No products found" });
+      return res.status(404).json({message: "No products found"});
     }
 
-    res.status(200).json({ success: true, data: results });
+    res.status(200).json({success: true, data: results});
   } catch (error) {
     serverErrorHandler(error, res);
   }

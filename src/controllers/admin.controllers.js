@@ -1,6 +1,6 @@
 const serverErrorHandler = require("../utils/serverErrorHandler.js");
 const User = require("../models/user.js");
-const post = require("../models/post.js");
+const post = require("../models/Post.js");
 const ChatRoom = require("../models/chatRoom.js");
 const CategoryModel = require("../models/categorySchema.js")
 const OfflineCategoryModel = require("../models/offlineCategorySchema.js")
@@ -32,7 +32,7 @@ exports.createCategory = async (req, res) => {
 
     const newCategory = await CategoryModel.create({name :category,isPremium});
     if (newCategory) return res.status(200).json({ message: "category created" });
-     
+
   } catch (error) {
     serverErrorHandler(error, res);
   }
@@ -48,7 +48,7 @@ exports.createOnlineCategory = async (req, res) => {
 
     const newCategory = await onlineCategoryModel.create({name :category,isPremium});
     if (newCategory) return res.status(200).json({ message: "category created" });
-     
+
   } catch (error) {
     serverErrorHandler(error, res);
   }
@@ -109,7 +109,7 @@ exports.deleteCategory = async (req, res, next) => {
   try {
     const categoryToDelete = await CategoryModel.findOne({ name: category });
     if (!categoryToDelete) return res.status(404).json({ message: 'Category does not exist' });
-    
+
     await deleteCategoryRecursive(categoryToDelete._id);
     res.status(200).json({ message: 'Category and its subcategories deleted successfully' });
   } catch (error) {
@@ -129,7 +129,7 @@ exports.findCategoryWithSubcategories = async (req, res) => {
       },
       {
         "$lookup": {
-          "from": "categories", 
+          "from": "categories",
           "localField": "subcategories",
           "foreignField": "_id",
           "as": "subcategoriesDetails"
@@ -169,7 +169,7 @@ exports.createOfflineCategory = async (req, res) => {
 
     const newCategory = await OfflineCategoryModel.create({name :category});
     if (newCategory) return res.status(200).json({ message: "Ofline category created" });
-     
+
   } catch (error) {
     serverErrorHandler(error, res);
   }
@@ -181,11 +181,11 @@ exports.addOfflineSubcategory = async (req, res) => {
     const pCategory = await OfflineCategoryModel.findOne({name: parentCategory});
 
     if (!pCategory) return res.status(404).json({ message: 'Parent offline category not found' });
-    
+
     let subcategory = await OfflineCategoryModel.findOne({ name: SubcategoryName });
 
     if (subcategory) {
-  
+
       if (pCategory.offlineSubcategories.includes(subcategory._id)) {
         return res.status(400).json({ message: 'This offline subCategory is already linked to the parent category' });
       }
@@ -209,7 +209,7 @@ exports.deleteUser = async (req, res, next) => {
   try {
     const categoryToDelete = await CategoryModel.findOne({ name: category });
     if (!categoryToDelete) return res.status(404).json({ message: 'Category does not exist' });
-    
+
     await deleteCategoryRecursive(categoryToDelete._id);
     res.status(200).json({ message: 'Category and its subcategories deleted successfully' });
   } catch (error) {
