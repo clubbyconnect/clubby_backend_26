@@ -6,6 +6,7 @@ const Group = require("../models/group.js");
 const mongoose = require("mongoose");
 const User = require("../models/user");
 const {sendSystemMessage} = require("./user.controller");
+const ClubRequest = require("../models/clubRequest");
 
 const PostController = {
   create: async (req, res) => {
@@ -271,6 +272,12 @@ const PostController = {
       // Update admin ID in both post and group
       group.adminId = newAdminId;
       existingPost.postOwnerId = newAdminId;
+
+      // Delete club request for new post owner
+      const pendingRequest = await ClubRequest.findOne({requester: newAdminId, postId});
+      if (pendingRequest) {
+        await ClubRequest.deleteOne({_id: pendingRequest._id});
+      }
 
       // Save changes
       await Promise.all([group.save(), existingPost.save()]);

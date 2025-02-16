@@ -57,14 +57,14 @@ const ClubRequestController = {
       const postData = await post.findById(postId);
       if (!postData) return res.status(404).json({error: "Post not found."});
 
-      const recipientId = postData.postOwnerId;
-      if (!recipientId) return res.status(404).json({error: "Post owner not found."});
+      const postOwnerId = postData.postOwnerId;
+      if (!postOwnerId) return res.status(404).json({error: "Post owner not found."});
 
-      if (requesterId.toString() === recipientId.toString()) {
+      if (requesterId.toString() === postOwnerId.toString()) {
         return res.status(400).json({error: "You cannot send a club request to your own post."});
       }
 
-      const existingRequest = await ClubRequest.findOne({requester: requesterId, recipient: recipientId, postId});
+      const existingRequest = await ClubRequest.findOne({requester: requesterId, postId});
       if (existingRequest) return res.status(400).json({error: "Club request already sent."});
 
       // Fetch the associated group
@@ -80,12 +80,13 @@ const ClubRequestController = {
         }
       }
 
-      await new ClubRequest({requester: requesterId, recipient: recipientId, postId}).save();
+      await new ClubRequest({requester: requesterId, postId}).save();
 
-      const recipient = await User.findById(recipientId);
-      if (recipient?.fcmToken) {
+
+      const postOwner = await User.findById(postOwnerId);
+      if (postOwner?.fcmToken) {
         await sendPushNotification({
-          token: recipient.fcmToken,
+          token: postOwner.fcmToken,
           notification: {
             title: "New Club Request",
             body: `You have received a club request for your post "${postData.title}".`,
@@ -127,7 +128,7 @@ const ClubRequestController = {
         return res.status(404).json({error: "Requester Not Found"});
       }
 
-      const pendingRequest = await ClubRequest.findOne({requester: requesterId, recipient: userId, postId});
+      const pendingRequest = await ClubRequest.findOne({requester: requesterId, postId});
       if (!pendingRequest) {
         return res.status(400).json({error: "Pending Request Not Found"});
       }
