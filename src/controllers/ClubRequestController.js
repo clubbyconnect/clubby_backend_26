@@ -65,7 +65,16 @@ const ClubRequestController = {
       }
 
       const existingRequest = await ClubRequest.findOne({requester: requesterId, postId});
-      if (existingRequest) return res.status(400).json({error: "Club request already sent."});
+      if (existingRequest) {
+        if (existingRequest.status === "accepted") {
+          return res.status(400).json({error: "You have already joined this club."});
+        }
+        if (existingRequest.status === "declined") {
+          return res.status(400).json({error: "Your join request was declined."});
+        }
+        return res.status(400).json({error: "You have already sent a join request."});
+      }
+
 
       // Fetch the associated group
       const group = await Group.findOne({productId: postId});
