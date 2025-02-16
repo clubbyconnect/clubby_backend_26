@@ -8,14 +8,14 @@ module.exports = {
       let {name, isPremium, image} = req.body;
 
       if (!name) {
-        return res.status(400).json({message: "Category name is required."});
+        return res.status(400).json({error: "Category name is required."});
       }
 
       name = name.trim(); // Trim whitespace
 
       const isCategoryExist = await CategoryModel.findOne({name});
       if (isCategoryExist) {
-        return res.status(409).json({message: "Category already exists"});
+        return res.status(409).json({error: "Category already exists"});
       }
 
       const newCategory = await CategoryModel.create({name, isPremium, image});
@@ -26,7 +26,7 @@ module.exports = {
 
     } catch (error) {
       console.error("Error:", error);
-      res.status(500).json({message: "Internal Server Error"});
+      res.status(500).json({error: "Internal Server Error"});
     }
   },
 
@@ -35,13 +35,13 @@ module.exports = {
       const {name, image, isPremium, subcategories} = req.body;
 
       if (!name) {
-        return res.status(400).json({message: "Category name is required."});
+        return res.status(400).json({error: "Category name is required."});
       }
 
       //  Check if the category already exists
       let existingCategory = await CategoryModel.findOne({name: name.trim()});
       if (existingCategory) {
-        return res.status(409).json({message: "Category already exists."});
+        return res.status(409).json({error: "Category already exists."});
       }
 
       // Create the category
@@ -65,7 +65,7 @@ module.exports = {
 
     } catch (error) {
       console.error("Error:", error);
-      res.status(500).json({message: "Internal Server Error"});
+      res.status(500).json({error: "Internal Server Error"});
     }
   },
 
@@ -85,7 +85,7 @@ module.exports = {
       });
     } catch (error) {
       console.error("Error:", error);
-      res.status(500).json({message: "Internal Server Error"});
+      res.status(500).json({error: "Internal Server Error"});
     }
   },
 
@@ -95,7 +95,7 @@ module.exports = {
     try {
       const category = await CategoryModel.findById(req.params.id).lean();
       if (!category) {
-        return res.status(404).json({message: "Category not found"});
+        return res.status(404).json({error: "Category not found"});
       }
 
       // Fetch subcategories related to this category
@@ -104,7 +104,7 @@ module.exports = {
       return res.status(200).json({...category, subcategories});
     } catch (error) {
       console.error("Error:", error);
-      res.status(500).json({message: "Internal Server Error"});
+      res.status(500).json({error: "Internal Server Error"});
     }
   },
 
@@ -116,7 +116,7 @@ module.exports = {
       const category = await CategoryModel.findByIdAndUpdate(req.params.id, {name, isPremium, image}, {new: true, runValidators: true});
 
       if (!category) {
-        return res.status(404).json({message: "Category not found"});
+        return res.status(404).json({error: "Category not found"});
       }
 
       return res.status(200).json({
@@ -124,7 +124,7 @@ module.exports = {
       });
     } catch (error) {
       console.error("Error:", error);
-      res.status(500).json({message: "Internal Server Error"});
+      res.status(500).json({error: "Internal Server Error"});
     }
   },
 
@@ -133,13 +133,13 @@ module.exports = {
     try {
       const category = await CategoryModel.findByIdAndDelete(req.params.id);
       if (!category) {
-        return res.status(404).json({message: "Category not found"});
+        return res.status(404).json({error: "Category not found"});
       }
 
       return res.status(200).json({message: "Category deleted successfully"});
     } catch (error) {
       console.error("Error:", error);
-      res.status(500).json({message: "Internal Server Error"});
+      res.status(500).json({error: "Internal Server Error"});
     }
   },
 
@@ -150,7 +150,7 @@ module.exports = {
       return res.status(200).json({message: `Deleted ${result.deletedCount} categories`});
     } catch (error) {
       console.error("Error:", error);
-      res.status(500).json({message: "Internal Server Error"});
+      res.status(500).json({error: "Internal Server Error"});
     }
   }
 };

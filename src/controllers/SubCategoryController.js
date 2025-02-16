@@ -8,18 +8,18 @@ const SubcategoryController = {
       const {name, categoryId, image} = req.body;
 
       if (!name || !categoryId) {
-        return res.status(400).json({message: "Subcategory name and category ID are required."});
+        return res.status(400).json({error: "Subcategory name and category ID are required."});
       }
 
       // Check if parent category exists
       const category = await CategoryModel.findById(categoryId);
       if (!category) {
-        return res.status(404).json({message: "Parent category not found."});
+        return res.status(404).json({error: "Parent category not found."});
       }
 
       const existingSubcategory = await SubcategoryModel.findOne({name: name.trim(), category: categoryId, image: image,});
       if (existingSubcategory) {
-        return res.status(409).json({message: "Subcategory already exists under this category."});
+        return res.status(409).json({error: "Subcategory already exists under this category."});
       }
 
       const newSubcategory = await SubcategoryModel.create({
@@ -31,7 +31,7 @@ const SubcategoryController = {
       });
 
     } catch (error) {
-      res.status(500).json({message: "Internal Server Error"});
+      res.status(500).json({error: "Internal Server Error"});
     }
   },
 
@@ -41,7 +41,7 @@ const SubcategoryController = {
       const subcategories = await SubcategoryModel.find().populate("category");
       return res.status(200).json(subcategories);
     } catch (error) {
-      res.status(500).json({message: "Internal Server Error"});
+      res.status(500).json({error: "Internal Server Error"});
     }
   },
 
@@ -50,11 +50,11 @@ const SubcategoryController = {
     try {
       const subcategory = await SubcategoryModel.findById(req.params.id).populate("category");
       if (!subcategory) {
-        return res.status(404).json({message: "Subcategory not found"});
+        return res.status(404).json({error: "Subcategory not found"});
       }
       return res.status(200).json(subcategory);
     } catch (error) {
-      res.status(500).json({message: "Internal Server Error"});
+      res.status(500).json({error: "Internal Server Error"});
     }
   },
 
@@ -66,14 +66,14 @@ const SubcategoryController = {
       // Check if subcategory exists
       const subcategory = await SubcategoryModel.findById(id);
       if (!subcategory) {
-        return res.status(404).json({message: "Subcategory not found."});
+        return res.status(404).json({error: "Subcategory not found."});
       }
 
       // If categoryId is provided and changed, validate the new category
       if (categoryId && categoryId !== subcategory.category.toString()) {
         const categoryExists = await CategoryModel.findById(categoryId);
         if (!categoryExists) {
-          return res.status(404).json({message: "Parent category not found."});
+          return res.status(404).json({error: "Parent category not found."});
         }
       }
 
@@ -83,7 +83,7 @@ const SubcategoryController = {
       });
 
       if (existingSubcategory) {
-        return res.status(409).json({message: "Subcategory already exists under this category."});
+        return res.status(409).json({error: "Subcategory already exists under this category."});
       }
 
       // Update subcategory
@@ -95,7 +95,7 @@ const SubcategoryController = {
 
     } catch (error) {
       console.error("Error:", error);
-      return res.status(500).json({message: "Internal Server Error."});
+      return res.status(500).json({error: "Internal Server Error."});
     }
   },
 
@@ -105,12 +105,12 @@ const SubcategoryController = {
     try {
       const subcategory = await SubcategoryModel.findByIdAndDelete(req.params.id);
       if (!subcategory) {
-        return res.status(404).json({message: "Subcategory not found"});
+        return res.status(404).json({error: "Subcategory not found"});
       }
 
       return res.status(200).json({message: "Subcategory deleted successfully"});
     } catch (error) {
-      res.status(500).json({message: "Internal Server Error"});
+      res.status(500).json({error: "Internal Server Error"});
     }
   },
 
@@ -120,7 +120,7 @@ const SubcategoryController = {
       const result = await SubcategoryModel.deleteMany({});
       return res.status(200).json({message: `Deleted ${result.deletedCount} subcategories`});
     } catch (error) {
-      res.status(500).json({message: "Internal Server Error"});
+      res.status(500).json({error: "Internal Server Error"});
     }
   }
 };
