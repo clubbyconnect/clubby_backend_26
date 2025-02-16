@@ -66,7 +66,11 @@ const PostController = require("../controllers/PostController");
 const ClubRequestController = require("../controllers/ClubRequestController");
 const GroupController = require("../controllers/GroupController");
 const {createPost} = require("../controllers/user.controller");
+const FileController = require("../controllers/FileController");
 
+
+// // Image Upload
+router.post("/image-upload",verifyJWT, upload.single("image"), FileController.image);
 //user
 router.post("/signUp", signUp);
 router.post("/googleAuth", googleAuth);
@@ -82,8 +86,9 @@ router.post("/resetPassword", resetPassword);
 router.post("/uploadAvatar", verifyJWT, upload.single('avatar'), uploadAvatar);
 
 // POST ROUTES
-// router.post("/post/create", verifyJWT, upload.single('productImage'), PostController.create);
+router.post("/post/create", verifyJWT, upload.single('productImage'), PostController.create);
 router.get('/post/:productId', verifyJWT, PostController.read)
+router.put("/post/:postId", verifyJWT, upload.single('productImage'), PostController.update);
 router.delete("/post/:postId", verifyJWT, PostController.delete)
 router.post("/posts", verifyJWT, PostController.getPost)
 router.post("/post/transfer",verifyJWT, PostController.transfer);

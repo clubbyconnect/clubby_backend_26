@@ -1,9 +1,7 @@
 const PostModel = require("../models/Post");
-const uploadOnCloudinary = require("../utils/cloudinary.js");
 const SubcategoryModel = require("../models/Subcategory");
 const CategoryModel = require("../models/Category");
 const Group = require("../models/group.js");
-const mongoose = require("mongoose");
 const User = require("../models/user");
 const {sendSystemMessage} = require("./user.controller");
 const ClubRequest = require("../models/clubRequest");
@@ -12,10 +10,8 @@ const PostController = {
   create: async (req, res) => {
     try {
       const {
-        category, subCategory, itemName, offerType, price, price_type, clubMembers, store_location_latitude, store_location_longitude, additionalInformation, size,
+        category, subCategory, itemName, offerType, price, price_type, clubMembers, store_location_latitude, store_location_longitude, additionalInformation, size, productImages
       } = req.body;
-
-      console.log(req.headers, req.body);
 
       // Validate required fields
       if ([category, subCategory, itemName, offerType, price, price_type, clubMembers].some((field) => !field || field.trim() === "")) {
@@ -38,13 +34,10 @@ const PostController = {
       if (!subcategoryObj) return res.status(400).json({error: "Invalid subcategory."});
 
       // Handle product image
-      let productImageUrl = subcategoryObj.image;
+      let productImageUrls = [subcategoryObj.image];
 
-      if (req.file?.path) {
-        const uploadedImage = await uploadOnCloudinary(req.file.path);
-        if (uploadedImage?.url) {
-          productImageUrl = uploadedImage.url;
-        }
+      if (productImages) {
+        productImageUrls = productImages;
       }
 
       // Set expiry time (current time + 30 days)
@@ -54,7 +47,7 @@ const PostController = {
       // Prepare post data
       const postData = {
         userId: req.User._id, postOwnerId: req.User._id, // Initially, user and post owner are the same
-        itemName, offerType, price, price_type, clubMembers, category: categoryObj._id, subCategory: subcategoryObj._id, productImage: productImageUrl, store_location: {
+        itemName, offerType, price, price_type, clubMembers, category: categoryObj._id, subCategory: subcategoryObj._id, productImage: productImageUrls?.[0], productImages: productImageUrls, store_location: {
           type: "Point", coordinates: [parseFloat(store_location_longitude), parseFloat(store_location_latitude)],
         }, expiryAt,
       };
@@ -103,6 +96,98 @@ const PostController = {
       });
     } catch (error) {
       console.error("Error in createPost:", error);
+      res.status(500).json({error: "Internal Server Error"});
+    }
+  },
+
+  update: async (req, res) => {
+    try {
+      const {postId} = req.params;
+      const {
+        category,
+        subCategory,
+        itemName,
+        offerType,
+        price,
+        price_type,
+        clubMembers,
+        store_location_latitude,
+        store_location_longitude,
+        additionalInformation,
+        size,
+        productImages,
+      } = req.body;
+
+      const existingPost = await PostModel.findById(postId);
+      if (!existingPost) {
+        return res.status(404).json({error: "Post not found."});
+      }
+
+      console.log("req.body", req.body)
+      if ([category, subCategory, itemName, offerType, price, price_type, clubMembers].some((field) => !field || field.trim() === "")) {
+        return res.status(400).json({error: "Please fill all required fields."});
+      }
+
+      let updates = {};
+
+      const categoryObj = await CategoryModel.findOne({name: category});
+      if (!categoryObj) return res.status(400).json({error: "Invalid category."});
+      updates.category = categoryObj._id;
+
+      const subcategoryObj = await SubcategoryModel.findOne({name: subCategory, category: updates.category});
+      if (!subcategoryObj) return res.status(400).json({error: "Invalid subcategory."});
+      updates.subCategory = subcategoryObj._id;
+
+
+      if (itemName) updates.itemName = itemName;
+      if (offerType) updates.offerType = offerType;
+      if (price) updates.price = price.toString();
+      if (price_type) updates.price_type = price_type;
+
+      if (clubMembers) {
+        const memberLimit = parseInt(clubMembers, 10);
+        if (isNaN(memberLimit) || memberLimit < 2 || memberLimit > 4) {
+          return res.status(400).json({error: "Club members must be between 2 and 4."});
+        }
+        updates.clubMembers = memberLimit;
+        await Group.updateOne({productId: existingPost._id}, {limit: memberLimit});
+      }
+
+      if (store_location_latitude && store_location_longitude) {
+        updates.store_location = {
+          type: "Point",
+          coordinates: [parseFloat(store_location_longitude), parseFloat(store_location_latitude)],
+        };
+      }
+
+      if (size) updates.size = size;
+      if (additionalInformation) updates.additionalInformation = additionalInformation;
+
+      // Handle product images
+      if (productImages && productImages.length > 0) {
+        updates.productImages = productImages;
+        updates.productImage = productImages[0];
+      } else {
+        updates.productImages = [subcategoryObj.image];
+        updates.productImage = subcategoryObj.image;
+      }
+
+      await PostModel.updateOne({_id: postId}, {$set: updates});
+
+      const updatedPost = await PostModel.findById(postId)
+        .populate("category", "name")
+        .populate("subCategory", "name");
+
+      return res.status(200).json({
+        message: "Post updated successfully.",
+        post: {
+          ...updatedPost._doc,
+          category: updatedPost.category.name,
+          subCategory: updatedPost.subCategory.name,
+        },
+      });
+    } catch (error) {
+      console.error("Error in updatePost:", error);
       res.status(500).json({error: "Internal Server Error"});
     }
   },
@@ -197,7 +282,7 @@ const PostController = {
       // Fetch corresponding product details
       const products = await PostModel.find({
         _id: {$in: activeProductIds},
-        $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }] // do not fetch deleted
+        $or: [{deletedAt: null}, {deletedAt: {$exists: false}}] // do not fetch deleted
       })
         .populate("category", "name") // Populate category with only the name field
         .sort({createdAt: -1}); // Sort by latest created first
@@ -278,6 +363,9 @@ const PostController = {
       if (pendingRequest) {
         await ClubRequest.deleteOne({_id: pendingRequest._id});
       }
+      // remove current owner from group
+      group.members = group.members.filter(memberId => memberId.toString() !== userId.toString());
+      await group.save();
 
       // Save changes
       await Promise.all([group.save(), existingPost.save()]);

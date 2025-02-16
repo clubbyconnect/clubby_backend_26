@@ -87,6 +87,11 @@ const postSchema = new mongoose.Schema(
       default:
         "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721192873/zhcbblypjd3qg4gohafv.png",
     },
+    productImages: {
+      type: [String],
+      default:
+        ["https://res.cloudinary.com/dlb8pmzph/image/upload/v1721192873/zhcbblypjd3qg4gohafv.png"],
+    },
     clubStatus: {
       type: String,
       enum: ["Pending", "Created", "Full", "Inactive", "Active"],
