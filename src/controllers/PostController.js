@@ -36,7 +36,7 @@ const PostController = {
       // Handle product image
       let productImageUrls = [subcategoryObj.image];
 
-      if (productImages) {
+      if (productImages && productImages.length > 0) {
         productImageUrls = productImages;
       }
 

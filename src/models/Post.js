@@ -85,12 +85,12 @@ const postSchema = new mongoose.Schema(
     productImage: {
       type: String,
       default:
-        "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721192873/zhcbblypjd3qg4gohafv.png",
+        "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721381426/default%20images/y9yzagqvwgeyk2g1o0bj.png",
     },
     productImages: {
       type: [String],
       default:
-        ["https://res.cloudinary.com/dlb8pmzph/image/upload/v1721192873/zhcbblypjd3qg4gohafv.png"],
+        ["https://res.cloudinary.com/dlb8pmzph/image/upload/v1721381426/default%20images/y9yzagqvwgeyk2g1o0bj.png"],
     },
     clubStatus: {
       type: String,
