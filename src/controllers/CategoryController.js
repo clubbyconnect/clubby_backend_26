@@ -1,5 +1,5 @@
-const CategoryModel = require('../models/Category');
-const SubcategoryModel = require("../models/Subcategory");
+const CategoryModel = require('../models/Category.js');
+const SubcategoryModel = require("../models/Subcategory.js");
 
 module.exports = {
   // Create Category

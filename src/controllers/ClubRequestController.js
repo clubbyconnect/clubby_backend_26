@@ -1,10 +1,10 @@
-const PostModel = require("../models/Post");
-const ClubRequest = require("../models/clubRequest");
-const User = require("../models/user");
-const Group = require("../models/group");
-const {sendSystemMessage} = require("./user.controller");
+const PostModel = require("../models/Post.js");
+const ClubRequest = require("../models/clubRequest.js");
+const User = require("../models/user.js");
+const Group = require("../models/group.js");
+const {sendSystemMessage} = require("./user.controller.js");
 const post = require("../models/Post");
-const {sendPushNotification} = require("./data.controller");
+const {sendPushNotification} = require("./data.controller.js");
 
 const ClubRequestController = {
   list: async (req, res) => {

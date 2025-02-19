@@ -1,4 +1,4 @@
-const Group = require('../models/Group'); // Import Group model
+const Group = require('../models/group.js'); // Import Group model
 
 const GroupController = {
   member: async (req, res) => {

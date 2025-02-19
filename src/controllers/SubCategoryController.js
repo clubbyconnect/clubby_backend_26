@@ -1,5 +1,5 @@
-const SubcategoryModel = require("../models/Subcategory");
-const CategoryModel = require("../models/Category");
+const SubcategoryModel = require("../models/Subcategory.js");
+const CategoryModel = require("../models/Category.js");
 
 const SubcategoryController = {
   // Create a new subcategory

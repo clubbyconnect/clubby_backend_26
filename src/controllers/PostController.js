@@ -1,10 +1,10 @@
-const PostModel = require("../models/Post");
-const SubcategoryModel = require("../models/Subcategory");
-const CategoryModel = require("../models/Category");
+const PostModel = require("../models/Post.js");
+const SubcategoryModel = require("../models/Subcategory.js");
+const CategoryModel = require("../models/Category.js");
 const Group = require("../models/group.js");
-const User = require("../models/user");
-const {sendSystemMessage} = require("./user.controller");
-const ClubRequest = require("../models/clubRequest");
+const User = require("../models/user.js");
+const {sendSystemMessage} = require("./user.controller.js");
+const ClubRequest = require("../models/clubRequest.js");
 
 const PostController = {
   create: async (req, res) => {

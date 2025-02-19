@@ -1,4 +1,4 @@
-const uploadOnCloudinary = require("../utils/cloudinary");
+const uploadOnCloudinary = require("../utils/cloudinary.js");
 
 const FileController = {
   image: async (req, res) => {
