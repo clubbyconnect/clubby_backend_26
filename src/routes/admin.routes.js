@@ -13,7 +13,7 @@ const {
 } = require('../controllers/admin.controllers.js');
 
 const CategoryController = require('../controllers/CategoryController.js');
-const SubcategoryController = require("../controllers/SubcategoryController");
+const SubcategoryController = require("../controllers/SubcategoryController.js");
 
 // Category
 router.post("/categories/create",CategoryController.createCategory);

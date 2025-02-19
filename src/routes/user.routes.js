@@ -58,15 +58,15 @@ const {
   getFavoriteProducts,
   getFilteredFavoriteProducts,
   getUserPosts,
+  createPost
   // filterUserPosts
 } = require("../controllers/user.controller.js");
 
 
-const PostController = require("../controllers/PostController");
-const ClubRequestController = require("../controllers/ClubRequestController");
-const GroupController = require("../controllers/GroupController");
-const {createPost} = require("../controllers/user.controller");
-const FileController = require("../controllers/FileController");
+const PostController = require("../controllers/PostController.js");
+const ClubRequestController = require("../controllers/ClubRequestController.js");
+const GroupController = require("../controllers/GroupController.js");
+const FileController = require("../controllers/FileController.js");
 
 
 // // Image Upload
