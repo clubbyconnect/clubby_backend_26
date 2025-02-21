@@ -71,21 +71,24 @@ module.exports = {
 
   getAllCategories: async (req, res) => {
     try {
-      const categories = await CategoryModel.find()
-        .lean() // Improves performance by returning plain JavaScript objects
-        .then(async (categories) => {
-          return Promise.all(categories.map(async (category) => {
-            const subcategories = await SubcategoryModel.find({category: category._id});
-            return {...category, subcategories}; // Merge subcategories into category object
-          }));
-        });
+      const categories = await CategoryModel.aggregate([
+        {
+          $lookup: {
+            from: "subcategories",
+            localField: "_id",
+            foreignField: "category",
+            as: "subcategories"
+          }
+        }
+      ]);
 
       return res.status(200).json({
-        message: "Categories fetched successfully", data: categories
+        message: "Categories fetched successfully",
+        data: categories
       });
     } catch (error) {
       console.error("Error:", error);
-      res.status(500).json({error: "Internal Server Error"});
+      res.status(500).json({ error: "Internal Server Error" });
     }
   },
 
