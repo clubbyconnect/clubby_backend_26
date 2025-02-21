@@ -10,7 +10,7 @@ const PostController = {
   create: async (req, res) => {
     try {
       const {
-        category, subCategory, itemName, offerType, price, price_type, clubMembers, store_location_latitude, store_location_longitude, additionalInformation, size, productImages
+        category, subCategory, itemName, offerType, price, price_type, clubMembers, store_location_latitude, store_location_longitude, additionalInformation, size, productImages,showroomAddress
       } = req.body;
 
       // Validate required fields
@@ -48,7 +48,7 @@ const PostController = {
       const postData = {
         userId: req.User._id, postOwnerId: req.User._id, // Initially, user and post owner are the same
         itemName, offerType, price, price_type, clubMembers, category: categoryObj._id, subCategory: subcategoryObj._id, productImage: productImageUrls?.[0], productImages: productImageUrls, store_location: {
-          type: "Point", coordinates: [parseFloat(store_location_longitude), parseFloat(store_location_latitude)],
+          name: showroomAddress ,type: "Point", coordinates: [parseFloat(store_location_longitude), parseFloat(store_location_latitude)],
         }, expiryAt,
       };
 
@@ -116,6 +116,7 @@ const PostController = {
         additionalInformation,
         size,
         productImages,
+        showroomAddress
       } = req.body;
 
       const existingPost = await PostModel.findById(postId);
@@ -155,6 +156,7 @@ const PostController = {
 
       if (store_location_latitude && store_location_longitude) {
         updates.store_location = {
+          showroomAddress: showroomAddress,
           type: "Point",
           coordinates: [parseFloat(store_location_longitude), parseFloat(store_location_latitude)],
         };

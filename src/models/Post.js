@@ -64,6 +64,10 @@ const postSchema = new mongoose.Schema(
         type: String,
         default: "Point",
       },
+      name: {
+        type: String,
+        default: "Somewhere in the world",
+      },
       coordinates: {
         type: [Number],
         index: "2dsphere",
