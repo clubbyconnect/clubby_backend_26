@@ -10,7 +10,7 @@ const PostController = {
   create: async (req, res) => {
     try {
       const {
-        category, subCategory, itemName, offerType, price, price_type, clubMembers, store_location_latitude, store_location_longitude, additionalInformation, size, productImages,showroomAddress
+        category, subCategory, itemName, offerType, price, price_type, clubMembers, store_location_latitude, store_location_longitude, additionalInformation, size, productImages, showroomAddress
       } = req.body;
 
       // Validate required fields
@@ -156,7 +156,7 @@ const PostController = {
 
       if (store_location_latitude && store_location_longitude) {
         updates.store_location = {
-          showroomAddress: showroomAddress,
+          name: showroomAddress,
           type: "Point",
           coordinates: [parseFloat(store_location_longitude), parseFloat(store_location_latitude)],
         };
