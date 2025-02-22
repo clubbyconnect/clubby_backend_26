@@ -92,6 +92,8 @@ router.put("/post/:postId", verifyJWT, upload.single('productImage'), PostContro
 router.delete("/post/:postId", verifyJWT, PostController.delete)
 router.post("/posts", verifyJWT, PostController.getPost)
 router.post("/post/transfer",verifyJWT, PostController.transfer);
+// NOTE: ALI - Update the search posts functionality. with deletedAt and category name in the search results.
+router.post("/search-posts", verifyJWT, PostController.getPost);
 
 // router.delete("/deletePost",verifyJWT,deletePost)
 router.post("/createPost",verifyJWT, upload.single('productImage'), createPost);
