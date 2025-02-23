@@ -90,9 +90,8 @@ router.post("/post/create", verifyJWT, upload.single('productImage'), PostContro
 router.get('/post/:productId', verifyJWT, PostController.read)
 router.put("/post/:postId", verifyJWT, upload.single('productImage'), PostController.update);
 router.delete("/post/:postId", verifyJWT, PostController.delete)
-router.post("/posts", verifyJWT, PostController.getPost)
 router.post("/post/transfer",verifyJWT, PostController.transfer);
-// NOTE: ALI - Update the search posts functionality. with deletedAt and category name in the search results.
+// NOTE: ALI, SONALI - Update the search posts functionality. with deletedAt and category name in the search results.
 router.post("/search-posts", verifyJWT, PostController.getPost);
 
 // router.delete("/deletePost",verifyJWT,deletePost)
