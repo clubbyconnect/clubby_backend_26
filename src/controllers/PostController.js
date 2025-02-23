@@ -306,7 +306,7 @@ const PostController = {
         const group = activeGroups.find(g => g.productId.equals(product._id));
 
         return {
-          ...product.toObject(), totalGroupLimit: group ? group.limit : 0, availableSlots: group ? group.limit - (group.members?.length || 0) : 0, isLikedByUser: likedProductIds.some(likedId => likedId.equals(product._id)),
+          ...product.toObject(), totalGroupLimit: group ? group.limit : 0, availableSlots: group ? group.limit - (group.members?.length || 0) : 0, isLiked: likedProductIds.some(likedId => likedId.equals(product._id)),
         };
       });
 
