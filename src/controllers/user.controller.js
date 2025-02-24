@@ -16,6 +16,8 @@ const CategoryModel = require("../models/categorySchema.js");
 const ClubRequest = require("../models/clubRequest.js");
 const ChatRoom = require("../models/chatRoom.js");
 const { sendPushNotification } = require('../controllers/data.controller.js');
+const Report = require('../models/reportSchema.js');
+
 
 const SubcategoryModel = require("../models/Subcategory");
 
@@ -620,7 +622,7 @@ exports.createPost = async (req, res) => {
     if (productImageLocalPath) {
       productImage = await uploadOnCloudinary(productImageLocalPath);
     } else {
-      if (subcategoryObj.image){
+      if (subcategoryObj.image) {
         productImage = { url: subcategoryObj.image };
       }
     }
@@ -659,7 +661,7 @@ exports.createPost = async (req, res) => {
       const timestamp = Date.now().toString().slice(-9);
       const randomDigit = Math.floor(Math.random() * 9) + 1;
       const postId = `CLA${randomDigit}${timestamp}`;
-      const existingPost = await PostModel.findOne({postId});
+      const existingPost = await PostModel.findOne({ postId });
       return existingPost ? generatePostId() : postId;
     };
 
@@ -696,7 +698,7 @@ exports.createPost = async (req, res) => {
       .populate("category", "name")
       .populate("subCategory", "name");
 
-    console.log(populatedPost,"LLLLLLLLLLLL")
+    console.log(populatedPost, "LLLLLLLLLLLL")
     return res.status(200).json({
       message: "Post created successfully.",
       post: {
@@ -837,7 +839,7 @@ exports.sendClubRequest = async (req, res) => {
     console.log("hittttt")
     const { postId } = req.body
     const requesterId = req.User._id;
-    console.log(requesterId,"LLLLLLL")
+    console.log(requesterId, "LLLLLLL")
     const postData = await post.findById(postId);
     if (!postData) {
       return res.status(404).json({ error: "Post Not Found" });
@@ -960,7 +962,7 @@ exports.fetchGroupMembers = async (req, res) => {
     if (!postId) {
       return res.status(400).json({ message: "PostId is required." });
     }
-    const group = await Group.findOne({ productId: postId }).populate("members", "firstName lastName email avatar" ); // Populate member details (e.g., name, email)
+    const group = await Group.findOne({ productId: postId }).populate("members", "firstName lastName email avatar"); // Populate member details (e.g., name, email)
     if (!group) {
       return res.status(404).json({ message: "Group not found for this post." });
     }
@@ -1377,7 +1379,7 @@ exports.markMessageAsRead = async (req, res) => {
 
 exports.leaveGroup = async (req, res) => {
   const { groupId, userId, newAdminId } = req.body;
-  console.log(groupId,userId,newAdminId,"LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL")
+  console.log(groupId, userId, newAdminId, "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL")
   if (!groupId || !userId) {
     return res.status(400).json({ message: 'groupId and userId are required.' });
   }
@@ -1398,7 +1400,7 @@ exports.leaveGroup = async (req, res) => {
     }
     const userFirstName = user.firstName || "User";
     const userObjectId = new mongoose.Types.ObjectId(userId);
-    console.log(userObjectId,"LLLLLLLLLLLLLLLLLLLLLLLLLLLsssssssssss")
+    console.log(userObjectId, "LLLLLLLLLLLLLLLLLLLLLLLLLLLsssssssssss")
     const newAdminObjectId = new mongoose.Types.ObjectId(newAdminId);
     if (group.adminId.equals(userObjectId)) {
       if (!group.isActive) {
@@ -1693,16 +1695,17 @@ exports.getFavoriteProducts = async (req, res) => {
 
     let aggregatePipeline = [];
 
-    // GeoNear for distance calculation
+    // GeoNear for distance calculation (within 200 KM)
     aggregatePipeline.push({
       $geoNear: {
         near: {
           type: "Point",
           coordinates: [parsedLon, parsedLat],
         },
-        distanceField: "distance",
-        spherical: true,
-        key: "store_location.coordinates",
+        distanceField: "distance", // Field to store the calculated distance
+        spherical: true, // Use spherical geometry for calculations
+        maxDistance: 200000, // 200 kilometers in meters
+        key: "store_location.coordinates", // Field containing the GeoJSON coordinates
       },
     });
 
@@ -1720,29 +1723,29 @@ exports.getFavoriteProducts = async (req, res) => {
           from: "categories",
           localField: "category",
           foreignField: "_id",
-          as: "categoryDetails"
-        }
+          as: "categoryDetails",
+        },
       },
       {
         $unwind: {
           path: "$categoryDetails",
-          preserveNullAndEmptyArrays: true
-        }
+          preserveNullAndEmptyArrays: true,
+        },
       },
-      // Direct lookup for subcategory as a category document
+      // Lookup for subcategory details (from subcategories collection)
       {
         $lookup: {
-          from: "categories",
-          localField: "subCategory",  // This is the subcategory ID in your product
-          foreignField: "_id",        // This will match directly with category documents
-          as: "subCategoryDetails"
-        }
+          from: "subcategories",
+          localField: "subCategory",
+          foreignField: "_id",
+          as: "subCategoryDetails",
+        },
       },
       {
         $unwind: {
           path: "$subCategoryDetails",
-          preserveNullAndEmptyArrays: true
-        }
+          preserveNullAndEmptyArrays: true,
+        },
       },
       // Lookup for group info
       {
@@ -1768,10 +1771,8 @@ exports.getFavoriteProducts = async (req, res) => {
       $project: {
         _id: 1,
         userId: 1,
+        postOwnerId: 1,
         itemName: 1,
-        // offerType: 1,
-        // price: 1,
-        // price_type: 1,
         clubMembers: 1,
         clubToJoin: {
           $cond: {
@@ -1780,29 +1781,18 @@ exports.getFavoriteProducts = async (req, res) => {
             else: { $subtract: ["$clubMembers", 1] },
           },
         },
-        // additionalInformation: 1,
         size: 1,
-        // itemLink: 1,
-        // platform: 1,
-        // paymentMode: 1,
         productImage: 1,
         clubStatus: 1,
-        // reportCount: 1,
-        // reportedBy: 1,
-        // reportMessage: 1,
-        // createdAt: 1,
-        // updatedAt: 1,
-        // store_location: 1,
-        // delivery_location: 1,
         categoryName: "$categoryDetails.name",
-        // categoryImage: "$categoryDetails.image",
-        // subCategoryName: "$subCategoryDetails.name",
-        // subCategoryImage: "$subCategoryDetails.image",
+        categoryImage: "$categoryDetails.image",
+        subCategoryName: "$subCategoryDetails.name",
+        subCategoryImage: "$subCategoryDetails.image",
         distance: {
           $cond: {
             if: { $lt: ["$distance", 1] },
             then: 0,
-            else: { $divide: ["$distance", 1000] },
+            else: { $divide: ["$distance", 1000] }, // Convert meters to kilometers
           },
         },
       },
@@ -1815,7 +1805,7 @@ exports.getFavoriteProducts = async (req, res) => {
     console.log("Favorite Products:", favoriteProducts); // Log the result of the aggregation query
 
     if (favoriteProducts.length === 0) {
-      return res.status(404).json({ success: false, message: "No favorite products found 2" });
+      return res.status(404).json({ success: false, message: "No favorite products found within 200 KM" });
     }
 
     res.status(200).json({ success: true, data: favoriteProducts });
@@ -1827,7 +1817,6 @@ exports.getFavoriteProducts = async (req, res) => {
 
 exports.getFilteredFavoriteProducts = async (req, res) => {
   try {
-
     const userId = req.User._id;
     const { lat, lon, status } = req.query;
 
@@ -1864,16 +1853,17 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
 
     let aggregatePipeline = [];
 
-    // GeoNear for distance calculation
+    // GeoNear for distance calculation (within 200 KM)
     aggregatePipeline.push({
       $geoNear: {
         near: {
           type: "Point",
           coordinates: [parsedLon, parsedLat],
         },
-        distanceField: "distance",
-        spherical: true,
-        key: "store_location.coordinates",
+        distanceField: "distance", // Field to store the calculated distance
+        spherical: true, // Use spherical geometry for calculations
+        maxDistance: 200000, // 200 kilometers in meters
+        key: "store_location.coordinates", // Field containing the GeoJSON coordinates
       },
     });
 
@@ -1881,6 +1871,7 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
     aggregatePipeline.push({
       $match: {
         _id: { $in: user.favourites.map(id => new mongoose.Types.ObjectId(id)) }, // Ensure correct ID type
+        deletedAt: { $exists: false },
         ...statusFilter, // Apply the status filter if provided
       },
     });
@@ -1892,29 +1883,29 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
           from: "categories",
           localField: "category",
           foreignField: "_id",
-          as: "categoryDetails"
-        }
+          as: "categoryDetails",
+        },
       },
       {
         $unwind: {
           path: "$categoryDetails",
-          preserveNullAndEmptyArrays: true
-        }
+          preserveNullAndEmptyArrays: true,
+        },
       },
-      // Direct lookup for subcategory as a category document
+      // Lookup for subcategory details (from subcategories collection)
       {
         $lookup: {
-          from: "categories",
-          localField: "subCategory",  // This is the subcategory ID in your product
-          foreignField: "_id",        // This will match directly with category documents
-          as: "subCategoryDetails"
-        }
+          from: "subcategories",
+          localField: "subCategory",
+          foreignField: "_id",
+          as: "subCategoryDetails",
+        },
       },
       {
         $unwind: {
           path: "$subCategoryDetails",
-          preserveNullAndEmptyArrays: true
-        }
+          preserveNullAndEmptyArrays: true,
+        },
       },
       // Lookup for group info
       {
@@ -1940,10 +1931,8 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
       $project: {
         _id: 1,
         userId: 1,
+        postOwnerId: 1,
         itemName: 1,
-        // offerType: 1,
-        // price: 1,
-        // price_type: 1,
         clubMembers: 1,
         clubToJoin: {
           $cond: {
@@ -1952,29 +1941,18 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
             else: { $subtract: ["$clubMembers", 1] },
           },
         },
-        // additionalInformation: 1,
         size: 1,
-        // itemLink: 1,
-        // platform: 1,
-        // paymentMode: 1,
         productImage: 1,
         clubStatus: 1,
-        // reportCount: 1,
-        // reportedBy: 1,
-        // reportMessage: 1,
-        // createdAt: 1,
-        // updatedAt: 1,
-        // store_location: 1,
-        // delivery_location: 1,
         categoryName: "$categoryDetails.name",
-        // categoryImage: "$categoryDetails.image",
-        // subCategoryName: "$subCategoryDetails.name",
-        // subCategoryImage: "$subCategoryDetails.image",
+        categoryImage: "$categoryDetails.image",
+        subCategoryName: "$subCategoryDetails.name",
+        subCategoryImage: "$subCategoryDetails.image",
         distance: {
           $cond: {
             if: { $lt: ["$distance", 1] },
             then: 0,
-            else: { $divide: ["$distance", 1000] },
+            else: { $divide: ["$distance", 1000] }, // Convert meters to kilometers
           },
         },
       },
@@ -1987,7 +1965,7 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
     console.log("Filtered Favorite Products:", filteredFavoriteProducts); // Log the result of the aggregation query
 
     if (filteredFavoriteProducts.length === 0) {
-      return res.status(404).json({ success: false, message: "No favorite products found" });
+      return res.status(404).json({ success: false, message: "No favorite products found within 200 KM" });
     }
 
     res.status(200).json({ success: true, data: filteredFavoriteProducts });
@@ -2022,9 +2000,10 @@ exports.getUserPosts = async (req, res) => {
             type: "Point",
             coordinates: [parsedLon, parsedLat],
           },
-          distanceField: "distance",
-          spherical: true,
-          key: "store_location.coordinates",
+          distanceField: "distance", // Field to store the calculated distance
+          spherical: true, // Use spherical geometry for calculations
+          maxDistance: 200000, // 200 kilometers in meters
+          key: "store_location.coordinates", // Field containing the GeoJSON coordinates
         },
       },
       {
@@ -2046,7 +2025,7 @@ exports.getUserPosts = async (req, res) => {
       },
       {
         $lookup: {
-          from: "categories",
+          from: "subcategories",
           localField: "subCategory",
           foreignField: "_id",
           as: "subCategoryDetails",
@@ -2078,6 +2057,7 @@ exports.getUserPosts = async (req, res) => {
         $project: {
           _id: 1,
           userId: 1,
+          postOwnerId: 1,
           itemName: 1,
           postStatus: 1,
           price: 1,
@@ -2091,15 +2071,13 @@ exports.getUserPosts = async (req, res) => {
             $cond: {
               if: { $lt: ["$distance", 1] },
               then: 0,
-              else: { $divide: ["$distance", 1000] },
+              else: { $divide: ["$distance", 1000] }, // Convert meters to kilometers
             },
           },
           groupInfo: 1,
           size: 1,
           itemLink: 1,
           platform: 1,
-          delivery_location: 1,
-          store_location: 1,
           additionalInformation: 1,
           clubStatus: 1,
           clubMembers: 1,
@@ -2117,14 +2095,14 @@ exports.getUserPosts = async (req, res) => {
     const posts = await post.aggregate(aggregatePipeline);
 
     if (posts.length === 0) {
-      return res.status(404).json({ success: false, message: "No posts found" });
+      return res.status(404).json({ success: false, message: "No posts found within 200 KM" });
     }
 
     const modifiedPosts = await Promise.all(
       posts.map(async (post) => {
         let postStatus = post.postStatus;
 
-        if (post.userId && post.userId.toString() === userId.toString()) {
+        if (post.postOwnerId && post.postOwnerId.toString() === userId.toString()) {
           postStatus = "I created";
         } else {
           const groups = await Group.find({ members: userId, productId: post.productId });
@@ -2141,16 +2119,16 @@ exports.getUserPosts = async (req, res) => {
           postStatus,
           distance: post.distance,
           categoryName: post.categoryName,
-          // categoryImage: post.categoryImage,
-          // subCategoryName: post.subCategoryName,
-          // subCategoryImage: post.subCategoryImage,
+          categoryImage: post.categoryImage,
+          subCategoryName: post.subCategoryName,
+          subCategoryImage: post.subCategoryImage,
           groupInfo: post.groupInfo,
           size: post.size,
-          // itemLink: post.itemLink,
-          // platform: post.platform,
-          // delivery_location: post.delivery_location,
-          // store_location: post.store_location,
-          // additionalInformation: post.additionalInformation,
+          itemLink: post.itemLink,
+          platform: post.platform,
+          delivery_location: post.delivery_location,
+          store_location: post.store_location,
+          additionalInformation: post.additionalInformation,
           clubMembers: post.clubMembers,
           clubToJoin: post.clubToJoin,
           productImage: post.productImage,
@@ -2161,7 +2139,6 @@ exports.getUserPosts = async (req, res) => {
 
     // Apply status filters
     let filteredPosts = modifiedPosts;
-
     if (status) {
       if (status === "I created") {
         filteredPosts = modifiedPosts.filter(post => post.postStatus === "I created");
@@ -2175,12 +2152,195 @@ exports.getUserPosts = async (req, res) => {
       // If status is "All", no filter is applied, all posts are returned
     }
 
-    res.status(200).json({ success: true, message: "Posts fetched successfully", posts: filteredPosts });
+    res.status(200).json({ success: true, message: "Posts fetched successfully within 200 KM", posts: filteredPosts });
   } catch (error) {
     console.error("Error fetching posts:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
+exports.removeUserFromGroup = async (req, res) => {
+  const { groupId, removeUserId, adminId } = req.body;
+
+  if (!groupId || !removeUserId || !adminId) {
+    return res.status(400).json({ message: 'groupId, userId, and adminId are required.' });
+  }
+
+  try {
+    // Find the group by groupId
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ message: "Group not found." });
+    }
+
+    // Check if the admin is the person making the request
+    if (!group.adminId.equals(adminId)) {
+      return res.status(403).json({ message: "You are not authorized to remove users from this group." });
+    }
+
+    // Check if the user is a member of the group
+    const isMember = group.members.includes(removeUserId);
+    if (!isMember) {
+      return res.status(403).json({ message: "User is not a member of this group." });
+    }
+
+    // Remove the user from the group's members array
+    group.members = group.members.filter(member => !member.equals(removeUserId));
+    await group.save();
+
+    // Send system message to notify the group about the removal
+    const user = await User.findById(removeUserId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+    const userFirstName = user.firstName || "User";
+
+    await exports.sendSystemMessage(group._id, `${userFirstName} has been removed from the group by Admin.`);
+
+    // Return success response
+    return res.status(200).json({ message: `${userFirstName} has been removed from the group.`, group });
+
+  } catch (error) {
+    console.error("Error removing user from group:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+exports.getFirst4MediaMessages = async (req, res) => {
+  const { groupId } = req.params;
+
+  try {
+    // Retrieve the first 4 media messages (image or video) for the given groupId
+    const messages = await Message.find({
+      groupId,
+      type: { $in: ['image', 'video'] }
+    })
+      .limit(4)  // Limit to 4 messages
+      .populate('senderId', 'firstName avatar') // Populate senderId to get username
+      .sort({ createdAt: 1 }); // Sort messages by creation date in ascending order
+
+    // Return messages in the response
+    return res.status(200).json(messages);
+  } catch (error) {
+    console.error("Error fetching first 4 media messages:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+
+exports.getAllMediaMessages = async (req, res) => {
+  const { groupId } = req.params;
+
+  try {
+    // Retrieve all media messages (image or video) for the given groupId
+    const messages = await Message.find({
+      groupId,
+      type: { $in: ['image', 'video'] }
+    })
+      .populate('senderId', 'firstName avatar') // Populate senderId to get username
+      .sort({ createdAt: 1 }); // Sort messages by creation date in ascending order
+
+    // Return messages in the response
+    return res.status(200).json(messages);
+  } catch (error) {
+    console.error("Error fetching all media messages:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+
+exports.wrapDeal = async (req, res) => {
+  const { groupId, reviews } = req.body;
+  console.log('groupId, reviews ', groupId, reviews)
+  try {
+    // Update group status and isActive
+    await Group.findByIdAndUpdate(groupId, { status: 'wrap', isActive: false });
+
+    // Process reviews
+    if (reviews) {
+      for (const review of reviews) {
+        const user = await User.findById(review.userId);
+
+        // If the user's current rating is 0, adjust the new rating
+        const currentRating = user.UserRating || 0;
+        const newRating = currentRating == 0 ? review.rating : review.rating / 2;
+        console.log('Current rating ', currentRating, ' newRating ', newRating, ' review.rating ', review.rating, ' currentRating == 0 ', currentRating == 0)
+
+        // Update the user's rating
+        await User.findByIdAndUpdate(review.userId, {
+          $inc: { UserRating: newRating },
+        });
+      }
+    }
+    res.status(200).json({ message: 'Group and ratings updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'An error occurred while updating the group and ratings.' });
+  }
+
+}
+
+exports.sortReports = async (req, res) => {
+
+  try {
+    // Determine the sort field based on the query
+    let sortCriteria = {};
+    sortCriteria = { reportedAt: -1 };  // Descending order for reportedAt
+
+
+    // Retrieve sorted reports
+    const reports = await Report.find().sort(sortCriteria);
+
+    // Return sorted reports
+    return res.status(200).json(reports);
+  } catch (error) {
+    console.error("Error sorting reports:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+exports.getAllReports = async (req, res) => {
+  try {
+    // Retrieve all reports
+    const reports = await Report.find()
+      .populate('groupId', 'productName')  // Populate group name
+      .populate('userId', 'firstName avatar');  // Populate user info
+
+    // Return reports in the response
+    return res.status(200).json(reports);
+  } catch (error) {
+    console.error("Error fetching all reports:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+exports.createReport = async (req, res) => {
+  const { groupId, userId, title, details } = req.body;
+  console.log('groupId, userId, title, details ', groupId, userId, title, details)
+  try {
+    // Validate required fields
+    if (!groupId || !userId || !title || !details) {
+      return res.status(400).json({ message: "All fields are required." });
+    }
+
+    // Create the new report
+    const newReport = new Report({
+      groupId,
+      userId,
+      title,
+      details,
+    });
+
+    // Save the report to the database
+    await newReport.save();
+
+    // Return success response
+    return res.status(201).json({ message: "Report created successfully.", report: newReport });
+  } catch (error) {
+    console.error("Error creating report:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
 
 
 exports.getProductDetails = async (req, res) => {
@@ -2191,7 +2351,7 @@ exports.getProductDetails = async (req, res) => {
     }
 
     const userId = req.User._id;
-    if(!userId){
+    if (!userId) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
@@ -2237,14 +2397,14 @@ exports.getCategoryName = async (req, res) => {
     }
     const category = await CategoryModel.findById(categoryId);
     if (!category) {
-      return res.status(404).json({ success: false, message: "Category not found"})
+      return res.status(404).json({ success: false, message: "Category not found" })
     }
     const categoryResponse = {
       id: category._id,
       name: category.name,
     }
     res.status(200).json({ success: true, data: [categoryResponse] });
-  }catch (e) {
+  } catch (e) {
     console.error(e);
     res.status(500).json({ success: false, message: "Server error" });
   }

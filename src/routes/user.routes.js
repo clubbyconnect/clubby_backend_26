@@ -58,7 +58,14 @@ const {
   getFavoriteProducts,
   getFilteredFavoriteProducts,
   getUserPosts,
-  createPost
+  createPost,
+  removeUserFromGroup,
+  getFirst4MediaMessages,
+  getAllMediaMessages,
+  wrapDeal,
+  createReport,
+  getAllReports
+
   // filterUserPosts
 } = require("../controllers/user.controller.js");
 
@@ -70,7 +77,7 @@ const FileController = require("../controllers/FileController.js");
 
 
 // // Image Upload
-router.post("/image-upload",verifyJWT, upload.single("image"), FileController.image);
+router.post("/image-upload", verifyJWT, upload.single("image"), FileController.image);
 //user
 router.post("/signUp", signUp);
 router.post("/googleAuth", googleAuth);
@@ -90,42 +97,42 @@ router.post("/post/create", verifyJWT, upload.single('productImage'), PostContro
 router.get('/post/:productId', verifyJWT, PostController.read)
 router.put("/post/:postId", verifyJWT, upload.single('productImage'), PostController.update);
 router.delete("/post/:postId", verifyJWT, PostController.delete)
-router.post("/post/transfer",verifyJWT, PostController.transfer);
+router.post("/post/transfer", verifyJWT, PostController.transfer);
 // NOTE: ALI, SONALI - Update the search posts functionality. with deletedAt and category name in the search results.
 router.post("/search-posts", verifyJWT, PostController.getPost);
 
 // router.delete("/deletePost",verifyJWT,deletePost)
-router.post("/createPost",verifyJWT, upload.single('productImage'), createPost);
+router.post("/createPost", verifyJWT, upload.single('productImage'), createPost);
 //router.get('/productDetails/:productId',verifyJWT,getProductDetails)
 
 
 // CLUB ROUTES
-router.get("/club/:productId",verifyJWT, ClubRequestController.list);
-router.get("/club/join/:postId",verifyJWT, ClubRequestController.sendClubRequest);
-router.post("/club-request/action",verifyJWT,  ClubRequestController.handleClubRequest);
+router.get("/club/:productId", verifyJWT, ClubRequestController.list);
+router.get("/club/join/:postId", verifyJWT, ClubRequestController.sendClubRequest);
+router.post("/club-request/action", verifyJWT, ClubRequestController.handleClubRequest);
 
 
 
 // GROUP ROUTES
-router.get("/group/member/:postId",verifyJWT, GroupController.member);
+router.get("/group/member/:postId", verifyJWT, GroupController.member);
 
 
 router.post("/UpdateUserDetails", verifyJWT, upload.single('avatar'), UpdateUserDetails);
 router.post("/UpdateUserLikePost", verifyJWT, UpdateUserLikePost);
 router.get("/getUserLikePost", verifyJWT, getUserLikePost);
-router.get("/getPost",verifyJWT, getPost);
+router.get("/getPost", verifyJWT, getPost);
 
 //App data
 //router.post("/fetchallcategory",sendPushNotification);
 //router.post("/fetchallcategory",verifyJWT, fetchallcategory);
-router.post("/fetchallcategory",verifyJWT, CategoryController.getAllCategories);
-router.post("/fetchsubcategory",verifyJWT,  fetchsubcategory);
-router.post("/fetchOfflinecategory",verifyJWT, fetchOfflinecategory);
-router.post("/fetchOnlinecategory",verifyJWT, fetchOnlinecategory);
+router.post("/fetchallcategory", verifyJWT, CategoryController.getAllCategories);
+router.post("/fetchsubcategory", verifyJWT, fetchsubcategory);
+router.post("/fetchOfflinecategory", verifyJWT, fetchOfflinecategory);
+router.post("/fetchOnlinecategory", verifyJWT, fetchOnlinecategory);
 
 //serch & filter
 //getAllProducts
-router.get("/getAllProducts",verifyJWT, getAllProducts);
+router.get("/getAllProducts", verifyJWT, getAllProducts);
 
 router.get("/serchByProductName", searchByProductName);
 router.get("/searchByDistance", searchByDistance);
@@ -144,8 +151,8 @@ router.post("/acceptClubRequest", verifyJWT, acceptClubRequest);
 router.post("/declineClubRequest", verifyJWT, declineClubRequest);
 router.post("/removeUserFromClub", verifyJWT, removeUserFromClub);
 
-router.post ("/isConnected",verifyJWT,isConnected)
-router.post("/fetchGroupMembers",fetchGroupMembers)
+router.post("/isConnected", verifyJWT, isConnected)
+router.post("/fetchGroupMembers", fetchGroupMembers)
 
 router.get("/categoryname/:categoryId", getCategoryName);
 
@@ -186,16 +193,21 @@ router.post("/sendSystemMessage", sendSystemMessage);
 
 router.post("/addToFav", verifyJWT, addToFavourites);
 
-//getFavoriteProducts
-router.get("/getFavoriteProducts", verifyJWT, getFavoriteProducts);
-//getFilteredFavoriteProducts
-router.get("/getFilteredFavoriteProducts", verifyJWT, getFilteredFavoriteProducts);
-//getUserPosts
-router.get("/getUserPosts", verifyJWT, getUserPosts);
-//filterUserPosts
-// router.get("/filterUserPosts", verifyJWT, filterUserPosts);
 
-// Route for admin to leave the group
+router.get("/getFavoriteProducts", verifyJWT, getFavoriteProducts);
+router.get("/getFilteredFavoriteProducts", verifyJWT, getFilteredFavoriteProducts);
+
+router.get("/getUserPosts", verifyJWT, getUserPosts);
+
 router.post("/castVote", castVote);
+
+router.post("/removeUserFromGroup", removeUserFromGroup);
+router.get("/getSortmedia/:groupId", getFirst4MediaMessages);
+router.get("/getAllMediaMessages/:groupId", getAllMediaMessages);
+router.post("/wrapDeal", wrapDeal);
+router.post("/createReport", createReport);
+router.get("/getAllReports", getAllReports);
+
+
 
 module.exports = router;
