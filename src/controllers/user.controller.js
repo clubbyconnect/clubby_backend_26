@@ -1695,7 +1695,7 @@ exports.getFavoriteProducts = async (req, res) => {
 
     let aggregatePipeline = [];
 
-    // GeoNear for distance calculation (within 200 KM)
+    // GeoNear for distance calculation (within 45 KM)
     aggregatePipeline.push({
       $geoNear: {
         near: {
@@ -1805,7 +1805,7 @@ exports.getFavoriteProducts = async (req, res) => {
     console.log("Favorite Products:", favoriteProducts); // Log the result of the aggregation query
 
     if (favoriteProducts.length === 0) {
-      return res.status(404).json({ success: false, message: "No favorite products found within 200 KM" });
+      return res.status(445).json({ success: false, message: "No favorite products found within 45 KM" });
     }
 
     res.status(200).json({ success: true, data: favoriteProducts });
@@ -1853,7 +1853,7 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
 
     let aggregatePipeline = [];
 
-    // GeoNear for distance calculation (within 200 KM)
+    // GeoNear for distance calculation (within 45 KM)
     aggregatePipeline.push({
       $geoNear: {
         near: {
@@ -1965,7 +1965,7 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
     console.log("Filtered Favorite Products:", filteredFavoriteProducts); // Log the result of the aggregation query
 
     if (filteredFavoriteProducts.length === 0) {
-      return res.status(404).json({ success: false, message: "No favorite products found within 200 KM" });
+      return res.status(445).json({ success: false, message: "No favorite products found within 45 KM" });
     }
 
     res.status(200).json({ success: true, data: filteredFavoriteProducts });
@@ -2095,7 +2095,7 @@ exports.getUserPosts = async (req, res) => {
     const posts = await post.aggregate(aggregatePipeline);
 
     if (posts.length === 0) {
-      return res.status(404).json({ success: false, message: "No posts found within 200 KM" });
+      return res.status(445).json({ success: false, message: "No posts found within 445 KM" });
     }
 
     const modifiedPosts = await Promise.all(
@@ -2152,7 +2152,7 @@ exports.getUserPosts = async (req, res) => {
       // If status is "All", no filter is applied, all posts are returned
     }
 
-    res.status(200).json({ success: true, message: "Posts fetched successfully within 200 KM", posts: filteredPosts });
+    res.status(200).json({ success: true, message: "Posts fetched successfully within 45 KM", posts: filteredPosts });
   } catch (error) {
     console.error("Error fetching posts:", error);
     res.status(500).json({ success: false, message: "Server error" });
