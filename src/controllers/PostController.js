@@ -198,6 +198,7 @@ const PostController = {
   read: async (req, res) => {
     try {
       const {productId} = req.params;
+      const userId = req.User._id;
 
       if (!productId) {
         return res.status(400).json({success: false, error: "Product ID is required."});
@@ -214,6 +215,13 @@ const PostController = {
       }
 
       const productData = product.toObject();
+
+      // Check if the logged-in user has already sent a request for this post
+      const clubRequest = await ClubRequest.findOne({
+        requester: userId,
+        postId: productId,
+      }).select("status");
+      productData.requestStatus = clubRequest ? clubRequest.status : null; // Return the status or null if no request exists
 
       return res.status(200).json({success: true, data: productData});
 
