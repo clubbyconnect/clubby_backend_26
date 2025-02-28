@@ -1845,7 +1845,7 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    console.log("User's Favourites:", user.favourites); // Log user's favourite product IDs
+    console.log("User's Favourites:", user.favourites);
 
     if (!user.favourites || user.favourites.length === 0) {
       return res.status(404).json({ success: false, message: "No favorite products found" });
@@ -1853,26 +1853,27 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
 
     let aggregatePipeline = [];
 
-    // GeoNear for distance calculation (within 45 KM)
+    // GeoNear for distance calculation (within 200 KM)
     aggregatePipeline.push({
       $geoNear: {
         near: {
           type: "Point",
           coordinates: [parsedLon, parsedLat],
         },
-        distanceField: "distance", // Field to store the calculated distance
-        spherical: true, // Use spherical geometry for calculations
-        maxDistance: 45000, // 200 kilometers in meters
-        key: "store_location.coordinates", // Field containing the GeoJSON coordinates
+        distanceField: "distance",
+        spherical: true,
+        maxDistance: 200000,
+        key: "store_location.coordinates",
       },
     });
 
-    // Match user's favorite products and apply status filter if provided
+    // Match user's favorite products, apply status filter, and filter by expiry date
     aggregatePipeline.push({
       $match: {
-        _id: { $in: user.favourites.map(id => new mongoose.Types.ObjectId(id)) }, // Ensure correct ID type
+        _id: { $in: user.favourites.map(id => new mongoose.Types.ObjectId(id)) },
         deletedAt: { $exists: false },
-        ...statusFilter, // Apply the status filter if provided
+        expiryDate: { $gt: new Date() }, // Only include products whose expiry date is in the future
+        ...statusFilter,
       },
     });
 
@@ -1892,7 +1893,6 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
           preserveNullAndEmptyArrays: true,
         },
       },
-      // Lookup for subcategory details (from subcategories collection)
       {
         $lookup: {
           from: "subcategories",
@@ -1907,7 +1907,6 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
           preserveNullAndEmptyArrays: true,
         },
       },
-      // Lookup for group info
       {
         $lookup: {
           from: "groups",
@@ -1948,6 +1947,7 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
         categoryImage: "$categoryDetails.image",
         subCategoryName: "$subCategoryDetails.name",
         subCategoryImage: "$subCategoryDetails.image",
+        expiryDate: 1, // Include expiry date in response
         distance: {
           $cond: {
             if: { $lt: ["$distance", 1] },
@@ -1958,14 +1958,14 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
       },
     });
 
-    console.log("Aggregation Pipeline:", JSON.stringify(aggregatePipeline, null, 2)); // Log the aggregation pipeline
+    console.log("Aggregation Pipeline:", JSON.stringify(aggregatePipeline, null, 2));
 
     const filteredFavoriteProducts = await post.aggregate(aggregatePipeline);
 
-    console.log("Filtered Favorite Products:", filteredFavoriteProducts); // Log the result of the aggregation query
+    console.log("Filtered Favorite Products:", filteredFavoriteProducts);
 
     if (filteredFavoriteProducts.length === 0) {
-      return res.status(445).json({ success: false, message: "No favorite products found within 45 KM" });
+      return res.status(404).json({ success: false, message: "No favorite products found within 200 KM" });
     }
 
     res.status(200).json({ success: true, data: filteredFavoriteProducts });
@@ -1974,6 +1974,7 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 };
+
 
 exports.getUserPosts = async (req, res) => {
   try {
@@ -2002,12 +2003,13 @@ exports.getUserPosts = async (req, res) => {
           },
           distanceField: "distance", // Field to store the calculated distance
           spherical: true, // Use spherical geometry for calculations
-          maxDistance: 45000, // 200 kilometers in meters
+          maxDistance: 200000, // 200 kilometers in meters
           key: "store_location.coordinates", // Field containing the GeoJSON coordinates
         },
       },
       {
         $match: { userId: userIdObjectId },
+        expiryDate: { $gt: new Date() }
       },
       {
         $lookup: {
@@ -2095,7 +2097,7 @@ exports.getUserPosts = async (req, res) => {
     const posts = await post.aggregate(aggregatePipeline);
 
     if (posts.length === 0) {
-      return res.status(445).json({ success: false, message: "No posts found within 445 KM" });
+      return res.status(404).json({ success: false, message: "No posts found within 200 KM" });
     }
 
     const modifiedPosts = await Promise.all(
@@ -2152,7 +2154,7 @@ exports.getUserPosts = async (req, res) => {
       // If status is "All", no filter is applied, all posts are returned
     }
 
-    res.status(200).json({ success: true, message: "Posts fetched successfully within 45 KM", posts: filteredPosts });
+    res.status(200).json({ success: true, message: "Posts fetched successfully within 200 KM", posts: filteredPosts });
   } catch (error) {
     console.error("Error fetching posts:", error);
     res.status(500).json({ success: false, message: "Server error" });
