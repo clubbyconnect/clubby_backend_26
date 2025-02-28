@@ -662,6 +662,8 @@ exports.searchProducts = async (req, res) => {
     const userId = req.User._id;
 
     let matchStage = { deletedAt: null };
+    matchStage.expiryAt = { $gte: new Date() };
+
     let aggregatePipeline = [];
 
     // GeoNear for distance calculation (within 200 KM if no range is provided)
@@ -694,7 +696,7 @@ exports.searchProducts = async (req, res) => {
           },
           distanceField: "distance",
           spherical: true,
-          maxDistance: 45000, // 45 kilometers in meters
+          maxDistance: 200000, // 200 kilometers in meters
           key: "store_location.coordinates",
         },
       });
@@ -847,6 +849,7 @@ exports.searchProducts = async (req, res) => {
         price: 1,
         price_type: 1,
         clubMembers: 1,
+        expiryAt: 1,
         clubToJoin: {
           $cond: {
             if: { $isArray: "$groupInfo.members" },
@@ -914,6 +917,7 @@ exports.searchProducts = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 };
+
 
 //-------------------All filters in One Api--------------------------------
 exports.unifiedSearch = async (req, res) => {
