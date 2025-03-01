@@ -1269,23 +1269,23 @@ exports.sendMessage = async (req, res) => {
     const group = await Group.findById(groupId).populate('productId'); // Populate the related post
 
     if (!group) {
-      return res.status(404).json({ message: "Group not found." });
+      return res.status(404).json({ error: "Group not found." });
     }
 
     const post = group.productId; // Fetch the associated post
 
     if (!post) {
-      return res.status(404).json({ message: "Related post not found." });
+      return res.status(404).json({ error: "Related post not found." });
     }
 
     // Check if the post's clubStatus is "Inactive" or "Wrap"
     if (post.clubStatus === "Inactive" || post.clubStatus === "Wrap") {
-      return res.status(403).json({ message: "No one can send message as Post is Inactive or Wrapped." });
+      return res.status(403).json({ error: "No one can send message as Post is Inactive or Wrapped." });
     }
 
     // Check if the post is expired
     if (new Date(post.expiryAt) < new Date()) {
-      return res.status(403).json({ message: "No one can send message as Post is expired." });
+      return res.status(403).json({ error: "No one can send message as Post is expired." });
     }
 
     console.log('group is ', group.isActive);
@@ -1293,12 +1293,12 @@ exports.sendMessage = async (req, res) => {
     // Check if the user is a member of the group
     const isMember = group.members.includes(userId);
     if (!isMember) {
-      return res.status(403).json({ message: "You are not a member of this group." });
+      return res.status(403).json({ error: "You are not a member of this group." });
     }
 
     // Check if the group is active
     if (!group.isActive) {
-      return res.status(403).json({ message: "No one can send messages as the group is deactivated." });
+      return res.status(403).json({ error: "No one can send messages as the group is deactivated." });
     }
 
     let finalMessageContent = messageContent;
@@ -1371,7 +1371,7 @@ exports.sendMessage = async (req, res) => {
 
   } catch (error) {
     console.error("Error sending message:", error);
-    return res.status(500).json({ message: "Internal server error." });
+    res.status(500).json({ error: error.message || "Internal Server Error" });
   }
 };
 
