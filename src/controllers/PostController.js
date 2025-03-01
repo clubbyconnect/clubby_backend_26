@@ -89,6 +89,9 @@ const PostController = {
 
       console.log(populatedPost, "Post Created Successfully");
 
+      // Send system message
+      await sendSystemMessage(createdGroup._id, `Group is created.`);
+
       return res.status(200).json({
         message: "Post created successfully.", post: {
           ...populatedPost._doc, category: populatedPost.category.name, subCategory: populatedPost.subCategory.name, group: createdGroup._id,
@@ -96,7 +99,7 @@ const PostController = {
       });
     } catch (error) {
       console.error("Error in createPost:", error);
-      res.status(500).json({error: "Internal Server Error"});
+      res.status(500).json({ error: error.message || "Internal Server Error" });
     }
   },
 
@@ -180,6 +183,10 @@ const PostController = {
         .populate("category", "name")
         .populate("subCategory", "name");
 
+      // Send system message
+      const group = await Group.findOne({productId: postId});
+      await sendSystemMessage(group._id, `Post details are updated.`);
+
       return res.status(200).json({
         message: "Post updated successfully.",
         post: {
@@ -190,7 +197,7 @@ const PostController = {
       });
     } catch (error) {
       console.error("Error in updatePost:", error);
-      res.status(500).json({error: "Internal Server Error"});
+      res.status(500).json({ error: error.message || "Internal Server Error" });
     }
   },
 
@@ -251,19 +258,11 @@ const PostController = {
         return res.status(403).json({error: "You do not have the rights to delete this post."});
       }
 
-      // Check if the post is associated with a group
-      const associatedGroup = await Group.findOne({productId: postId});
-
-      // Delete the post
+      //Soft Delete the post and do not change anything in group
       await PostModel.findByIdAndUpdate(postId, {deletedAt: new Date()});
 
-      // Delete the associated group if found
-      if (associatedGroup) {
-        await Group.findByIdAndDelete(associatedGroup._id);
-      }
-
       return res.status(200).json({
-        message: "Post and associated group deleted successfully.", postId, groupId: associatedGroup ? associatedGroup._id : null,
+        message: "Post and associated group deleted successfully.", postId,
       });
 
     } catch (error) {

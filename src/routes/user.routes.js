@@ -165,7 +165,7 @@ router.get("/categoryname/:categoryId", getCategoryName);
 router.post("/joinGroup", createOrJoinGroup);
 router.post("/leaveGroupRequest", leaveGroup);
 
-router.get("/myGroups/:userId", getGroupsForUser);
+router.post("/myGroups/:userId", GroupController.getGroupsForUser);
 
 router.post(
   "/sendMessage",
@@ -180,7 +180,7 @@ router.post(
 
 router.post("/markMessageAsRead", verifyJWT, markMessageAsRead);
 
-router.get("/getMessages/:groupId", getMessagesForGroup);
+router.get("/getMessages/:groupId",verifyJWT, getMessagesForGroup);
 
 router.get("/getAdminUser/:groupId", getGroupMembersAndAdmin);
 router.get("/getGroupDetails/:groupId", getGroupDetails)

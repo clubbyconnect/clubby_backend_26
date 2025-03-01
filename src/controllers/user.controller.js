@@ -1358,7 +1358,14 @@ exports.sendMessage = async (req, res) => {
     group.messages.push(newMessage._id);
     await group.save();
 
-    return res.status(201).json(newMessage);
+    // Emit the new message to the group members
+    const io = getIO();
+    io.to(groupId.toString()).emit("newMessage", newMessage);
+
+    // Emit an event to update the recent chats list for all group members
+    group.members.forEach((member) => {
+      io.to(member.toString()).emit('recentChats', newMessage);
+    });
 
   } catch (error) {
     console.error("Error sending message:", error);

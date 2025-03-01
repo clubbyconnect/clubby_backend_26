@@ -18,7 +18,7 @@ const serverErrorHandler = (error, res) => {
   }
 
   console.log(error);
-  return new ErrorHandler("Server error. Something went wrong", 500, res);
+  return new ErrorHandler("User is not verified ", 500, res);
 };
 
 module.exports = serverErrorHandler;
