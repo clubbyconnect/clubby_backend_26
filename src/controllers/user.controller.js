@@ -1659,7 +1659,7 @@ exports.getGroupDetails = async (req, res) => {
     if (!group) {
       return res.status(404).json({ message: "Group not found." });
     }
-    console.log('Group is ', group.productId._id)
+    console.log('Group is ', group)
     // Fetch the post associated with the same productId to get productImage
     const posts = await post.findOne({ _id: group.productId });
 

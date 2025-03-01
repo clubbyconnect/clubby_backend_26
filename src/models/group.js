@@ -5,7 +5,7 @@ const Schema = mongoose.Schema;
 const GroupSchema = new Schema({
   productId: {
     type: mongoose.Schema.Types.ObjectId,  // Change to ObjectId for reference to Product
-    ref: 'Product',  // Reference to the Product model
+    ref: 'Post',  // Reference to the Product model
     required: true,
     index: true  // Index for fast retrieval by productId
   },
