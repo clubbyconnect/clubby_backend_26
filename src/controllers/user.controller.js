@@ -1674,12 +1674,12 @@ exports.getGroupDetails = async (req, res) => {
     // Fetch the post associated with the same productId to get productImage
     const posts = await post.findOne({ _id: group.productId });
 
-    console.log('post is ', posts)
+    console.log('group.productId is ', group.productId)
 
     return res.status(200).json({
       message: "Group details fetched successfully",
       groupId: group._id,
-      productId: group.productId || null,
+      productId: group.productId._id || null,
       groupName: posts.itemName,
       productImage: posts?.productImage || null, // Fetch image from Post model
     });
