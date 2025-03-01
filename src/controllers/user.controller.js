@@ -1556,9 +1556,11 @@ exports.deletePost = async (req, res) => {
 
 exports.getGroupsForUser = async (req, res) => {
   const { userId } = req.params;
+  const { searchQuery } = req.query; // Extract search query from query parameters
 
   try {
-    console.log('userId is', userId)
+    console.log('userId is', userId);
+
     // Fetch groups where the user is a member
     const groups = await Group.find({ members: new mongoose.Types.ObjectId(userId) })
       .lean(); // Convert to plain JavaScript objects for easier manipulation
@@ -1576,9 +1578,18 @@ exports.getGroupsForUser = async (req, res) => {
       })
     );
 
-    console.log('groupWithPostDetails is ', groupWithPostDetails)
+    console.log('groupWithPostDetails is ', groupWithPostDetails);
 
-    return res.status(200).json(groupWithPostDetails);
+    // Apply search functionality by productName if a search query is provided
+    let filteredGroups = groupWithPostDetails;
+    if (searchQuery) {
+      filteredGroups = groupWithPostDetails.filter(group => {
+        // Search by productName (case-insensitive)
+        return group.productName?.toLowerCase().includes(searchQuery.toLowerCase());
+      });
+    }
+
+    return res.status(200).json(filteredGroups);
   } catch (error) {
     console.error("Error fetching groups for user:", error);
     return res.status(500).json({ message: "Internal server error." });
