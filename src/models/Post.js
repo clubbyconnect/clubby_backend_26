@@ -98,8 +98,8 @@ const postSchema = new mongoose.Schema(
     },
     clubStatus: {
       type: String,
-      enum: ["Pending", "Created", "Full", "Inactive", "Active"],
-      default: "Pending",
+      enum: ["Pending", "Created", "Full", "Inactive", "Active", "Wrap"],
+      default: "Created",
     },
     groupId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -112,10 +112,10 @@ const postSchema = new mongoose.Schema(
     },
     deletedAt: { type: Date, default: null }
   },
-  {timestamps: true}
+  { timestamps: true }
 );
 
-postSchema.index({"store_location.coordinates": "2dsphere"});
+postSchema.index({ "store_location.coordinates": "2dsphere" });
 
 const Post = mongoose.models.Post || mongoose.model("Post", postSchema);
 module.exports = Post;

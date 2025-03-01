@@ -1223,6 +1223,7 @@ exports.createOrJoinGroup = async (req, res) => {
 };
 
 
+
 // Deactivate a group (admin only)
 exports.deactivateGroup = async (req, res) => {
   const { groupId, adminId } = req.body;
@@ -1250,9 +1251,8 @@ exports.deactivateGroup = async (req, res) => {
 // Send a message in the group
 exports.sendMessage = async (req, res) => {
   console.log('Request body:', req.body);
-  console.log('req.file ', req.file)
+  console.log('req.file ', req.file);
 
-  // Access image, audio, and video files from req.files
   const imageFile = req.files?.image ? req.files.image[0] : null;
   const audioFile = req.files?.audio ? req.files.audio[0] : null;
   const videoFile = req.files?.video ? req.files.video[0] : null;
@@ -1262,17 +1262,33 @@ exports.sendMessage = async (req, res) => {
   console.log('Video file:', videoFile);
 
   const { groupId, messageType, messageContent } = req.body;
-  console.log('req.User is ', req.User)
+  console.log('req.User is ', req.User);
   const userId = req.User._id;
 
   try {
-    const group = await Group.findById(groupId);
+    const group = await Group.findById(groupId).populate('productId'); // Populate the related post
 
     if (!group) {
       return res.status(404).json({ message: "Group not found." });
     }
-    console.log('group is ', group.isActive)
 
+    const post = group.productId; // Fetch the associated post
+
+    if (!post) {
+      return res.status(404).json({ message: "Related post not found." });
+    }
+
+    // Check if the post's clubStatus is "Inactive" or "Wrap"
+    if (post.clubStatus === "Inactive" || post.clubStatus === "Wrap") {
+      return res.status(403).json({ message: "No one can send message as Post is Inactive or Wrapped." });
+    }
+
+    // Check if the post is expired
+    if (new Date(post.expiryAt) < new Date()) {
+      return res.status(403).json({ message: "No one can send message as Post is expired." });
+    }
+
+    console.log('group is ', group.isActive);
 
     // Check if the user is a member of the group
     const isMember = group.members.includes(userId);
@@ -1288,7 +1304,7 @@ exports.sendMessage = async (req, res) => {
     let finalMessageContent = messageContent;
 
     if (messageType === 'image') {
-      const imageLocalPath = imageFile.path;
+      const imageLocalPath = imageFile?.path;
       if (!imageLocalPath) {
         return res.status(400).json({ error: "Image file is required for image messages" });
       }
@@ -1302,29 +1318,31 @@ exports.sendMessage = async (req, res) => {
     }
 
     if (messageType === 'audio') {
-      const audioLocalPath = audioFile.path;
+      const audioLocalPath = audioFile?.path;
       if (!audioLocalPath) {
         return res.status(400).json({ error: "Audio file is required for audio messages" });
       }
-      console.log('audio part...')
+
+      console.log('audio part...');
 
       const cloudinaryResult = await uploadOnCloudinary(audioLocalPath);
       if (!cloudinaryResult || !cloudinaryResult.secure_url) {
         return res.status(500).json({ error: "Failed to upload Audio to Cloudinary" });
       }
-      console.log('audio part URL ', cloudinaryResult.secure_url)
 
+      console.log('audio part URL ', cloudinaryResult.secure_url);
       finalMessageContent = cloudinaryResult.secure_url;
     }
+
     if (messageType === 'video') {
-      const videoLocalPath = videoFile.path;
+      const videoLocalPath = videoFile?.path;
       if (!videoLocalPath) {
-        return res.status(400).json({ error: "Image file is required for image messages" });
+        return res.status(400).json({ error: "Video file is required for video messages" });
       }
 
       const cloudinaryResult = await uploadOnCloudinary(videoLocalPath);
       if (!cloudinaryResult || !cloudinaryResult.secure_url) {
-        return res.status(500).json({ error: "Failed to upload image to Cloudinary" });
+        return res.status(500).json({ error: "Failed to upload video to Cloudinary" });
       }
 
       finalMessageContent = cloudinaryResult.secure_url;
@@ -1340,10 +1358,6 @@ exports.sendMessage = async (req, res) => {
     group.messages.push(newMessage._id);
     await group.save();
 
-    // Emit message to the socket (real-time update)
-    // const io = getIO();
-    // io.to(groupId).emit("newMessage", newMessage);
-
     return res.status(201).json(newMessage);
 
   } catch (error) {
@@ -1351,6 +1365,8 @@ exports.sendMessage = async (req, res) => {
     return res.status(500).json({ message: "Internal server error." });
   }
 };
+
+
 // New function to mark a message as read
 exports.markMessageAsRead = async (req, res) => {
   const { messageId } = req.body;
@@ -1379,73 +1395,96 @@ exports.markMessageAsRead = async (req, res) => {
 
 exports.leaveGroup = async (req, res) => {
   const { groupId, userId, newAdminId } = req.body;
-  console.log(groupId, userId, newAdminId, "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL")
+  console.log(groupId, userId, newAdminId, "checkedddddddddd");
+
   if (!groupId || !userId) {
     return res.status(400).json({ message: 'groupId and userId are required.' });
   }
+
   try {
     const group = await Group.findById(groupId);
-    console.log('groupId, userId, newAdminId  group.adminId', groupId, userId, newAdminId, group?.adminId)
+    console.log('groupId, userId, newAdminId, group.adminId', groupId, userId, newAdminId, group?.adminId);
 
     if (!group) {
       return res.status(404).json({ message: "Group not found." });
     }
+
+    // Check if the group is inactive or wrapped
+    if (!group.isActive || group.clubStatus === 'Wrap') {
+      return res.status(403).json({ message: "Cannot perform action as the group is inactive or wrapped." });
+    }
+
+    const productId = group.productId;
     const isMember = group.members.includes(userId);
+
     if (!isMember) {
       return res.status(403).json({ message: "You are not a member of this group." });
     }
+
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: "User not found." });
     }
+
     const userFirstName = user.firstName || "User";
     const userObjectId = new mongoose.Types.ObjectId(userId);
-    console.log(userObjectId, "LLLLLLLLLLLLLLLLLLLLLLLLLLLsssssssssss")
+    const productObjectId = new mongoose.Types.ObjectId(productId);
+
+    console.log(userObjectId, "LLLLLLLLLLLLLLLLLLLLLLLLLLLsssssssssss");
     const newAdminObjectId = new mongoose.Types.ObjectId(newAdminId);
+
     if (group.adminId.equals(userObjectId)) {
       if (!group.isActive) {
         return res.status(403).json({ message: "No action can perform as Group is deactivated." });
       }
+
       if (newAdminId) {
         const newAdmin = await User.findById(newAdminId);
         if (!newAdmin) {
-          return res.status(404).json({ message: "new Admin not found." });
+          return res.status(404).json({ message: "New Admin not found." });
         }
+
         const newAdminFirstName = newAdmin.firstName || "User";
-        console.log('Making Admin working')
+        console.log('Making Admin working');
         group.adminId = newAdminObjectId;
-        ;
         group.members = group.members.filter(member => !member.equals(userObjectId));
-        const postToUpdate = await post.findOne({ groupId });
+
+        const postToUpdate = await post.findOne({ _id: productObjectId });
         if (postToUpdate) {
-          postToUpdate.userId = newAdminObjectId;
+          postToUpdate.postOwnerId = newAdminObjectId;
           await postToUpdate.save();
-          console.log("admin updated")
+          console.log("Admin updated");
         }
+
         await group.save();
         await exports.sendSystemMessage(group._id, `${userFirstName} transferred admin rights to ${newAdminFirstName}.`);
         await exports.sendSystemMessage(group._id, `${userFirstName} left the group.`);
-        // const io = getIO(); // Emit the updated admin to the group members
-        // io.to(group._id).emit("sendSystemMessage", { newAdminId });
+
         return res.status(200).json({ message: "Admin rights transferred", group });
       } else {
         // Deactivate group if no new admin is specified
-        // await Group.deleteOne({ _id: groupId });
+        const postToUpdate = await post.findOne({ _id: productObjectId });
+        console.log('Post to be updated is ', postToUpdate, ' productId ', productObjectId);
+
+        if (postToUpdate) {
+          postToUpdate.clubStatus = 'Inactive';
+          await postToUpdate.save();
+          console.log("Post inactive");
+        }
+
         group.isActive = false;
         await group.save();
-        await exports.sendSystemMessage(group._id, `${userFirstName} deactivate the group. No one can send message now.`);
-        // const io = getIO(); // Emit group deactivation
-        // io.to(group._id).emit("groupDeactivated", { groupId });
+        await exports.sendSystemMessage(group._id, `${userFirstName} deactivated the group. No one can send messages now.`);
+
         return res.status(200).json({ message: "Group deactivated" });
       }
     } else {
-      console.log("hsitttttttttt")
+      console.log("here 2");
       // Normal user leaving the group without voting
       group.members = group.members.filter(member => !member.equals(userObjectId));
       await group.save();
       await exports.sendSystemMessage(group._id, `${userFirstName} has left the group.`);
-      // const io = getIO(); // Emit user leave event to the group members
-      // io.to(group._id).emit("memberLeft", { userId });
+
       return res.status(200).json({ message: "User has left the group", group });
     }
   } catch (error) {
@@ -1453,6 +1492,7 @@ exports.leaveGroup = async (req, res) => {
     return res.status(500).json({ message: "Internal server error." });
   }
 };
+
 
 exports.isConnected = async (req, res) => {
   try {
@@ -1513,17 +1553,38 @@ exports.deletePost = async (req, res) => {
   }
 };
 
+
 exports.getGroupsForUser = async (req, res) => {
   const { userId } = req.params;
 
   try {
-    const groups = await Group.find({ members: new mongoose.Types.ObjectId(userId) });
-    return res.status(200).json(groups);
+    console.log('userId is', userId)
+    // Fetch groups where the user is a member
+    const groups = await Group.find({ members: new mongoose.Types.ObjectId(userId) })
+      .lean(); // Convert to plain JavaScript objects for easier manipulation
+
+    // Fetch post details for each group
+    const groupWithPostDetails = await Promise.all(
+      groups.map(async (group) => {
+        const posts = await post.findOne({ _id: group.productId }).select("productImage itemName clubStatus");
+        return {
+          ...group,
+          productImage: posts?.productImage || null,
+          productName: posts?.itemName || null,
+          status: posts?.clubStatus || null
+        };
+      })
+    );
+
+    console.log('groupWithPostDetails is ', groupWithPostDetails)
+
+    return res.status(200).json(groupWithPostDetails);
   } catch (error) {
     console.error("Error fetching groups for user:", error);
     return res.status(500).json({ message: "Internal server error." });
   }
 };
+
 
 // Get messages for a specific group
 exports.getMessagesForGroup = async (req, res) => {
@@ -1545,26 +1606,74 @@ exports.getMessagesForGroup = async (req, res) => {
 
 // Controller function to fetch group members and admin by productId
 exports.getGroupMembersAndAdmin = async (req, res) => {
-  const { groupId } = req.params;  // Get groupId from URL params
-  console.log('groupId ', groupId);
+  const { groupId } = req.params; // Get groupId from URL params
+  console.log("groupId ", groupId);
 
   try {
     // Find the group by _id (groupId) and populate adminId and members fields
-    const group = await Group.findById((groupId)) // Find by _id
-      .populate('adminId', 'firstName') // Populate adminId with admin's name and email
-      .populate('members', 'firstName'); // Populate members with their names and emails
+    const group = await Group.findById(groupId)
+      .populate("adminId", "firstName avatar") // Populate adminId with admin's firstName and avatar
+      .populate("members", "firstName avatar") // Populate members with their firstName and avatar
+      .populate("productId", "clubStatus"); // Populate postId with clubStatus
 
     if (!group) {
       return res.status(404).json({ message: "Group not found." });
     }
 
+    // Extract clubStatus from post
+    const status = group.productId ? group.productId.clubStatus : null;
+
+    // Format the response with role information
+    const admin = {
+      ...group.adminId.toObject(),
+      role: "Admin",
+    };
+
+    const members = group.members.map((member) => ({
+      ...member.toObject(),
+      role: member._id.equals(group.adminId._id) ? "Admin" : "Member",
+    }));
+
     return res.status(200).json({
       message: "Group details fetched successfully",
-      admin: group.adminId,   // Return admin details
-      members: group.members, // Return member details
+      admin,
+      members,
+      status, // Add status field from post's clubStatus
     });
   } catch (error) {
     console.error("Error fetching group members and admin:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+
+
+exports.getGroupDetails = async (req, res) => {
+  const { groupId } = req.params; // Get groupId from URL params
+  console.log("groupId hits ", groupId);
+
+  try {
+    // Find the group by _id (groupId) and populate productId to fetch product details
+    const group = await Group.findById(groupId).populate("productId");
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found." });
+    }
+    console.log('Group is ', group.productId._id)
+    // Fetch the post associated with the same productId to get productImage
+    const posts = await post.findOne({ _id: group.productId });
+
+    console.log('post is ', posts)
+
+    return res.status(200).json({
+      message: "Group details fetched successfully",
+      groupId: group._id,
+      productId: group.productId || null,
+      groupName: posts.itemName,
+      productImage: posts?.productImage || null, // Fetch image from Post model
+    });
+  } catch (error) {
+    console.error("Error fetching group details:", error);
     return res.status(500).json({ message: "Internal server error." });
   }
 };
@@ -1625,8 +1734,6 @@ exports.castVote = async (req, res) => {
     return res.status(500).json({ message: "Internal server error." });
   }
 };
-
-
 
 
 
@@ -2212,23 +2319,21 @@ exports.getFirst4MediaMessages = async (req, res) => {
   const { groupId } = req.params;
 
   try {
-    // Retrieve the first 4 media messages (image or video) for the given groupId
+    // Retrieve the latest 4 media messages (image or video) for the given groupId
     const messages = await Message.find({
       groupId,
       type: { $in: ['image', 'video'] }
     })
+      .sort({ createdAt: -1 }) // Sort by latest messages first
       .limit(4)  // Limit to 4 messages
-      .populate('senderId', 'firstName avatar') // Populate senderId to get username
-      .sort({ createdAt: 1 }); // Sort messages by creation date in ascending order
+      .populate('senderId', 'firstName avatar'); // Populate senderId to get username
 
-    // Return messages in the response
     return res.status(200).json(messages);
   } catch (error) {
-    console.error("Error fetching first 4 media messages:", error);
+    console.error("Error fetching latest 4 media messages:", error);
     return res.status(500).json({ message: "Internal server error." });
   }
 };
-
 
 exports.getAllMediaMessages = async (req, res) => {
   const { groupId } = req.params;
@@ -2240,10 +2345,19 @@ exports.getAllMediaMessages = async (req, res) => {
       type: { $in: ['image', 'video'] }
     })
       .populate('senderId', 'firstName avatar') // Populate senderId to get username
-      .sort({ createdAt: 1 }); // Sort messages by creation date in ascending order
+      .sort({ createdAt: -1 }); // Sort messages by latest first
 
-    // Return messages in the response
-    return res.status(200).json(messages);
+    // Group messages by date
+    const groupedMessages = messages.reduce((acc, message) => {
+      const date = moment(message.createdAt).format('YYYY-MM-DD'); // Format date
+      if (!acc[date]) {
+        acc[date] = [];
+      }
+      acc[date].push(message);
+      return acc;
+    }, {});
+
+    return res.status(200).json(groupedMessages);
   } catch (error) {
     console.error("Error fetching all media messages:", error);
     return res.status(500).json({ message: "Internal server error." });
@@ -2253,34 +2367,70 @@ exports.getAllMediaMessages = async (req, res) => {
 
 exports.wrapDeal = async (req, res) => {
   const { groupId, reviews } = req.body;
-  console.log('groupId, reviews ', groupId, reviews)
-  try {
-    // Update group status and isActive
-    await Group.findByIdAndUpdate(groupId, { status: 'wrap', isActive: false });
+  console.log("groupId, reviews ", groupId, reviews);
 
-    // Process reviews
+  try {
+    // Find the group to get the associated post (product)
+    const group = await Group.findById(groupId);
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found." });
+    }
+
+    // Fetch the associated post (product)
+    const product = await post.findById(group.productId);
+
+    if (!product) {
+      return res.status(404).json({ message: "Post not found." });
+    }
+
+    // Check if the post is already "Wrap" or "Inactive"
+    if (product.clubStatus === "Wrap" || product.clubStatus === "Inactive") {
+      return res.status(403).json({
+        message: "No action performed as the group is Inactive or already Wrapped.",
+      });
+    }
+    console.log('product is ', product)
+
+    // Update the post (product) status to "Wrap"
+    await post.findByIdAndUpdate(group.productId, { clubStatus: "Wrap" });
+
+    // Process reviews if they exist
     if (reviews) {
       for (const review of reviews) {
         const user = await User.findById(review.userId);
+        if (!user) continue;
 
-        // If the user's current rating is 0, adjust the new rating
+        // Adjust the new rating based on current rating
         const currentRating = user.UserRating || 0;
-        const newRating = currentRating == 0 ? review.rating : review.rating / 2;
-        console.log('Current rating ', currentRating, ' newRating ', newRating, ' review.rating ', review.rating, ' currentRating == 0 ', currentRating == 0)
+        const newRating =
+          currentRating === 0 ? review.rating : review.rating / 2;
+        console.log(
+          "Current rating:",
+          currentRating,
+          "New rating:",
+          newRating,
+          "Review rating:",
+          review.rating
+        );
 
-        // Update the user's rating
+        // Update user's rating
         await User.findByIdAndUpdate(review.userId, {
           $inc: { UserRating: newRating },
         });
       }
     }
-    res.status(200).json({ message: 'Group and ratings updated successfully' });
+
+    res
+      .status(200)
+      .json({ message: "Group and post wrapped successfully, ratings updated." });
   } catch (error) {
-    res.status(500).json({ error: 'An error occurred while updating the group and ratings.' });
+    console.error("Error in wrapDeal:", error);
+    res.status(500).json({
+      error: "An error occurred while updating the group and post status.",
+    });
   }
-
-}
-
+};
 exports.sortReports = async (req, res) => {
 
   try {

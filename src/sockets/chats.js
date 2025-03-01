@@ -3,29 +3,15 @@ const socketIO = require("socket.io");
 const { Server } = require("socket.io");
 const { sendSystemMessage } = require("../controllers/user.controller.js");
 const { sendPushNotification } = require('../controllers/data.controller.js');
-const { Message } = require('../models/message.js');
-const { Group } = require('../models/group.js');
-
 
 let io;
-let isInitialized = false;
-
 
 // Keep track of active calls and their participants
 const activeCallRooms = new Map();
 
 const initializeSockets = (server) => {
-  if (isInitialized) {
-    console.log('Sockets already initialized.');
-    return;
-  }
-
-
-  isInitialized = true;
-
   io = socketIO(server, {
     cors: {
-      origin: "*", // Allow all origins (change if needed)
       methods: ["GET", "POST"]
     }
   });
@@ -46,13 +32,11 @@ const initializeSockets = (server) => {
         return;
       }
 
-      console.log('avatar is ', initiator.avatar)
       activeCallRooms.set(groupId, {
         type: callType,
         participants: new Set([{
           socketId: socket.id,
           userId: initiator.userId,
-          avatar: initiator.avatar,
           userName: initiator.userName
         }]),
         callState: 'ringing',
@@ -106,7 +90,7 @@ const initializeSockets = (server) => {
     socket.on("acceptCall", (data) => {
       console.log("Server received acceptCall with data:", data);
 
-      const { groupId, userId, userName, fcmTokens, avatar } = data;
+      const { groupId, userId, userName, fcmTokens } = data;
       const callRoom = activeCallRooms.get(groupId);
 
       if (!callRoom) {
@@ -119,8 +103,7 @@ const initializeSockets = (server) => {
       const participant = {
         socketId: socket.id,
         userId,
-        userName,
-        avatar
+        userName
       };
 
       callRoom.participants.add(participant);
@@ -232,18 +215,17 @@ const initializeSockets = (server) => {
     // Handle sending a message in the group
     socket.on("sendMessage", (data, callback) => {
       const { groupId, content, fcmTokens } = data.result;
-      console.log('new message is ', data.result)
       io.to(groupId).emit("newMessage", data.result);
 
-      // // Notify via push notification
-      // if (fcmTokens && fcmTokens.length > 0) {
-      //   const title = "New Message";
-      //   const message = `You have a new message in group ${groupId}: "${content}"`;
+      // Notify via push notification
+      if (fcmTokens && fcmTokens.length > 0) {
+        const title = "New Message";
+        const message = `You have a new message in group ${groupId}: "${content}"`;
 
-      //   fcmTokens.forEach(token => {
-      //     sendPushNotification({ body: { token, title, message } }, { status: () => ({ json: () => { } }) });
-      //   });
-      // }
+        fcmTokens.forEach(token => {
+          sendPushNotification({ body: { token, title, message } }, { status: () => ({ json: () => { } }) });
+        });
+      }
 
       callback({ status: content });
     });
@@ -268,8 +250,8 @@ const initializeSockets = (server) => {
 
     // Handle sending a system-generated message
     socket.on("sendSystemMessage", async (data) => {
+      console.log('I m in the system message...')
       const { groupId, content, fcmTokens } = data;
-      console.log('I m in the system message...,', groupId)
 
       // Emit the system message to everyone in the group
       io.to(groupId).emit("newMessage", data);

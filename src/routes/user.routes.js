@@ -64,7 +64,8 @@ const {
   getAllMediaMessages,
   wrapDeal,
   createReport,
-  getAllReports
+  getAllReports,
+  getGroupDetails
 
   // filterUserPosts
 } = require("../controllers/user.controller.js");
@@ -161,14 +162,11 @@ router.get("/categoryname/:categoryId", getCategoryName);
 
 //http://localhost:8000/api/user/myGroups
 
-// Route to create a new group/join group
 router.post("/joinGroup", createOrJoinGroup);
-// Route to leave a group with voting logic
 router.post("/leaveGroupRequest", leaveGroup);
-// Route to get all groups a user is part of
+
 router.get("/myGroups/:userId", getGroupsForUser);
-// Route to send a message in the group
-// router.post("/sendMessage", verifyJWT, upload.single('image'), sendMessage);
+
 router.post(
   "/sendMessage",
   verifyJWT,
@@ -180,15 +178,12 @@ router.post(
   sendMessage
 );
 
-// Route to read the message
 router.post("/markMessageAsRead", verifyJWT, markMessageAsRead);
 
-// Route to get messages for a specific group
 router.get("/getMessages/:groupId", getMessagesForGroup);
-//Route to get userlist and admin for a specific group
-router.get("/getAdminUser/:groupId", getGroupMembersAndAdmin);
 
-//system message
+router.get("/getAdminUser/:groupId", getGroupMembersAndAdmin);
+router.get("/getGroupDetails/:groupId", getGroupDetails)
 router.post("/sendSystemMessage", sendSystemMessage);
 
 router.post("/addToFav", verifyJWT, addToFavourites);
@@ -202,11 +197,15 @@ router.get("/getUserPosts", verifyJWT, getUserPosts);
 router.post("/castVote", castVote);
 
 router.post("/removeUserFromGroup", removeUserFromGroup);
+
 router.get("/getSortmedia/:groupId", getFirst4MediaMessages);
 router.get("/getAllMediaMessages/:groupId", getAllMediaMessages);
+
 router.post("/wrapDeal", wrapDeal);
 router.post("/createReport", createReport);
 router.get("/getAllReports", getAllReports);
+
+
 
 
 
