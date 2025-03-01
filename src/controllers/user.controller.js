@@ -1367,6 +1367,8 @@ exports.sendMessage = async (req, res) => {
       io.to(member.toString()).emit('recentChats', newMessage);
     });
 
+    return res.status(200).json(newMessage);
+
   } catch (error) {
     console.error("Error sending message:", error);
     return res.status(500).json({ message: "Internal server error." });
