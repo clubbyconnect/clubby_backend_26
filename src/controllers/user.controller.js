@@ -2441,6 +2441,7 @@ exports.wrapDeal = async (req, res) => {
       }
     }
 
+    await exports.sendSystemMessage(groupId, `Deal has been wrapped.`);
     res
       .status(200)
       .json({ message: "Group and post wrapped successfully, ratings updated." });

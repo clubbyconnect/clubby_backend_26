@@ -261,6 +261,9 @@ const PostController = {
       //Soft Delete the post and do not change anything in group
       await PostModel.findByIdAndUpdate(postId, {deletedAt: new Date()});
 
+      const group = await Group.findOne({productId: postId});
+      await sendSystemMessage(group._id, `Group has been deactivated.`);
+
       return res.status(200).json({
         message: "Post and associated group deleted successfully.", postId,
       });
