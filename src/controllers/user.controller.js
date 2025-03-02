@@ -1690,7 +1690,10 @@ exports.getGroupDetails = async (req, res) => {
       groupId: group._id,
       productId: group.productId._id || null,
       groupName: posts.itemName,
-      productImage: posts?.productImage || null, // Fetch image from Post model
+      productImage: posts?.productImage || null,
+      deletedAt: posts?.deletedAt || null,
+      expiryAt: posts?.expiryAt || null,
+      clubStatus: posts?.clubStatus || null
     });
   } catch (error) {
     console.error("Error fetching group details:", error);
