@@ -233,7 +233,7 @@ const PostController = {
       return res.status(200).json({success: true, data: productData});
 
     } catch (error) {
-      return res.status(500).json({success: false, error: "Internal Server Error. "});
+      res.status(500).json({ error: error.message || "Internal Server Error" });
     }
   },
 
