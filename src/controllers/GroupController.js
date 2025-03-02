@@ -37,7 +37,7 @@ const GroupController = {
 
   getGroupsForUser: async (req, res) => {
     try {
-      const { userId } = req.params;
+      const userId = req.User._id;
       let { keyword, page = 1, limit = 20 } = req.body;
 
       // Ensure `page` and `limit` are numbers

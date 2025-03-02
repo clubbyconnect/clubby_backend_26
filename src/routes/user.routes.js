@@ -165,7 +165,7 @@ router.get("/categoryname/:categoryId", getCategoryName);
 router.post("/joinGroup", createOrJoinGroup);
 router.post("/leaveGroupRequest", leaveGroup);
 
-router.post("/myGroups/:userId", GroupController.getGroupsForUser);
+router.post("/myGroups",verifyJWT, GroupController.getGroupsForUser);
 
 router.post(
   "/sendMessage",
