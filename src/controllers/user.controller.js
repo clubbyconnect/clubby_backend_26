@@ -2368,16 +2368,16 @@ exports.getAllMediaMessages = async (req, res) => {
       .sort({ createdAt: -1 }); // Sort messages by latest first
 
     // Group messages by date
-    const groupedMessages = messages.reduce((acc, message) => {
-      const date = moment(message.createdAt).format('YYYY-MM-DD'); // Format date
-      if (!acc[date]) {
-        acc[date] = [];
-      }
-      acc[date].push(message);
-      return acc;
-    }, {});
+    // const groupedMessages = messages.reduce((acc, message) => {
+    //   const date = moment(message.createdAt).format('YYYY-MM-DD'); // Format date
+    //   if (!acc[date]) {
+    //     acc[date] = [];
+    //   }
+    //   acc[date].push(message);
+    //   return acc;
+    // }, {});
 
-    return res.status(200).json(groupedMessages);
+    return res.status(200).json({media: messages});
   } catch (error) {
     console.error("Error fetching all media messages:", error);
     return res.status(500).json({ message: "Internal server error." });
