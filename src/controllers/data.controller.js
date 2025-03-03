@@ -696,7 +696,7 @@ exports.searchProducts = async (req, res) => {
           },
           distanceField: "distance",
           spherical: true,
-          maxDistance: 200000, // 200 kilometers in meters
+          maxDistance: 4500000000, // 200 kilometers in meters
           key: "store_location.coordinates",
         },
       });
