@@ -2133,7 +2133,7 @@ exports.getUserPosts = async (req, res) => {
           },
           distanceField: "distance", // Field to store the calculated distance
           spherical: true, // Use spherical geometry for calculations
-          maxDistance: 200000, // 200 kilometers in meters
+          maxDistance: 4500000000, // 200 kilometers in meters
           key: "store_location.coordinates", // Field containing the GeoJSON coordinates
         },
       },
