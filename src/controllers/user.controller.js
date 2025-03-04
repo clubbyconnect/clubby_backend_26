@@ -2138,9 +2138,12 @@ exports.getUserPosts = async (req, res) => {
         },
       },
       {
-        $match: { userId: userIdObjectId },
-        expiryDate: { $gt: new Date() }
-      },
+        $match: {
+          userId: userIdObjectId,
+          expiryDate: { $gt: new Date() }
+        }
+      }
+      ,
       {
         $lookup: {
           from: "categories",
@@ -2227,7 +2230,7 @@ exports.getUserPosts = async (req, res) => {
     const posts = await post.aggregate(aggregatePipeline);
 
     if (posts.length === 0) {
-      return res.status(404).json({ success: false, message: "No posts found within 200 KM" });
+      return res.status(404).json({ success: false, message: "No posts found" });
     }
 
     const modifiedPosts = await Promise.all(
@@ -2290,7 +2293,6 @@ exports.getUserPosts = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
-
 exports.removeUserFromGroup = async (req, res) => {
   const { groupId, removeUserId, adminId } = req.body;
 
