@@ -1376,21 +1376,24 @@ exports.sendMessage = async (req, res) => {
 };
 
 
-// New function to mark a message as read
 exports.markMessageAsRead = async (req, res) => {
   const { messageId } = req.body;
   const userId = req.User._id;
+
   try {
     const message = await Message.findById(messageId);
     if (!message) {
       return res.status(404).json({ message: "Message not found." });
     }
-    // Check if the user has already read the message
-    if (!message.readBy.some(read => read.userId.equals(userId))) {
-      message.readBy.push({ userId, readAt: new Date() });
-      await message.save();
 
-      // Emit the read receipt to all users in the group
+    // Use $addToSet to prevent duplicate entries
+    const updateResult = await Message.updateOne(
+      { _id: messageId, "readBy.userId": { $ne: userId } },
+      { $push: { readBy: { userId, readAt: new Date() } } }
+    );
+
+    if (updateResult.modifiedCount > 0) {
+      // Emit the read receipt to all users in the group only if the update occurred
       const io = getIO();
       io.to(message.groupId.toString()).emit("messageRead", { messageId, userId });
     }
@@ -1401,6 +1404,7 @@ exports.markMessageAsRead = async (req, res) => {
     return res.status(500).json({ message: "Internal server error." });
   }
 };
+
 
 exports.leaveGroup = async (req, res) => {
   const { groupId, userId, newAdminId } = req.body;
