@@ -657,13 +657,16 @@ exports.searchProducts = async (req, res) => {
       rangeRadius,
       category,
       subCategory,
+      page = 1, // Default to page 1 if not provided
+      limit = 25 // Default limit is 25 if not provided
     } = req.query;
 
     const userId = req.User._id;
+    const parsedLimit = parseInt(limit) || 25;
+    const parsedPage = parseInt(page) || 1;
+    const skip = (parsedPage - 1) * parsedLimit;
 
-    let matchStage = { deletedAt: null };
-    matchStage.expiryAt = { $gte: new Date() };
-
+    let matchStage = { deletedAt: null, expiryAt: { $gte: new Date() } };
     let aggregatePipeline = [];
 
     // GeoNear for distance calculation (within 200 KM if no range is provided)
@@ -676,10 +679,7 @@ exports.searchProducts = async (req, res) => {
         const radiusInMeters = kmRadius * 1000;
         aggregatePipeline.push({
           $geoNear: {
-            near: {
-              type: "Point",
-              coordinates: [lon, lat],
-            },
+            near: { type: "Point", coordinates: [lon, lat] },
             distanceField: "distance",
             spherical: true,
             maxDistance: radiusInMeters,
@@ -690,26 +690,21 @@ exports.searchProducts = async (req, res) => {
     } else if (lon && lat) {
       aggregatePipeline.push({
         $geoNear: {
-          near: {
-            type: "Point",
-            coordinates: [parseFloat(lon), parseFloat(lat)],
-          },
+          near: { type: "Point", coordinates: [parseFloat(lon), parseFloat(lat)] },
           distanceField: "distance",
           spherical: true,
-          maxDistance: 4500000000, // 200 kilometers in meters
+          maxDistance: 200000,
           key: "store_location.coordinates",
         },
       });
     }
 
-    // Match stage for filters
     if (productName) {
       matchStage.itemName = { $regex: productName, $options: "i" };
     }
 
     if (offerType) {
-      const offerTypes = offerType.split(',').map(type => type.trim());
-      matchStage.offerType = { $in: offerTypes };
+      matchStage.offerType = { $in: offerType.split(',').map(type => type.trim()) };
     }
 
     if (clubMembers) {
@@ -727,198 +722,71 @@ exports.searchProducts = async (req, res) => {
       }
     }
 
-    if (gender && gender != 'Any') {
-      const users = await User.find({ gender: { $regex: gender, $options: "i" } }).select('_id');
-      const userIds = users.map(user => user._id);
-      matchStage.userId = { $in: userIds };
-    }
-
     if (category) {
-      if (!/^[0-9a-fA-F]{24}$/.test(category)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid category ID format',
-          providedId: category
-        });
-      }
-
-      try {
-        matchStage.category = new mongoose.Types.ObjectId(category);
-        const categoryExists = await mongoose.model('Category').findById(category);
-        console.log('Category is ', categoryExists);
-        if (!categoryExists) {
-          return res.status(404).json({
-            success: false,
-            message: 'Category not found',
-            providedId: category
-          });
-        }
-      } catch (e) {
-        return res.status(400).json({
-          success: false,
-          message: 'Error processing category ID',
-          error: e.message,
-          providedId: category
-        });
-      }
+      matchStage.category = new mongoose.Types.ObjectId(category);
     }
 
     if (subCategory) {
-      try {
-        matchStage.subCategory = new mongoose.Types.ObjectId(subCategory);
-        console.log('subCategory is ', matchStage.subCategory);
-      } catch (e) {
-        console.error('Error converting subCategory to ObjectId:', e.message);
-      }
+      matchStage.subCategory = new mongoose.Types.ObjectId(subCategory);
     }
 
     if (Object.keys(matchStage).length > 0) {
       aggregatePipeline.push({ $match: matchStage });
     }
 
-    // Add lookups for category and subcategory names
+    // Lookups
     aggregatePipeline.push(
-      // Lookup for main category from categories collection
-      {
-        $lookup: {
-          from: "categories",
-          localField: "category",
-          foreignField: "_id",
-          as: "categoryDetails"
-        }
-      },
-      {
-        $unwind: {
-          path: "$categoryDetails",
-          preserveNullAndEmptyArrays: true
-        }
-      },
-      // Lookup for subcategory from subcategories collection
-      {
-        $lookup: {
-          from: "subcategories",
-          localField: "subCategory",
-          foreignField: "_id",
-          as: "subCategoryDetails"
-        }
-      },
-      {
-        $unwind: {
-          path: "$subCategoryDetails",
-          preserveNullAndEmptyArrays: true
-        }
-      },
-      // Add lookup for group information
-      {
-        $lookup: {
-          from: "groups",
-          let: { productId: { $toString: "$_id" } },
-          pipeline: [
-            {
-              $match: {
-                $expr: { $eq: ["$productId", "$$productId"] }
-              }
-            }
-          ],
-          as: "groupInfo"
-        }
-      },
-      {
-        $unwind: {
-          path: "$groupInfo",
-          preserveNullAndEmptyArrays: true
-        }
-      }
+      { $lookup: { from: "categories", localField: "category", foreignField: "_id", as: "categoryDetails" } },
+      { $unwind: { path: "$categoryDetails", preserveNullAndEmptyArrays: true } },
+      { $lookup: { from: "subcategories", localField: "subCategory", foreignField: "_id", as: "subCategoryDetails" } },
+      { $unwind: { path: "$subCategoryDetails", preserveNullAndEmptyArrays: true } }
     );
 
-    // Project required fields
+    // Projection
     aggregatePipeline.push({
       $project: {
         _id: 1,
-        userId: 1,
-        postOwnerId: 1,
-        clubType: 1,
-        category: 1,
-        categoryName: "$categoryDetails.name",
-        categoryImage: "$categoryDetails.image",
-        subCategory: 1,
-        subCategoryName: "$subCategoryDetails.name",
-        subCategoryImage: "$subCategoryDetails.image",
         itemName: 1,
         offerType: 1,
         price: 1,
-        price_type: 1,
-        clubMembers: 1,
-        expiryAt: 1,
-        clubToJoin: {
-          $cond: {
-            if: { $isArray: "$groupInfo.members" },
-            then: {
-              $subtract: [
-                "$clubMembers",
-                { $size: "$groupInfo.members" }
-              ]
-            },
-            else: { $subtract: ["$clubMembers", 1] }
-          }
-        },
-        size: 1,
+        categoryName: "$categoryDetails.name",
+        subCategoryName: "$subCategoryDetails.name",
         productImage: 1,
-        clubStatus: 1,
-        distance: {
-          $cond: {
-            if: { $lt: ["$distance", 1] },
-            then: 0,
-            else: { $divide: ["$distance", 1000] }, // Convert meters to kilometers
-          },
-        },
-        isLiked: {
-          $in: ["$_id", userId ? (await User.findById(userId).select("favourites")).favourites : []]
-        }
+        distance: { $divide: ["$distance", 1000] }, // Convert meters to km
       },
     });
 
-    // Sort results if sortBy is provided
+    // Sorting
     if (sortBy) {
       let sortOptions = {};
-      if (sortBy === "price_high_to_low") {
-        sortOptions.price = -1;
-      } else if (sortBy === "price_low_to_high") {
-        sortOptions.price = 1;
-      } else if (sortBy === "newest") {
-        sortOptions.createdAt = -1;
-      }
+      if (sortBy === "price_high_to_low") sortOptions.price = -1;
+      else if (sortBy === "price_low_to_high") sortOptions.price = 1;
+      else if (sortBy === "newest") sortOptions.createdAt = -1;
       aggregatePipeline.push({ $sort: sortOptions });
     }
 
+    // Pagination
+    aggregatePipeline.push({ $skip: skip }, { $limit: parsedLimit });
+
     const products = await post.aggregate(aggregatePipeline);
-
-    if (products.length === 0) {
-      return res.status(404).json({ message: "No products found" });
-    }
-
-    if (products.length > 0) {
-      console.log('Debug - First product after aggregation:', {
-        categoryName: products[0].categoryName,
-        subCategoryName: products[0].subCategoryName,
-        subCategory: products[0].subCategory
-      });
-    }
+    const totalProducts = await post.countDocuments(matchStage);
+    const totalPages = Math.ceil(totalProducts / parsedLimit);
 
     res.status(200).json({
       success: true,
-      data: products.map((product) => ({
-        ...product,
-        distance: product.distance,
-      })),
+      data: products,
+      pagination: {
+        totalItems: totalProducts,
+        totalPages,
+        currentPage: parsedPage,
+        itemsPerPage: parsedLimit,
+      },
     });
   } catch (error) {
     console.error("Error searching products:", error);
     res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 };
-
-
 //-------------------All filters in One Api--------------------------------
 exports.unifiedSearch = async (req, res) => {
   try {
