@@ -1945,10 +1945,11 @@ exports.getFavoriteProducts = async (req, res) => {
   }
 };
 
+
 exports.getFilteredFavoriteProducts = async (req, res) => {
   try {
     const userId = req.User._id;
-    const { lat, lon, status } = req.query;
+    const { lat, lon, status, page = 1, limit = 10 } = req.query;
 
     // Validate latitude and longitude
     if (!lat || !lon) {
@@ -1974,8 +1975,6 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-
-    console.log("User's Favourites:", user.favourites);
 
     if (!user.favourites || user.favourites.length === 0) {
       return res.status(404).json({ success: false, message: "No favorite products found" });
@@ -2088,17 +2087,38 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
       },
     });
 
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Add pagination to aggregation
+    const totalProducts = await post.aggregate([...aggregatePipeline, { $count: "total" }]);
+    const total = totalProducts.length > 0 ? totalProducts[0].total : 0;
+
+    aggregatePipeline.push(
+      { $skip: skip },
+      { $limit: limitNum }
+    );
+
     console.log("Aggregation Pipeline:", JSON.stringify(aggregatePipeline, null, 2));
 
     const filteredFavoriteProducts = await post.aggregate(aggregatePipeline);
-
-    console.log("Filtered Favorite Products:", filteredFavoriteProducts);
 
     if (filteredFavoriteProducts.length === 0) {
       return res.status(404).json({ success: false, message: "No favorite products found within 200 KM" });
     }
 
-    res.status(200).json({ success: true, data: filteredFavoriteProducts });
+    res.status(200).json({
+      success: true,
+      data: filteredFavoriteProducts,
+      pagination: {
+        totalItems: total,
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        pageSize: limitNum,
+      },
+    });
   } catch (error) {
     console.error("Error fetching filtered favorite products:", error);
     res.status(500).json({ success: false, message: "Server error", error: error.message });
@@ -2106,10 +2126,11 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
 };
 
 
+
 exports.getUserPosts = async (req, res) => {
   try {
     const userId = req.User._id;
-    const { lon, lat, status } = req.query;
+    const { lon, lat, status, page = 1, limit = 10 } = req.query;
 
     if (!lat || !lon) {
       return res.status(400).json({ success: false, message: "Latitude and longitude are required" });
@@ -2117,9 +2138,11 @@ exports.getUserPosts = async (req, res) => {
 
     const parsedLat = parseFloat(lat);
     const parsedLon = parseFloat(lon);
+    const parsedPage = parseInt(page, 10);
+    const parsedLimit = parseInt(limit, 10);
 
-    if (isNaN(parsedLat) || isNaN(parsedLon)) {
-      return res.status(400).json({ success: false, message: "Invalid latitude or longitude" });
+    if (isNaN(parsedLat) || isNaN(parsedLon) || isNaN(parsedPage) || isNaN(parsedLimit)) {
+      return res.status(400).json({ success: false, message: "Invalid parameters" });
     }
 
     const userIdObjectId = new mongoose.Types.ObjectId(userId);
@@ -2127,14 +2150,11 @@ exports.getUserPosts = async (req, res) => {
     let aggregatePipeline = [
       {
         $geoNear: {
-          near: {
-            type: "Point",
-            coordinates: [parsedLon, parsedLat],
-          },
-          distanceField: "distance", // Field to store the calculated distance
-          spherical: true, // Use spherical geometry for calculations
-          maxDistance: 4500000000, // 200 kilometers in meters
-          key: "store_location.coordinates", // Field containing the GeoJSON coordinates
+          near: { type: "Point", coordinates: [parsedLon, parsedLat] },
+          distanceField: "distance",
+          spherical: true,
+          maxDistance: 4500000000,
+          key: "store_location.coordinates",
         },
       },
       {
@@ -2142,8 +2162,7 @@ exports.getUserPosts = async (req, res) => {
           userId: userIdObjectId,
           expiryDate: { $gt: new Date() }
         }
-      }
-      ,
+      },
       {
         $lookup: {
           from: "categories",
@@ -2152,12 +2171,7 @@ exports.getUserPosts = async (req, res) => {
           as: "categoryDetails",
         },
       },
-      {
-        $unwind: {
-          path: "$categoryDetails",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
+      { $unwind: { path: "$categoryDetails", preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
           from: "subcategories",
@@ -2166,28 +2180,16 @@ exports.getUserPosts = async (req, res) => {
           as: "subCategoryDetails",
         },
       },
-      {
-        $unwind: {
-          path: "$subCategoryDetails",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
+      { $unwind: { path: "$subCategoryDetails", preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
           from: "groups",
           let: { productId: { $toString: "$_id" } },
-          pipeline: [
-            { $match: { $expr: { $eq: ["$productId", "$$productId"] } } },
-          ],
+          pipeline: [{ $match: { $expr: { $eq: ["$productId", "$$productId"] } } }],
           as: "groupInfo",
         },
       },
-      {
-        $unwind: {
-          path: "$groupInfo",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
+      { $unwind: { path: "$groupInfo", preserveNullAndEmptyArrays: true } },
       {
         $project: {
           _id: 1,
@@ -2206,7 +2208,7 @@ exports.getUserPosts = async (req, res) => {
             $cond: {
               if: { $lt: ["$distance", 1] },
               then: 0,
-              else: { $divide: ["$distance", 1000] }, // Convert meters to kilometers
+              else: { $divide: ["$distance", 1000] },
             },
           },
           groupInfo: 1,
@@ -2225,8 +2227,11 @@ exports.getUserPosts = async (req, res) => {
           },
         },
       },
+      { $skip: (parsedPage - 1) * parsedLimit },
+      { $limit: parsedLimit }
     ];
 
+    const totalPosts = await post.countDocuments({ userId: userIdObjectId, expiryDate: { $gt: new Date() } });
     const posts = await post.aggregate(aggregatePipeline);
 
     if (posts.length === 0) {
@@ -2272,7 +2277,6 @@ exports.getUserPosts = async (req, res) => {
       })
     );
 
-    // Apply status filters
     let filteredPosts = modifiedPosts;
     if (status) {
       if (status === "I created") {
@@ -2284,15 +2288,23 @@ exports.getUserPosts = async (req, res) => {
       } else if (status === "Full") {
         filteredPosts = modifiedPosts.filter(post => post.clubToJoin === 0);
       }
-      // If status is "All", no filter is applied, all posts are returned
     }
 
-    res.status(200).json({ success: true, message: "Posts fetched successfully within 200 KM", posts: filteredPosts });
+    res.status(200).json({
+      success: true,
+      message: "Posts fetched successfully within 200 KM",
+      posts: filteredPosts,
+      totalPages: Math.ceil(totalPosts / parsedLimit),
+      currentPage: parsedPage,
+    });
   } catch (error) {
     console.error("Error fetching posts:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
+
+
 exports.removeUserFromGroup = async (req, res) => {
   const { groupId, removeUserId, adminId } = req.body;
 
