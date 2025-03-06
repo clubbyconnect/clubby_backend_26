@@ -1,6 +1,6 @@
 
-const { initializeSockets } = require("./chats.js");
+const { initializeSockets } = require("./Chat.js");
 
 exports.setupSocket = (server) => {
-  initializeSockets(server); 
+  initializeSockets(server);
 };

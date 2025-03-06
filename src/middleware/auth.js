@@ -1,7 +1,7 @@
 
 const jwt = require("jsonwebtoken");
-const User = require("../models/user.js")
-const serverErrorHandler = require("../utils/serverErrorHandler.js");
+const User = require("../models/User.js")
+const serverErrorHandler = require("../utils/ServerErrorHandler.js");
 
 exports.verifyJWT = async (req, res, next) => {
   try {

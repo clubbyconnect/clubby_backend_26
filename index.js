@@ -5,7 +5,7 @@ dotenv.config({
 const connectDB = require("./src/config/connectDb.js");
 const app = require("./app.js");
 const http = require("http");
-const { setupSocket } = require("./src/sockets/index.js");
+const { setupSocket } = require("./src/sockets/Index.js");
 
 const server = http.createServer(app);
 

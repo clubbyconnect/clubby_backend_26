@@ -5,20 +5,20 @@ module.exports = {
   // Create Category
   createCategory: async (req, res) => {
     try {
-      let {name, isPremium, image} = req.body;
+      let { name, isPremium, image } = req.body;
 
       if (!name) {
-        return res.status(400).json({error: "Category name is required."});
+        return res.status(400).json({ error: "Category name is required." });
       }
 
       name = name.trim(); // Trim whitespace
 
-      const isCategoryExist = await CategoryModel.findOne({name});
+      const isCategoryExist = await CategoryModel.findOne({ name });
       if (isCategoryExist) {
-        return res.status(409).json({error: "Category already exists"});
+        return res.status(409).json({ error: "Category already exists" });
       }
 
-      const newCategory = await CategoryModel.create({name, isPremium, image});
+      const newCategory = await CategoryModel.create({ name, isPremium, image });
 
       return res.status(201).json({
         message: "Category created successfully", category: newCategory
@@ -26,22 +26,22 @@ module.exports = {
 
     } catch (error) {
       console.error("Error:", error);
-      res.status(500).json({error: "Internal Server Error"});
+      res.status(500).json({ error: "Internal Server Error" });
     }
   },
 
   createCategoryWithSubcategories: async (req, res) => {
     try {
-      const {name, image, isPremium, subcategories} = req.body;
+      const { name, image, isPremium, subcategories } = req.body;
 
       if (!name) {
-        return res.status(400).json({error: "Category name is required."});
+        return res.status(400).json({ error: "Category name is required." });
       }
 
       //  Check if the category already exists
-      let existingCategory = await CategoryModel.findOne({name: name.trim()});
+      let existingCategory = await CategoryModel.findOne({ name: name.trim() });
       if (existingCategory) {
-        return res.status(409).json({error: "Category already exists."});
+        return res.status(409).json({ error: "Category already exists." });
       }
 
       // Create the category
@@ -65,7 +65,7 @@ module.exports = {
 
     } catch (error) {
       console.error("Error:", error);
-      res.status(500).json({error: "Internal Server Error"});
+      res.status(500).json({ error: "Internal Server Error" });
     }
   },
 
@@ -98,16 +98,16 @@ module.exports = {
     try {
       const category = await CategoryModel.findById(req.params.id).lean();
       if (!category) {
-        return res.status(404).json({error: "Category not found"});
+        return res.status(404).json({ error: "Category not found" });
       }
 
       // Fetch subcategories related to this category
-      const subcategories = await SubcategoryModel.find({category: category._id});
+      const subcategories = await SubcategoryModel.find({ category: category._id });
 
-      return res.status(200).json({...category, subcategories});
+      return res.status(200).json({ ...category, subcategories });
     } catch (error) {
       console.error("Error:", error);
-      res.status(500).json({error: "Internal Server Error"});
+      res.status(500).json({ error: "Internal Server Error" });
     }
   },
 
@@ -115,11 +115,11 @@ module.exports = {
   // Update category
   updateCategory: async (req, res) => {
     try {
-      const {name, isPremium, image} = req.body;
-      const category = await CategoryModel.findByIdAndUpdate(req.params.id, {name, isPremium, image}, {new: true, runValidators: true});
+      const { name, isPremium, image } = req.body;
+      const category = await CategoryModel.findByIdAndUpdate(req.params.id, { name, isPremium, image }, { new: true, runValidators: true });
 
       if (!category) {
-        return res.status(404).json({error: "Category not found"});
+        return res.status(404).json({ error: "Category not found" });
       }
 
       return res.status(200).json({
@@ -127,7 +127,7 @@ module.exports = {
       });
     } catch (error) {
       console.error("Error:", error);
-      res.status(500).json({error: "Internal Server Error"});
+      res.status(500).json({ error: "Internal Server Error" });
     }
   },
 
@@ -136,13 +136,13 @@ module.exports = {
     try {
       const category = await CategoryModel.findByIdAndDelete(req.params.id);
       if (!category) {
-        return res.status(404).json({error: "Category not found"});
+        return res.status(404).json({ error: "Category not found" });
       }
 
-      return res.status(200).json({message: "Category deleted successfully"});
+      return res.status(200).json({ message: "Category deleted successfully" });
     } catch (error) {
       console.error("Error:", error);
-      res.status(500).json({error: "Internal Server Error"});
+      res.status(500).json({ error: "Internal Server Error" });
     }
   },
 
@@ -150,10 +150,30 @@ module.exports = {
   deleteAllCategories: async (req, res) => {
     try {
       const result = await CategoryModel.deleteMany({}); // Deletes all categories
-      return res.status(200).json({message: `Deleted ${result.deletedCount} categories`});
+      return res.status(200).json({ message: `Deleted ${result.deletedCount} categories` });
     } catch (error) {
       console.error("Error:", error);
-      res.status(500).json({error: "Internal Server Error"});
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  },
+  getCategoryName: async (req, res) => {
+    try {
+      const { categoryId } = req.params;
+      if (!categoryId) {
+        return res.status(400).json({ success: false, message: "Category ID is required" });
+      }
+      const category = await CategoryModel.findById(categoryId);
+      if (!category) {
+        return res.status(404).json({ success: false, message: "Category not found" })
+      }
+      const categoryResponse = {
+        id: category._id,
+        name: category.name,
+      }
+      res.status(200).json({ success: true, data: [categoryResponse] });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ success: false, message: "Server error" });
     }
   }
 };

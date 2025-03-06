@@ -1,10 +1,10 @@
 const PostModel = require("../models/Post.js");
 const SubcategoryModel = require("../models/Subcategory.js");
 const CategoryModel = require("../models/Category.js");
-const Group = require("../models/group.js");
-const User = require("../models/user.js");
-const {sendSystemMessage} = require("./user.controller.js");
-const ClubRequest = require("../models/clubRequest.js");
+const Group = require("../models/Group.js");
+const User = require("../models/User.js");
+const { sendSystemMessage } = require("./MessageController.js");
+const ClubRequest = require("../models/ClubRequest.js");
 
 const PostController = {
   create: async (req, res) => {
@@ -15,23 +15,23 @@ const PostController = {
 
       // Validate required fields
       if ([category, subCategory, itemName, offerType, price, price_type, clubMembers].some((field) => !field || field.trim() === "")) {
-        return res.status(400).json({error: "Please fill all required fields."});
+        return res.status(400).json({ error: "Please fill all required fields." });
       }
 
       // Validate club members limit (minimum 2, maximum 4)
       const memberLimit = parseInt(clubMembers, 10);
       if (isNaN(memberLimit) || memberLimit < 2 || memberLimit > 4) {
-        return res.status(400).json({error: "Club members must be between 2 and 4."});
+        return res.status(400).json({ error: "Club members must be between 2 and 4." });
       }
 
       // Fetch category and subcategory
-      const categoryObj = await CategoryModel.findOne({name: category});
-      if (!categoryObj) return res.status(400).json({error: "Invalid category."});
+      const categoryObj = await CategoryModel.findOne({ name: category });
+      if (!categoryObj) return res.status(400).json({ error: "Invalid category." });
 
       const subcategoryObj = await SubcategoryModel.findOne({
         name: subCategory, category: categoryObj._id,
       });
-      if (!subcategoryObj) return res.status(400).json({error: "Invalid subcategory."});
+      if (!subcategoryObj) return res.status(400).json({ error: "Invalid subcategory." });
 
       // Handle product image
       let productImageUrls = [subcategoryObj.image];
@@ -48,7 +48,7 @@ const PostController = {
       const postData = {
         userId: req.User._id, postOwnerId: req.User._id, // Initially, user and post owner are the same
         itemName, offerType, price, price_type, clubMembers, category: categoryObj._id, subCategory: subcategoryObj._id, productImage: productImageUrls?.[0], productImages: productImageUrls, store_location: {
-          name: showroomAddress ,type: "Point", coordinates: [parseFloat(store_location_longitude), parseFloat(store_location_latitude)],
+          name: showroomAddress, type: "Point", coordinates: [parseFloat(store_location_longitude), parseFloat(store_location_latitude)],
         }, expiryAt,
       };
 
@@ -60,7 +60,7 @@ const PostController = {
         const timestamp = Date.now().toString().slice(-9);
         const randomDigit = Math.floor(Math.random() * 9) + 1;
         const postId = `CLA${randomDigit}${timestamp}`;
-        const existingPost = await PostModel.findOne({postId});
+        const existingPost = await PostModel.findOne({ postId });
         return existingPost ? generatePostId() : postId;
       };
 
@@ -68,7 +68,7 @@ const PostController = {
 
       // Create post
       const createdPost = await PostModel.create(postData);
-      if (!createdPost._id) return res.status(500).json({error: "Unable to create post."});
+      if (!createdPost._id) return res.status(500).json({ error: "Unable to create post." });
 
       // Create group
       const groupData = {
@@ -76,7 +76,7 @@ const PostController = {
       };
 
       const createdGroup = await Group.create(groupData);
-      if (!createdGroup._id) return res.status(500).json({error: "Unable to create group."});
+      if (!createdGroup._id) return res.status(500).json({ error: "Unable to create group." });
 
       // Link group to post
       createdPost.groupId = createdGroup._id;
@@ -105,7 +105,7 @@ const PostController = {
 
   update: async (req, res) => {
     try {
-      const {postId} = req.params;
+      const { postId } = req.params;
       const {
         category,
         subCategory,
@@ -124,22 +124,22 @@ const PostController = {
 
       const existingPost = await PostModel.findById(postId);
       if (!existingPost) {
-        return res.status(404).json({error: "Post not found."});
+        return res.status(404).json({ error: "Post not found." });
       }
 
       console.log("req.body", req.body)
       if ([category, subCategory, itemName, offerType, price, price_type, clubMembers].some((field) => !field || field.trim() === "")) {
-        return res.status(400).json({error: "Please fill all required fields."});
+        return res.status(400).json({ error: "Please fill all required fields." });
       }
 
       let updates = {};
 
-      const categoryObj = await CategoryModel.findOne({name: category});
-      if (!categoryObj) return res.status(400).json({error: "Invalid category."});
+      const categoryObj = await CategoryModel.findOne({ name: category });
+      if (!categoryObj) return res.status(400).json({ error: "Invalid category." });
       updates.category = categoryObj._id;
 
-      const subcategoryObj = await SubcategoryModel.findOne({name: subCategory, category: updates.category});
-      if (!subcategoryObj) return res.status(400).json({error: "Invalid subcategory."});
+      const subcategoryObj = await SubcategoryModel.findOne({ name: subCategory, category: updates.category });
+      if (!subcategoryObj) return res.status(400).json({ error: "Invalid subcategory." });
       updates.subCategory = subcategoryObj._id;
 
 
@@ -151,10 +151,10 @@ const PostController = {
       if (clubMembers) {
         const memberLimit = parseInt(clubMembers, 10);
         if (isNaN(memberLimit) || memberLimit < 2 || memberLimit > 4) {
-          return res.status(400).json({error: "Club members must be between 2 and 4."});
+          return res.status(400).json({ error: "Club members must be between 2 and 4." });
         }
         updates.clubMembers = memberLimit;
-        await Group.updateOne({productId: existingPost._id}, {limit: memberLimit});
+        await Group.updateOne({ productId: existingPost._id }, { limit: memberLimit });
       }
 
       if (store_location_latitude && store_location_longitude) {
@@ -177,14 +177,14 @@ const PostController = {
         updates.productImage = subcategoryObj.image;
       }
 
-      await PostModel.updateOne({_id: postId}, {$set: updates});
+      await PostModel.updateOne({ _id: postId }, { $set: updates });
 
       const updatedPost = await PostModel.findById(postId)
         .populate("category", "name")
         .populate("subCategory", "name");
 
       // Send system message
-      const group = await Group.findOne({productId: postId});
+      const group = await Group.findOne({ productId: postId });
       await sendSystemMessage(group._id, `Post details are updated.`);
 
       return res.status(200).json({
@@ -204,11 +204,11 @@ const PostController = {
 
   read: async (req, res) => {
     try {
-      const {productId} = req.params;
+      const { productId } = req.params;
       const userId = req.User._id;
 
       if (!productId) {
-        return res.status(400).json({success: false, error: "Product ID is required."});
+        return res.status(400).json({ success: false, error: "Product ID is required." });
       }
 
       const product = await PostModel.findById(productId)
@@ -218,7 +218,7 @@ const PostController = {
         .populate("subCategory", "name description")
 
       if (!product) {
-        return res.status(404).json({success: false, error: "Product not found."});
+        return res.status(404).json({ success: false, error: "Product not found." });
       }
 
       const productData = product.toObject();
@@ -230,7 +230,7 @@ const PostController = {
       }).select("status");
       productData.requestStatus = clubRequest ? clubRequest.status : null; // Return the status or null if no request exists
 
-      return res.status(200).json({success: true, data: productData});
+      return res.status(200).json({ success: true, data: productData });
 
     } catch (error) {
       res.status(500).json({ error: error.message || "Internal Server Error" });
@@ -239,29 +239,29 @@ const PostController = {
 
   delete: async (req, res) => {
     try {
-      const {postId} = req.params;
+      const { postId } = req.params;
 
       if (!postId) {
-        return res.status(400).json({error: "Post ID is required."});
+        return res.status(400).json({ error: "Post ID is required." });
       }
 
       // Check if the post exists
       const existingPost = await PostModel.findById(postId);
       if (!existingPost) {
-        return res.status(404).json({error: "Post not found."});
+        return res.status(404).json({ error: "Post not found." });
       }
 
       console.log("existingPost", existingPost)
       console.log("req.user", req.User);
       // Ensure the user has rights to delete the post
       if (existingPost.postOwnerId.toString() !== req.User._id.toString()) {
-        return res.status(403).json({error: "You do not have the rights to delete this post."});
+        return res.status(403).json({ error: "You do not have the rights to delete this post." });
       }
 
       //Soft Delete the post and do not change anything in group
-      await PostModel.findByIdAndUpdate(postId, {deletedAt: new Date()});
+      await PostModel.findByIdAndUpdate(postId, { deletedAt: new Date() });
 
-      const group = await Group.findOne({productId: postId});
+      const group = await Group.findOne({ productId: postId });
       await sendSystemMessage(group._id, `Group has been deactivated.`);
 
       return res.status(200).json({
@@ -270,85 +270,32 @@ const PostController = {
 
     } catch (error) {
       console.error("Error in deletePost:", error);
-      return res.status(500).json({error: "Internal server error."});
+      return res.status(500).json({ error: "Internal server error." });
     }
   },
 
-
-  // USE THESE FOR FILTERS ALSO JUST ADD THE REQUIRED FIELD IN PAYLOAD AND HANDLE HERE
-  getPost: async (req, res) => {
-    try {
-      const userId = req.User?._id;
-      console.log("Fetching all active group products...");
-
-      // Fetch active groups with product references
-      const activeGroups = await Group.find({isActive: true}).select("productId limit members");
-
-      if (!activeGroups.length) {
-        return res.status(200).json({message: "No active group products found.", products: []});
-      }
-
-      // Extract product IDs from active groups
-      const activeProductIds = activeGroups.map(group => group.productId);
-
-      // Fetch corresponding product details
-      const products = await PostModel.find({
-        _id: {$in: activeProductIds},
-        $or: [{deletedAt: null}, {deletedAt: {$exists: false}}] // do not fetch deleted
-      })
-        .populate("category", "name") // Populate category with only the name field
-        .sort({createdAt: -1}); // Sort by latest created first
-
-
-      if (!products.length) {
-        return res.status(200).json({message: "No products found for active groups.", products: []});
-      }
-
-      // Retrieve user's liked (favorite) products
-      let likedProductIds = [];
-      if (userId) {
-        const user = await User.findById(userId).select("favourites");
-        likedProductIds = user?.favourites || [];
-      }
-
-      // Enrich products with group and user info
-      const formattedProducts = products.map(product => {
-        const group = activeGroups.find(g => g.productId.equals(product._id));
-
-        return {
-          ...product.toObject(), totalGroupLimit: group ? group.limit : 0, availableSlots: group ? group.limit - (group.members?.length || 0) : 0, isLiked: likedProductIds.some(likedId => likedId.equals(product._id)),
-        };
-      });
-
-      return res.status(200).json({message: "Active group products retrieved successfully.", products: formattedProducts});
-
-    } catch (error) {
-      console.error("Error fetching active group products:", error);
-      return res.status(500).json({error: "Internal server error."});
-    }
-  },
 
   transfer: async (req, res) => {
     try {
-      const {postId, newAdminId} = req.body;
+      const { postId, newAdminId } = req.body;
       const userId = req.User?._id;
 
       if (!postId) {
-        return res.status(400).json({error: "Post ID is required."});
+        return res.status(400).json({ error: "Post ID is required." });
       }
       if (!newAdminId) {
-        return res.status(400).json({error: "New admin ID is required."});
+        return res.status(400).json({ error: "New admin ID is required." });
       }
 
       // Fetch post and group together for efficiency
       const existingPost = await PostModel.findById(postId);
       if (!existingPost) {
-        return res.status(404).json({error: "Post not found."});
+        return res.status(404).json({ error: "Post not found." });
       }
 
       const group = await Group.findById(existingPost.groupId);
       if (!group) {
-        return res.status(404).json({error: "Group not found."});
+        return res.status(404).json({ error: "Group not found." });
       }
 
       // Check if the requester is the current admin
@@ -356,14 +303,14 @@ const PostController = {
         console.log("group.adminId", group.adminId)
         console.log("userId", userId)
 
-        return res.status(403).json({error: "Only the current admin can transfer ownership."});
+        return res.status(403).json({ error: "Only the current admin can transfer ownership." });
       }
 
 
       // Validate new admin
       const newAdmin = await User.findById(newAdminId);
       if (!newAdmin) {
-        return res.status(404).json({error: "New admin not found."});
+        return res.status(404).json({ error: "New admin not found." });
       }
 
       // Update admin ID in both post and group
@@ -371,9 +318,9 @@ const PostController = {
       existingPost.postOwnerId = newAdminId;
 
       // Delete club request for new post owner
-      const pendingRequest = await ClubRequest.findOne({requester: newAdminId, postId});
+      const pendingRequest = await ClubRequest.findOne({ requester: newAdminId, postId });
       if (pendingRequest) {
-        await ClubRequest.deleteOne({_id: pendingRequest._id});
+        await ClubRequest.deleteOne({ _id: pendingRequest._id });
       }
       // remove current owner from group
       group.members = group.members.filter(memberId => memberId.toString() !== userId.toString());
@@ -385,13 +332,162 @@ const PostController = {
       // Send system message
       await sendSystemMessage(group._id, `Admin rights transferred to ${newAdmin.firstName || "User"}.`);
 
-      return res.status(200).json({message: "Admin rights transferred successfully.", group});
+      return res.status(200).json({ message: "Admin rights transferred successfully.", group });
 
     } catch (error) {
       console.error("Error transferring admin rights:", error);
-      return res.status(500).json({error: "Internal server error."});
+      return res.status(500).json({ error: "Internal server error." });
+    }
+  },
+
+  search: async (req, res) => {
+    try {
+      const {
+        productName,
+        lon,
+        lat,
+        gender,
+        date,
+        offerType,
+        clubMembers,
+        size,
+        sortBy,
+        rangeLat,
+        rangeLon,
+        rangeRadius,
+        category,
+        subCategory,
+        page = 1, // Default to page 1 if not provided
+        limit = 25 // Default limit is 25 if not provided
+      } = req.query;
+
+      const userId = req.User._id;
+      const parsedLimit = parseInt(limit) || 25;
+      const parsedPage = parseInt(page) || 1;
+      const skip = (parsedPage - 1) * parsedLimit;
+
+      let matchStage = { deletedAt: null, expiryAt: { $gte: new Date() } };
+      let aggregatePipeline = [];
+
+      // GeoNear for distance calculation (within 200 KM if no range is provided)
+      if (rangeLat && rangeLon && rangeRadius) {
+        const lat = parseFloat(rangeLat);
+        const lon = parseFloat(rangeLon);
+        const kmRadius = parseFloat(rangeRadius);
+
+        if (!isNaN(lat) && !isNaN(lon) && !isNaN(kmRadius) && kmRadius > 0) {
+          const radiusInMeters = kmRadius * 1000;
+          aggregatePipeline.push({
+            $geoNear: {
+              near: { type: "Point", coordinates: [lon, lat] },
+              distanceField: "distance",
+              spherical: true,
+              maxDistance: radiusInMeters,
+              key: "store_location.coordinates",
+            },
+          });
+        }
+      } else if (lon && lat) {
+        aggregatePipeline.push({
+          $geoNear: {
+            near: { type: "Point", coordinates: [parseFloat(lon), parseFloat(lat)] },
+            distanceField: "distance",
+            spherical: true,
+            maxDistance: 200000,
+            key: "store_location.coordinates",
+          },
+        });
+      }
+
+      if (productName) {
+        matchStage.itemName = { $regex: productName, $options: "i" };
+      }
+
+      if (offerType) {
+        matchStage.offerType = { $in: offerType.split(',').map(type => type.trim()) };
+      }
+
+      if (clubMembers) {
+        matchStage.clubMembers = parseInt(clubMembers);
+      }
+
+      if (size) {
+        matchStage.size = size;
+      }
+
+      if (date) {
+        const startDate = new Date(date);
+        if (!isNaN(startDate.getTime())) {
+          matchStage.createdAt = { $gte: startDate };
+        }
+      }
+
+      if (category) {
+        matchStage.category = new mongoose.Types.ObjectId(category);
+      }
+
+      if (subCategory) {
+        matchStage.subCategory = new mongoose.Types.ObjectId(subCategory);
+      }
+
+      if (Object.keys(matchStage).length > 0) {
+        aggregatePipeline.push({ $match: matchStage });
+      }
+
+      // Lookups
+      aggregatePipeline.push(
+        { $lookup: { from: "categories", localField: "category", foreignField: "_id", as: "categoryDetails" } },
+        { $unwind: { path: "$categoryDetails", preserveNullAndEmptyArrays: true } },
+        { $lookup: { from: "subcategories", localField: "subCategory", foreignField: "_id", as: "subCategoryDetails" } },
+        { $unwind: { path: "$subCategoryDetails", preserveNullAndEmptyArrays: true } }
+      );
+
+      // Projection
+      aggregatePipeline.push({
+        $project: {
+          _id: 1,
+          itemName: 1,
+          offerType: 1,
+          price: 1,
+          categoryName: "$categoryDetails.name",
+          subCategoryName: "$subCategoryDetails.name",
+          productImage: 1,
+          distance: { $divide: ["$distance", 1000] }, // Convert meters to km
+        },
+      });
+
+      // Sorting
+      if (sortBy) {
+        let sortOptions = {};
+        if (sortBy === "price_high_to_low") sortOptions.price = -1;
+        else if (sortBy === "price_low_to_high") sortOptions.price = 1;
+        else if (sortBy === "newest") sortOptions.createdAt = -1;
+        aggregatePipeline.push({ $sort: sortOptions });
+      }
+
+      // Pagination
+      aggregatePipeline.push({ $skip: skip }, { $limit: parsedLimit });
+
+      const products = await post.aggregate(aggregatePipeline);
+      const totalProducts = await post.countDocuments(matchStage);
+      const totalPages = Math.ceil(totalProducts / parsedLimit);
+
+      res.status(200).json({
+        success: true,
+        data: products,
+        pagination: {
+          totalItems: totalProducts,
+          totalPages,
+          currentPage: parsedPage,
+          itemsPerPage: parsedLimit,
+        },
+      });
+    } catch (error) {
+      console.error("Error searching products:", error);
+      res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
   }
+
 };
 
 module.exports = PostController;
