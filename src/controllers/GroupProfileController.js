@@ -1,6 +1,5 @@
-const mongoose = require('mongoose');
 const User = require("../models/User.js");
-const post = require("../models/Post.js");
+const Post = require("../models/Post.js");
 const Report = require('../models/ReportSchema.js');
 const Group = require('../models/Group.js');
 const Message = require('../models/Message.js');
@@ -85,16 +84,6 @@ exports.getAllMediaMessages = async (req, res) => {
             .populate('senderId', 'firstName avatar') // Populate senderId to get username
             .sort({ createdAt: -1 }); // Sort messages by latest first
 
-        // Group messages by date
-        // const groupedMessages = messages.reduce((acc, message) => {
-        //   const date = moment(message.createdAt).format('YYYY-MM-DD'); // Format date
-        //   if (!acc[date]) {
-        //     acc[date] = [];
-        //   }
-        //   acc[date].push(message);
-        //   return acc;
-        // }, {});
-
         return res.status(200).json({ media: messages });
     } catch (error) {
         console.error("Error fetching all media messages:", error);
@@ -107,21 +96,21 @@ exports.wrapDeal = async (req, res) => {
     console.log("groupId, reviews ", groupId, reviews);
 
     try {
-        // Find the group to get the associated post (product)
+        // Find the group to get the associated Post (product)
         const group = await Group.findById(groupId);
 
         if (!group) {
             return res.status(404).json({ message: "Group not found." });
         }
 
-        // Fetch the associated post (product)
-        const product = await post.findById(group.productId);
+        // Fetch the associated Post (product)
+        const product = await Post.findById(group.productId);
 
         if (!product) {
             return res.status(404).json({ message: "Post not found." });
         }
 
-        // Check if the post is already "Wrap" or "Inactive"
+        // Check if the Post is already "Wrap" or "Inactive"
         if (product.clubStatus === "Wrap" || product.clubStatus === "Inactive") {
             return res.status(403).json({
                 message: "No action performed as the group is Inactive or already Wrapped.",
@@ -129,8 +118,8 @@ exports.wrapDeal = async (req, res) => {
         }
         console.log('product is ', product)
 
-        // Update the post (product) status to "Wrap"
-        await post.findByIdAndUpdate(group.productId, { clubStatus: "Wrap" });
+        // Update the Post (product) status to "Wrap"
+        await Post.findByIdAndUpdate(group.productId, { clubStatus: "Wrap" });
 
         // Process reviews if they exist
         if (reviews) {
@@ -161,11 +150,11 @@ exports.wrapDeal = async (req, res) => {
         await exports.sendSystemMessage(groupId, `Deal has been wrapped.`);
         res
             .status(200)
-            .json({ message: "Group and post wrapped successfully, ratings updated." });
+            .json({ message: "Group and Post wrapped successfully, ratings updated." });
     } catch (error) {
         console.error("Error in wrapDeal:", error);
         res.status(500).json({
-            error: "An error occurred while updating the group and post status.",
+            error: "An error occurred while updating the group and Post status.",
         });
     }
 };
@@ -193,8 +182,8 @@ exports.getAllReports = async (req, res) => {
     try {
         // Retrieve all reports
         const reports = await Report.find()
-            .populate('groupId', 'productName')  // Populate group name
-            .populate('userId', 'firstName avatar');  // Populate user info
+            .populate('groupId', 'productName')  
+            .populate('userId', 'firstName avatar');  
 
         // Return reports in the response
         return res.status(200).json(reports);
@@ -208,12 +197,10 @@ exports.createReport = async (req, res) => {
     const { groupId, userId, title, details } = req.body;
     console.log('groupId, userId, title, details ', groupId, userId, title, details)
     try {
-        // Validate required fields
         if (!groupId || !userId || !title || !details) {
             return res.status(400).json({ message: "All fields are required." });
         }
 
-        // Create the new report
         const newReport = new Report({
             groupId,
             userId,
@@ -221,7 +208,6 @@ exports.createReport = async (req, res) => {
             details,
         });
 
-        // Save the report to the database
         await newReport.save();
 
         // Return success response

@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const User = require("../models/User.js");
-const post = require("../models/Post.js");
+const Post = require("../models/Post.js");
 
 
 exports.addToFavourites = async (req, res) => {
@@ -92,7 +92,7 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
             $match: {
                 _id: { $in: user.favourites.map(id => new mongoose.Types.ObjectId(id)) },
                 deletedAt: { $exists: false },
-                expiryDate: { $gt: new Date() }, // Only include products whose expiry date is in the future
+                expiryAt: { $gt: new Date() }, // Only include products whose expiry date is in the future
                 ...statusFilter,
             },
         });
@@ -167,7 +167,7 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
                 categoryImage: "$categoryDetails.image",
                 subCategoryName: "$subCategoryDetails.name",
                 subCategoryImage: "$subCategoryDetails.image",
-                expiryDate: 1, // Include expiry date in response
+                expiryAt: 1, // Include expiry date in response
                 distance: {
                     $cond: {
                         if: { $lt: ["$distance", 1] },
@@ -184,7 +184,7 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
         const skip = (pageNum - 1) * limitNum;
 
         // Add pagination to aggregation
-        const totalProducts = await post.aggregate([...aggregatePipeline, { $count: "total" }]);
+        const totalProducts = await Post.aggregate([...aggregatePipeline, { $count: "total" }]);
         const total = totalProducts.length > 0 ? totalProducts[0].total : 0;
 
         aggregatePipeline.push(
@@ -194,7 +194,7 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
 
         console.log("Aggregation Pipeline:", JSON.stringify(aggregatePipeline, null, 2));
 
-        const filteredFavoriteProducts = await post.aggregate(aggregatePipeline);
+        const filteredFavoriteProducts = await Post.aggregate(aggregatePipeline);
 
         if (filteredFavoriteProducts.length === 0) {
             return res.status(404).json({ success: false, message: "No favorite products found within 200 KM" });

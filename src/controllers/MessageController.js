@@ -1,4 +1,3 @@
-const mongoose = require('mongoose');
 const uploadOnCloudinary = require("../utils/Cloudinary.js");
 const Group = require('../models/Group.js');
 const Message = require('../models/Message.js');
@@ -21,7 +20,7 @@ exports.sendMessage = async (req, res) => {
     const userId = req.User._id;
 
     try {
-        const group = await Group.findById(groupId).populate('productId'); // Populate the related post
+        const group = await Group.findById(groupId).populate('productId'); // Populate the related Post
 
         if (!group) {
             return res.status(404).json({ error: "Group not found." });

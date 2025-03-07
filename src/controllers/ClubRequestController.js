@@ -3,7 +3,7 @@ const ClubRequest = require("../models/ClubRequest.js");
 const User = require("../models/User.js");
 const Group = require("../models/Group.js");
 const { sendSystemMessage } = require("./MessageController.js");
-const post = require("../models/Post");
+const Post = require("../models/Post");
 const { sendPushNotification } = require("../utils/Firebase.js");
 
 const ClubRequestController = {
@@ -21,7 +21,7 @@ const ClubRequestController = {
       }
 
       if (!postData.postOwnerId.equals(userId)) {
-        return res.status(403).json({ error: "You are not authorized to view requests for this post" });
+        return res.status(403).json({ error: "You are not authorized to view requests for this Post" });
       }
 
       const clubRequests = await ClubRequest.find({ postId: productId })
@@ -54,14 +54,14 @@ const ClubRequestController = {
         return res.status(400).json({ error: "Post ID is required." });
       }
 
-      const postData = await post.findById(postId);
+      const postData = await Post.findById(postId);
       if (!postData) return res.status(404).json({ error: "Post not found." });
 
       const postOwnerId = postData.postOwnerId;
       if (!postOwnerId) return res.status(404).json({ error: "Post owner not found." });
 
       if (requesterId.toString() === postOwnerId.toString()) {
-        return res.status(400).json({ error: "You cannot send a club request to your own post." });
+        return res.status(400).json({ error: "You cannot send a club request to your own Post." });
       }
 
       const existingRequest = await ClubRequest.findOne({ requester: requesterId, postId });
@@ -98,7 +98,7 @@ const ClubRequestController = {
           token: postOwner.fcmToken,
           notification: {
             title: "New Club Request",
-            body: `You have received a club request for your post "${postData.title}".`,
+            body: `You have received a club request for your Post "${postData.title}".`,
           },
           data: { postId: postId.toString(), requesterId: requesterId.toString() },
         });
@@ -129,7 +129,7 @@ const ClubRequestController = {
       }
 
       if (!postData.postOwnerId.equals(userId)) {
-        return res.status(403).json({ error: "You are not authorized to view requests for this post" });
+        return res.status(403).json({ error: "You are not authorized to view requests for this Post" });
       }
 
       const requester = await User.findById(requesterId);
@@ -154,7 +154,7 @@ const ClubRequestController = {
         console.log("inside accepted")
         const group = await Group.findOne({ productId: postId });
         if (!group) {
-          return res.status(404).json({ error: "Group not found for this post." });
+          return res.status(404).json({ error: "Group not found for this Post." });
         }
 
         // Check if group has reached its max size

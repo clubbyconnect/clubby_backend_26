@@ -1,5 +1,4 @@
 const serverErrorHandler = require("./ServerErrorHandler.js");
-const CategoryModel = require("../models/CategorySchema.js");
 const admin = require('firebase-admin');
 
 //Firebase-setup

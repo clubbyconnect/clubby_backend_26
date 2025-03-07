@@ -185,7 +185,19 @@ const userSchema = new mongoose.Schema(
         ref: 'Post',
       },
     ],
-  },{timestamps: true,}
+    deviceType: {
+      type: String,
+      enum: {
+        values: ['ANDROID', 'IOS'],
+        message: "Device Type can be either 'ANDROID' OR 'IOS'",
+      },
+      default: null
+    },
+    fcmToken: {
+      type: String,
+      default: null
+    },
+  }, { timestamps: true, }
 );
 
 // Hashing password

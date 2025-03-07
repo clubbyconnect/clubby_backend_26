@@ -468,8 +468,8 @@ const PostController = {
       // Pagination
       aggregatePipeline.push({ $skip: skip }, { $limit: parsedLimit });
 
-      const products = await post.aggregate(aggregatePipeline);
-      const totalProducts = await post.countDocuments(matchStage);
+      const products = await PostModel.aggregate(aggregatePipeline);
+      const totalProducts = await PostModel.countDocuments(matchStage);
       const totalPages = Math.ceil(totalProducts / parsedLimit);
 
       res.status(200).json({

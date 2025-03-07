@@ -1,7 +1,7 @@
 const Group = require('../models/Group.js'); // Import Group model
 const mongoose = require("mongoose");
 const User = require("../models/User.js");
-const post = require("../models/Post.js");
+const Post = require("../models/Post.js");
 const ClubRequest = require("../models/ClubRequest.js");
 const { sendPushNotification } = require('../utils/Firebase.js');
 const { getIO } = require("../sockets/Chat.js");
@@ -23,7 +23,7 @@ exports.groupMember = async (req, res) => {
     );
 
     if (!group) {
-      return res.status(404).json({ error: "No group found for this post" });
+      return res.status(404).json({ error: "No group found for this Post" });
     }
 
     return res.status(200).json({
@@ -191,7 +191,7 @@ exports.createOrJoinGroup = async (req, res) => {
     const recipientId = req.User._id;
 
     if (requesterId) {
-      const postData = await post.findById(postId);
+      const postData = await Post.findById(postId);
       if (!postData) {
         return res.status(404).json({ error: "Post Not Found" });
       }
@@ -231,7 +231,7 @@ exports.createOrJoinGroup = async (req, res) => {
           token: requester.fcmToken, // Send notification to the requester
           notification: {
             title: "Club Request Accepted",
-            body: `Your club request for post "${postData.title}" has been accepted.`,
+            body: `Your club request for Post "${postData.title}" has been accepted.`,
           },
           data: {
             postId: postId.toString(),
@@ -395,7 +395,7 @@ exports.leaveGroup = async (req, res) => {
         group.adminId = newAdminObjectId;
         group.members = group.members.filter(member => !member.equals(userObjectId));
 
-        const postToUpdate = await post.findOne({ _id: productObjectId });
+        const postToUpdate = await Post.findOne({ _id: productObjectId });
         if (postToUpdate) {
           postToUpdate.postOwnerId = newAdminObjectId;
           await postToUpdate.save();
@@ -409,7 +409,7 @@ exports.leaveGroup = async (req, res) => {
         return res.status(200).json({ message: "Admin rights transferred", group });
       } else {
         // Deactivate group if no new admin is specified
-        const postToUpdate = await post.findOne({ _id: productObjectId });
+        const postToUpdate = await Post.findOne({ _id: productObjectId });
         console.log('Post to be updated is ', postToUpdate, ' productId ', productObjectId);
 
         if (postToUpdate) {
@@ -447,7 +447,7 @@ exports.isConnected = async (req, res) => {
     const group = await Group.findOne({ productId: postId });
 
     if (!group) {
-      return res.status(404).json({ message: "Group not found for this post." });
+      return res.status(404).json({ message: "Group not found for this Post." });
     }
     const otherMembers = group.members.filter(
       (memberId) => !memberId.equals(group.adminId)
@@ -478,7 +478,7 @@ exports.getGroupMembersAndAdmin = async (req, res) => {
       return res.status(404).json({ message: "Group not found." });
     }
 
-    // Extract clubStatus from post
+    // Extract clubStatus from Post
     const status = group.productId ? group.productId.clubStatus : null;
 
     // Format the response with role information
@@ -496,7 +496,7 @@ exports.getGroupMembersAndAdmin = async (req, res) => {
       message: "Group details fetched successfully",
       admin,
       members,
-      status, // Add status field from post's clubStatus
+      status, // Add status field from Post's clubStatus
     });
   } catch (error) {
     console.error("Error fetching group members and admin:", error);
@@ -516,8 +516,8 @@ exports.getGroupDetails = async (req, res) => {
       return res.status(404).json({ message: "Group not found." });
     }
     console.log('Group is ', group)
-    // Fetch the post associated with the same productId to get productImage
-    const posts = await post.findOne({ _id: group.productId });
+    // Fetch the Post associated with the same productId to get productImage
+    const posts = await Post.findOne({ _id: group.productId });
 
     console.log('group.productId is ', group.productId)
 

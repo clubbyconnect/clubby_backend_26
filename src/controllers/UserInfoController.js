@@ -1,5 +1,4 @@
 
-const mongoose = require('mongoose');
 const uploadOnCloudinary = require("../utils/Cloudinary.js");
 const serverErrorHandler = require("../utils/ServerErrorHandler.js");
 const User = require("../models/User.js");

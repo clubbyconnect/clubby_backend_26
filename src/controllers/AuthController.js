@@ -18,10 +18,11 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 exports.signUp = async (req, res) => {
     try {
-        const { email, confirmPassword, password } = req.body;
+        const { email, confirmPassword, password, deviceType, fcmToken } = req.body;
 
+        // Validate required fields
         if (
-            [confirmPassword, email, password].some((field) => field?.trim() === "")
+            [confirmPassword, email, password, deviceType, fcmToken].some((field) => field?.trim() === "")
         ) {
             return res.status(400).json({ error: "All fields are required" });
         }
@@ -30,6 +31,7 @@ exports.signUp = async (req, res) => {
             return res.status(400).json({ error: "Passwords do not match" });
         }
 
+        // Check if user already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             const googleAuthError =
@@ -44,32 +46,88 @@ exports.signUp = async (req, res) => {
             });
         }
 
-        const newUser = await User.create({ email, password });
-        const user = await User.findById(newUser._id).select("email");
+        // Create new user with deviceType and fcmToken
+        const newUser = await User.create({ email, password, deviceType, fcmToken });
+        const user = await User.findById(newUser._id).select("email deviceType fcmToken");
 
         if (!user) {
             return res
                 .status(500)
                 .json({ error: "Something went wrong while registering the user" });
         }
-        const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
-            user._id
-        );
 
-        return res
-            .status(200)
-            .json({
-                message: "User registered successfully", data: { accessToken: accessToken, userInfo: user },
-            });
+        // Generate tokens
+        const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
+
+        return res.status(200).json({
+            message: "User registered successfully",
+            data: { accessToken: accessToken, userInfo: user },
+        });
     } catch (error) {
         serverErrorHandler(error, res);
     }
 };
 
+
+exports.signIn = async (req, res) => {
+    try {
+        const { email, password, deviceType, fcmToken } = req.body;
+
+        // Validate required fields
+        if (!email || !password || !deviceType || !fcmToken) {
+            return res.status(400).json({ error: "All fields are required" });
+        }
+
+        // Find user with case-insensitive email search
+        const user = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+        if (!user) {
+            return res.status(404).json({ error: "User does not exist" });
+        }
+
+        // Validate password
+        const isPasswordValid = await user.isPasswordCorrect(password);
+        if (!isPasswordValid) {
+            return res.status(401).json({ error: "Invalid user credentials" });
+        }
+
+        // Update deviceType and fcmToken
+        user.deviceType = deviceType;
+        user.fcmToken = fcmToken;
+        await user.save();
+
+        // Generate tokens
+        const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
+        const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
+
+        // Set cookies
+        const options = {
+            httpOnly: true,
+            secure: true,
+        };
+
+        res.cookie("accessToken", accessToken, options);
+        res.cookie("refreshToken", refreshToken, options);
+
+        return res.status(200).json({
+            message: "User signed in successfully",
+            data: { accessToken: accessToken, userInfo: loggedInUser },
+        });
+    } catch (error) {
+        serverErrorHandler(error, res);
+    }
+};
+
+
 exports.googleAuth = async (req, res) => {
     try {
-        const { token } = req.body;
+        const { token, deviceType, fcmToken } = req.body;
 
+        // Validate required fields
+        if (!token || !deviceType || !fcmToken) {
+            return res.status(400).json({ error: "All fields are required" });
+        }
+
+        // Verify Google token
         const result = await client.verifyIdToken({
             idToken: token,
             audience: process.env.GOOGLE_CLIENT_ID,
@@ -77,20 +135,24 @@ exports.googleAuth = async (req, res) => {
 
         const googleAuthId = result.payload.sub;
         const email = result.payload.email;
-        let user = await User.findOne({ googleAuthId });
 
+        // Find or create user
+        let user = await User.findOne({ googleAuthId });
         if (!user) {
-            const newUser = await User.create({ email, googleAuthId });
+            const newUser = await User.create({ email, googleAuthId, deviceType, fcmToken });
             user = await User.findById(newUser._id).select("-password -refreshToken");
+        } else {
+            // Update deviceType and fcmToken
+            user.deviceType = deviceType;
+            user.fcmToken = fcmToken;
+            await user.save();
         }
 
-        const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
-            user._id
-        );
-        const loggedInUser = await User.findById(user._id).select(
-            "-password -refreshToken"
-        );
+        // Generate tokens
+        const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
+        const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
 
+        // Set cookies
         const options = {
             httpOnly: true,
             secure: true,
@@ -144,60 +206,27 @@ exports.facebookAuth = async (req, res) => {
     }
 };
 
-exports.signIn = async (req, res) => {
-    try {
-        const { email, password } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({ error: "All fields are required" });
-        }
-
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(404).json({ error: "User does not exist" });
-        }
-
-        const isPasswordValid = await user.isPasswordCorrect(password);
-        if (!isPasswordValid) {
-            return res.status(401).json({ error: "Invalid user credentials" });
-        }
-
-        const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
-            user._id
-        );
-        const loggedInUser = await User.findById(user._id).select(
-            `${excludeField}`
-        );
-        const options = {
-            httpOnly: true,
-            secure: true,
-        };
-
-        res.cookie("accessToken", accessToken, options);
-        res.cookie("refreshToken", refreshToken, options);
-        return res
-            .status(200)
-            .json({ message: "User signed in successfully", data: { accessToken: accessToken, userInfo: loggedInUser } });
-    } catch (error) {
-        serverErrorHandler(error, res);
-    }
-};
-
 
 exports.logout = async (req, res) => {
     try {
-        await User.findByIdAndUpdate(
-            req.User._id,
-            { $unset: { refreshToken: 1 } },
+        const userId = req.user._id; // Assuming user is authenticated and attached to req
+
+        // Find the user and remove deviceType and fcmToken
+        const user = await User.findByIdAndUpdate(
+            userId,
+            { $unset: { deviceType: "", fcmToken: "" } },
             { new: true }
         );
 
-        const cookieOptions = { httpOnly: true, secure: true };
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
 
-        return res
-            .status(200)
-            .clearCookie("accessToken", cookieOptions)
-            .clearCookie("refreshToken", cookieOptions)
-            .json({ message: "User logged out successfully" });
+
+        return res.status(200).json({
+            message: "User logged out successfully",
+            data: { userInfo: user },
+        });
     } catch (error) {
         serverErrorHandler(error, res);
     }

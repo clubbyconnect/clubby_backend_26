@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const Group = require('../models/Group.js');
+const Post = require("../models/Post");
+
 
 exports.getUserPosts = async (req, res) => {
     try {
@@ -34,7 +36,7 @@ exports.getUserPosts = async (req, res) => {
             {
                 $match: {
                     userId: userIdObjectId,
-                    expiryDate: { $gt: new Date() }
+                    expiryAt: { $gt: new Date() }
                 }
             },
             {
@@ -105,8 +107,8 @@ exports.getUserPosts = async (req, res) => {
             { $limit: parsedLimit }
         ];
 
-        const totalPosts = await post.countDocuments({ userId: userIdObjectId, expiryDate: { $gt: new Date() } });
-        const posts = await post.aggregate(aggregatePipeline);
+        const totalPosts = await Post.countDocuments({ userId: userIdObjectId, expiryAt: { $gt: new Date() } });
+        const posts = await Post.aggregate(aggregatePipeline);
 
         if (posts.length === 0) {
             return res.status(404).json({ success: false, message: "No posts found" });
