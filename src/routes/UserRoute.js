@@ -54,6 +54,13 @@ const {
   markMessageAsRead,
 } = require("../controllers/MessageController.js")
 
+const {
+  addNotification, getNotifications, getUnreadCount, readOneNotification
+} = require("../controllers/NotificationController.js")
+
+
+
+
 const PostController = require("../controllers/PostController.js");
 const ClubRequestController = require("../controllers/ClubRequestController.js");
 const FileController = require("../controllers/FileController.js");
@@ -104,8 +111,8 @@ router.get("/categoryname/:categoryId", CategoryController.getCategoryName);
 
 //--------------------Group chat Routes-------------------------------------------------
 
-router.post("/joinGroup", createOrJoinGroup);
-router.post("/leaveGroupRequest", leaveGroup);
+router.post("/joinGroup", verifyJWT, createOrJoinGroup);
+router.post("/leaveGroupRequest", verifyJWT, leaveGroup);
 router.post("/myGroups", verifyJWT, getGroupsForUser);
 
 router.post(
@@ -133,14 +140,20 @@ router.get("/getFilteredFavoriteProducts", verifyJWT, getFilteredFavoriteProduct
 router.get("/getUserPosts", verifyJWT, getUserPosts);
 
 //Group Profile
-router.post("/removeUserFromGroup", removeUserFromGroup);
-router.get("/getSortmedia/:groupId", getFirst4MediaMessages);
-router.get("/getAllMediaMessages/:groupId", getAllMediaMessages);
-router.post("/wrapDeal", wrapDeal);
-router.post("/createReport", createReport);
-router.get("/getAllReports", getAllReports);
+router.post("/removeUserFromGroup", verifyJWT, removeUserFromGroup);
+router.get("/getSortmedia/:groupId", verifyJWT, getFirst4MediaMessages);
+router.get("/getAllMediaMessages/:groupId", verifyJWT, getAllMediaMessages);
+router.post("/wrapDeal", verifyJWT, wrapDeal);
+router.post("/createReport", verifyJWT, createReport);
+router.get("/getAllReports", verifyJWT, getAllReports);
 
 
+
+//Notifications
+router.post("/addNotification", verifyJWT, addNotification);
+router.get("/getAllNoti", verifyJWT, getNotifications);
+router.get("/getNotiReadCount", verifyJWT, getUnreadCount);
+router.patch("/readNoti/:notificationId", verifyJWT, readOneNotification);
 
 
 
