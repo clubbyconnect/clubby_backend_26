@@ -486,7 +486,88 @@ const PostController = {
       console.error("Error searching products:", error);
       res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
-  }
+  },
+
+  adminSearch: async (req, res) => {
+    try {
+      const { keyword, status, startDate, endDate, page = 1, limit = 20 } = req.body;
+      const skip = (page - 1) * limit; // Calculate offset
+
+      let matchQuery = {};
+
+      // Keyword search in itemName (case insensitive)
+      if (keyword) {
+        matchQuery.itemName = { $regex: keyword, $options: "i" };
+      }
+
+      // Status Filtering
+      if (status) {
+        if (status === "active") {
+          matchQuery.$or = [
+            { clubStatus: { $in: ["Active", "Created", "Full"] } }, // Active statuses
+            { deletedAt: null }, // Not soft-deleted
+            { expiryAt: { $gte: new Date() } }, // Not expired
+          ];
+        } else if (status === "inactive") {
+          matchQuery.$or = [
+            { clubStatus: "Inactive" },
+            { deletedAt: { $ne: null } }, // Soft-deleted posts
+            { expiryAt: { $lt: new Date() } }, // Expired posts
+          ];
+        } else if (status === "paid") {
+          matchQuery.isPaid = true; // Filtering for paid posts
+        }
+      }
+
+      // Time range filter (createdAt)
+      if (startDate && endDate) {
+        matchQuery.createdAt = {
+          $gte: new Date(startDate),
+          $lte: new Date(endDate),
+        };
+      } else if (startDate) {
+        matchQuery.createdAt = { $gte: new Date(startDate) };
+      } else if (endDate) {
+        matchQuery.createdAt = { $lte: new Date(endDate) };
+      }
+
+      // Aggregate pipeline with pagination
+      const aggregatePipeline = [
+        { $match: matchQuery },
+        { $sort: { createdAt: -1 } }, // Sort by latest posts
+        { $skip: skip }, // Skip records for pagination
+        { $limit: Number(limit) }, // Limit records per page
+        {
+          $project: { // Return only specific fields
+            _id: 1,
+            itemName: 1,
+            price: 1,
+            productImage: 1
+          }
+        }
+      ];
+
+      // Fetch posts and total count
+      const [posts, total] = await Promise.all([
+        PostModel.aggregate(aggregatePipeline),
+        PostModel.countDocuments(matchQuery),
+      ]);
+
+      res.status(200).json({
+        message: "Posts retrieved successfully",
+        posts,
+        pagination: {
+          currentPage: Number(page),
+          totalPages: Math.ceil(total / limit),
+          totalPosts: total,
+          limit: Number(limit),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  },
 
 };
 

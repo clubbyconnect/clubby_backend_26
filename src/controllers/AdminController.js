@@ -2,6 +2,7 @@ const bcrypt = require("bcrypt");
 const Admin = require("../models/Admin.js");
 const dotenv = require("dotenv");
 const jwt = require("jsonwebtoken");
+const validateEmail = require("../utils/Helper.js");
 dotenv.config({
   path: "./.env",
 });
@@ -15,7 +16,11 @@ module.exports = {
         return res.status(400).json({ error: "All fields are required" });
       }
 
-      const existingAdmin = await Admin.findOne({ email });
+      if (!validateEmail(email)) {
+        return res.status(400).json({ error: "Invalid email format" });
+      }
+
+      const existingAdmin = await Admin.findOne({ email: email.toLowerCase() });
       if (existingAdmin) {
         return res.status(400).json({ error: "Admin already exists with this email" });
       }
@@ -24,7 +29,7 @@ module.exports = {
 
       const newAdmin = new Admin({
         name,
-        email,
+        email: email.toLowerCase(),
         password: hashedPassword,
         role,
         windows: windows || [],
@@ -48,7 +53,7 @@ module.exports = {
         return res.status(400).json({ error: "Email and password are required" });
       }
 
-      const admin = await Admin.findOne({ email });
+      const admin = await Admin.findOne({ email: email.toLowerCase() });
       if (!admin) {
         return res.status(404).json({ error: "Admin not found with this email" });
       }

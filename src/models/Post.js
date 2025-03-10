@@ -77,6 +77,10 @@ const postSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    isPaid:{
+      type: Boolean,
+      default: false
+    },
     size: {
       type: String,
       default: null,

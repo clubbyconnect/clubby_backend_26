@@ -8,12 +8,13 @@ const upload = require("../middleware/multer.js")
 const CategoryController = require('../controllers/CategoryController.js');
 const SubcategoryController = require("../controllers/SubCategoryController.js");
 const AdminController = require("../controllers/AdminController.js");
+const {verifyJWT} = require("../middleware/auth");
+const PostController = require("../controllers/PostController");
 
 // ADMIN ROUTES
 // Admin Details
 router.post("/create", AdminController.createAdmin);
 router.post("/login", AdminController.loginAdmin);
-router.post("/search-post", verifyAdminJWT, AdminController.createAdmin);
 
 // Category
 router.post("/categories/create", CategoryController.createCategory);
@@ -31,6 +32,9 @@ router.get("/subcategories/:id", SubcategoryController.getSubcategoryById);
 router.put("/subcategories/:id", SubcategoryController.updateSubcategory);
 router.delete("/subcategories/deleteAll", SubcategoryController.deleteAllSubcategories);
 router.delete("/subcategories/:id", SubcategoryController.deleteSubcategory);
+
+// POST ROUTES
+router.post("/search-post",verifyAdminJWT, PostController.adminSearch);
 
 module.exports = router;
 

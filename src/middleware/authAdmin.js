@@ -14,13 +14,17 @@ exports.verifyAdminJWT = async (req, res, next) => {
     if (!token) return res.status(401).json({ error: "Admin access required" });
 
     const decodedToken = jwt.verify(token, process.env.ADMIN_ACCESS_TOKEN_SECRET);
-    const admin = await Admin.findById(decodedToken?._id).select("-password");
 
+    if (!decodedToken?.id) {
+      return res.status(401).json({ error: "Invalid Token Structure" });
+    }
+    const admin = await Admin.findById(decodedToken.id).select("-password");
     if (!admin) return res.status(401).json({ error: "Invalid Admin Access Token" });
-
     req.Admin = admin; // Attach admin data to request
     next();
   } catch (error) {
-    serverErrorHandler(error, res);
+    console.error("JWT Verification Error:", error);
+    res.status(401).json({ error: "Invalid or Expired Token" });
   }
 };
+
