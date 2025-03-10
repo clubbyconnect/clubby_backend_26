@@ -74,7 +74,7 @@ router.post("/logout", verifyJWT, logout);
 router.post("/resetPassword", resetPassword);
 router.post("/uploadAvatar", verifyJWT, upload.single('avatar'), uploadAvatar);
 
-// POST ROUTES
+// POST ROUTES 123
 router.post("/post/create", verifyJWT, upload.single('productImage'), PostController.create);
 router.get('/post/:productId', verifyJWT, PostController.read)
 router.put("/post/:postId", verifyJWT, upload.single('productImage'), PostController.update);
