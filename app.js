@@ -13,9 +13,11 @@ app.use(cookieParser());
 
 //import routers
 const userRoutes = require("./src/routes/UserRoute.js");
+const adminRoutes = require("./src/routes/AdminRoute.js");
 
 //routes declaration
 app.use("/api/user", userRoutes);
+app.use("/api/admin", adminRoutes);
 
 module.exports = app;
 
