@@ -7,7 +7,7 @@ const GroupSchema = new Schema({
     type: mongoose.Schema.Types.ObjectId,  // Change to ObjectId for reference to Product
     ref: 'Post',  // Reference to the Product model
     required: true,
-    index: true  // Index for fast retrieval by productId
+    index: true 
   },
   productName: {
     type: String,
