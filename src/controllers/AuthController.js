@@ -209,8 +209,8 @@ exports.facebookAuth = async (req, res) => {
 
 exports.logout = async (req, res) => {
     try {
-        const userId = req.user._id; // Assuming user is authenticated and attached to req
-
+        const userId = req.User._id; // Assuming user is authenticated and attached to req
+        console.log('req.user is ', req.User)
         // Find the user and remove deviceType and fcmToken
         const user = await User.findByIdAndUpdate(
             userId,
@@ -225,7 +225,6 @@ exports.logout = async (req, res) => {
 
         return res.status(200).json({
             message: "User logged out successfully",
-            data: { userInfo: user },
         });
     } catch (error) {
         serverErrorHandler(error, res);
