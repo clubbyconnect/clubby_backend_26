@@ -5,6 +5,7 @@ const Post = require("../models/Post.js");
 const ClubRequest = require("../models/ClubRequest.js");
 const { sendPushNotification } = require('../utils/Firebase.js');
 const { getIO } = require("../sockets/Chat.js");
+const Report = require("../models/ReportSchema.js");
 
 
 
@@ -536,3 +537,37 @@ exports.getGroupDetails = async (req, res) => {
     return res.status(500).json({ message: "Internal server error." });
   }
 };
+
+
+exports.getReports = async (req, res) => {
+  try {
+    const {page = 1, limit = 10} = req.query;
+    const skip = (page - 1) * limit;
+
+    const reports = await Report.aggregate([{
+      $lookup: {
+        from: "users", localField: "userId", foreignField: "_id", as: "user",
+      },
+    }, {$unwind: "$user"}, {
+      $lookup: {
+        from: "posts", localField: "groupId", foreignField: "groupId", as: "post",
+      },
+    }, {$unwind: {path: "$post", preserveNullAndEmptyArrays: true}}, {
+      $project: {
+        _id: 1, title: 1, details: 1, reportedAt: 1, "user._id": 1, "user.firstName": 1, "user.lastName": 1, "user.avatar": 1, itemName: "$post.itemName", postId: "$post.postId",
+      },
+    }, {$sort: {reportedAt: -1}}, {$skip: skip}, {$limit: parseInt(limit)},]);
+
+    const totalReports = await Report.countDocuments();
+
+    return res.status(200).json({
+      success: true, data: reports, pagination: {
+        currentPage: parseInt(page), totalPages: Math.ceil(totalReports / limit), totalReports,
+      },
+    });
+
+  } catch (error) {
+    return res.status(500).json({message: "Internal server error."});
+  }
+};
+

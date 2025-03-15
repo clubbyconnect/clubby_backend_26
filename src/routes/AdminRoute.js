@@ -8,7 +8,8 @@ const upload = require("../middleware/multer.js")
 const CategoryController = require('../controllers/CategoryController.js');
 const SubcategoryController = require("../controllers/SubCategoryController.js");
 const AdminController = require("../controllers/AdminController.js");
-const PostController = require("../controllers/PostController");
+const PostController = require("../controllers/PostController.js");
+const {getReports} = require("../controllers/GroupController.js");
 
 // ADMIN ROUTES
 // Admin Details
@@ -40,6 +41,7 @@ router.patch("/subcategories/:id/restore",verifyAdminJWT, SubcategoryController.
 router.post("/search-post",verifyAdminJWT, PostController.adminSearch);
 router.get('/single-post/:postId', verifyAdminJWT, PostController.read);
 router.put("/deactivate-post/:postId", verifyAdminJWT, PostController.deactivatePost);
+router.post("/get-reports", verifyAdminJWT, getReports);
 
 module.exports = router;
 
