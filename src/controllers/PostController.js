@@ -3,7 +3,8 @@ const SubcategoryModel = require("../models/Subcategory.js");
 const CategoryModel = require("../models/Category.js");
 const Group = require("../models/Group.js");
 const User = require("../models/User.js");
-const { sendSystemMessage } = require("./MessageController.js");
+const Admin = require("../models/Admin.js");
+const {sendSystemMessage} = require("./MessageController.js");
 const ClubRequest = require("../models/ClubRequest.js");
 
 const PostController = {
@@ -15,23 +16,23 @@ const PostController = {
 
       // Validate required fields
       if ([category, subCategory, itemName, offerType, price, price_type, clubMembers].some((field) => !field || field.trim() === "")) {
-        return res.status(400).json({ error: "Please fill all required fields." });
+        return res.status(400).json({error: "Please fill all required fields."});
       }
 
       // Validate club members limit (minimum 2, maximum 4)
       const memberLimit = parseInt(clubMembers, 10);
       if (isNaN(memberLimit) || memberLimit < 2 || memberLimit > 4) {
-        return res.status(400).json({ error: "Club members must be between 2 and 4." });
+        return res.status(400).json({error: "Club members must be between 2 and 4."});
       }
 
       // Fetch category and subcategory
-      const categoryObj = await CategoryModel.findOne({ name: category });
-      if (!categoryObj) return res.status(400).json({ error: "Invalid category." });
+      const categoryObj = await CategoryModel.findOne({name: category});
+      if (!categoryObj) return res.status(400).json({error: "Invalid category."});
 
       const subcategoryObj = await SubcategoryModel.findOne({
         name: subCategory, category: categoryObj._id,
       });
-      if (!subcategoryObj) return res.status(400).json({ error: "Invalid subcategory." });
+      if (!subcategoryObj) return res.status(400).json({error: "Invalid subcategory."});
 
       // Handle product image
       let productImageUrls = [subcategoryObj.image];
@@ -60,7 +61,7 @@ const PostController = {
         const timestamp = Date.now().toString().slice(-9);
         const randomDigit = Math.floor(Math.random() * 9) + 1;
         const postId = `CLA${randomDigit}${timestamp}`;
-        const existingPost = await PostModel.findOne({ postId });
+        const existingPost = await PostModel.findOne({postId});
         return existingPost ? generatePostId() : postId;
       };
 
@@ -68,7 +69,7 @@ const PostController = {
 
       // Create post
       const createdPost = await PostModel.create(postData);
-      if (!createdPost._id) return res.status(500).json({ error: "Unable to create post." });
+      if (!createdPost._id) return res.status(500).json({error: "Unable to create post."});
 
       // Create group
       const groupData = {
@@ -76,7 +77,7 @@ const PostController = {
       };
 
       const createdGroup = await Group.create(groupData);
-      if (!createdGroup._id) return res.status(500).json({ error: "Unable to create group." });
+      if (!createdGroup._id) return res.status(500).json({error: "Unable to create group."});
 
       // Link group to post
       createdPost.groupId = createdGroup._id;
@@ -99,47 +100,35 @@ const PostController = {
       });
     } catch (error) {
       console.error("Error in createPost:", error);
-      res.status(500).json({ error: error.message || "Internal Server Error" });
+      res.status(500).json({error: error.message || "Internal Server Error"});
     }
   },
 
   update: async (req, res) => {
     try {
-      const { postId } = req.params;
+      const {postId} = req.params;
       const {
-        category,
-        subCategory,
-        itemName,
-        offerType,
-        price,
-        price_type,
-        clubMembers,
-        store_location_latitude,
-        store_location_longitude,
-        additionalInformation,
-        size,
-        productImages,
-        showroomAddress
+        category, subCategory, itemName, offerType, price, price_type, clubMembers, store_location_latitude, store_location_longitude, additionalInformation, size, productImages, showroomAddress
       } = req.body;
 
       const existingPost = await PostModel.findById(postId);
       if (!existingPost) {
-        return res.status(404).json({ error: "Post not found." });
+        return res.status(404).json({error: "Post not found."});
       }
 
       console.log("req.body", req.body)
       if ([category, subCategory, itemName, offerType, price, price_type, clubMembers].some((field) => !field || field.trim() === "")) {
-        return res.status(400).json({ error: "Please fill all required fields." });
+        return res.status(400).json({error: "Please fill all required fields."});
       }
 
       let updates = {};
 
-      const categoryObj = await CategoryModel.findOne({ name: category });
-      if (!categoryObj) return res.status(400).json({ error: "Invalid category." });
+      const categoryObj = await CategoryModel.findOne({name: category});
+      if (!categoryObj) return res.status(400).json({error: "Invalid category."});
       updates.category = categoryObj._id;
 
-      const subcategoryObj = await SubcategoryModel.findOne({ name: subCategory, category: updates.category });
-      if (!subcategoryObj) return res.status(400).json({ error: "Invalid subcategory." });
+      const subcategoryObj = await SubcategoryModel.findOne({name: subCategory, category: updates.category});
+      if (!subcategoryObj) return res.status(400).json({error: "Invalid subcategory."});
       updates.subCategory = subcategoryObj._id;
 
 
@@ -151,17 +140,15 @@ const PostController = {
       if (clubMembers) {
         const memberLimit = parseInt(clubMembers, 10);
         if (isNaN(memberLimit) || memberLimit < 2 || memberLimit > 4) {
-          return res.status(400).json({ error: "Club members must be between 2 and 4." });
+          return res.status(400).json({error: "Club members must be between 2 and 4."});
         }
         updates.clubMembers = memberLimit;
-        await Group.updateOne({ productId: existingPost._id }, { limit: memberLimit });
+        await Group.updateOne({productId: existingPost._id}, {limit: memberLimit});
       }
 
       if (store_location_latitude && store_location_longitude) {
         updates.store_location = {
-          name: showroomAddress,
-          type: "Point",
-          coordinates: [parseFloat(store_location_longitude), parseFloat(store_location_latitude)],
+          name: showroomAddress, type: "Point", coordinates: [parseFloat(store_location_longitude), parseFloat(store_location_latitude)],
         };
       }
 
@@ -177,39 +164,36 @@ const PostController = {
         updates.productImage = subcategoryObj.image;
       }
 
-      await PostModel.updateOne({ _id: postId }, { $set: updates });
+      await PostModel.updateOne({_id: postId}, {$set: updates});
 
       const updatedPost = await PostModel.findById(postId)
         .populate("category", "name")
         .populate("subCategory", "name");
 
       // Send system message
-      const group = await Group.findOne({ productId: postId });
+      const group = await Group.findOne({productId: postId});
       await sendSystemMessage(group._id, `Post details are updated.`);
 
       return res.status(200).json({
-        message: "Post updated successfully.",
-        post: {
-          ...updatedPost._doc,
-          category: updatedPost.category.name,
-          subCategory: updatedPost.subCategory.name,
+        message: "Post updated successfully.", post: {
+          ...updatedPost._doc, category: updatedPost.category.name, subCategory: updatedPost.subCategory.name,
         },
       });
     } catch (error) {
       console.error("Error in updatePost:", error);
-      res.status(500).json({ error: error.message || "Internal Server Error" });
+      res.status(500).json({error: error.message || "Internal Server Error"});
     }
   },
 
 
   read: async (req, res) => {
     try {
-      const { productId, postId } = req.params;
+      const {productId, postId} = req.params;
 
-      const query = productId ? { _id: productId } : { postId: postId };
+      const query = productId ? {_id: productId} : {postId: postId};
 
       if (!productId && !postId) {
-        return res.status(400).json({ success: false, error: "Product ID is required." });
+        return res.status(400).json({success: false, error: "Product ID is required."});
       }
 
       const product = await PostModel.findOne(query)
@@ -219,12 +203,12 @@ const PostController = {
         .populate("subCategory", "name description")
 
       if (!product) {
-        return res.status(404).json({ success: false, error: "Product not found." });
+        return res.status(404).json({success: false, error: "Product not found."});
       }
 
       const productData = product.toObject();
       // Fetch group members if a group exists for this product
-      const group = await Group.findOne({ productId: product._id })
+      const group = await Group.findOne({productId: product._id})
         .populate("members", "firstName lastName userName _id avatar");
       productData.members = group ? group.members : [];
 
@@ -232,43 +216,49 @@ const PostController = {
       if (productId) {
         const userId = req.User._id;
         const clubRequest = await ClubRequest.findOne({
-          requester: userId,
-          postId: productId,
+          requester: userId, postId: productId,
         }).select("status");
         productData.requestStatus = clubRequest ? clubRequest.status : null; // Return the status or null if no request exists
       }
-      return res.status(200).json({ success: true, data: productData });
+
+      // If the product was deactivated by an admin, fetch admin details
+      if (product.deactivatedByAdminId) {
+        const admin = await Admin.findById(product.deactivatedByAdminId).select("name image");
+        productData.deactivatedByAdmin = admin || null;
+      }
+
+      return res.status(200).json({success: true, data: productData});
 
     } catch (error) {
-      res.status(500).json({ error: error.message || "Internal Server Error" });
+      res.status(500).json({error: error.message || "Internal Server Error"});
     }
   },
 
   delete: async (req, res) => {
     try {
-      const { postId } = req.params;
+      const {postId} = req.params;
 
       if (!postId) {
-        return res.status(400).json({ error: "Post ID is required." });
+        return res.status(400).json({error: "Post ID is required."});
       }
 
       // Check if the post exists
       const existingPost = await PostModel.findById(postId);
       if (!existingPost) {
-        return res.status(404).json({ error: "Post not found." });
+        return res.status(404).json({error: "Post not found."});
       }
 
       console.log("existingPost", existingPost)
       console.log("req.user", req.User);
       // Ensure the user has rights to delete the post
       if (existingPost.postOwnerId.toString() !== req.User._id.toString()) {
-        return res.status(403).json({ error: "You do not have the rights to delete this post." });
+        return res.status(403).json({error: "You do not have the rights to delete this post."});
       }
 
       //Soft Delete the post and do not change anything in group
-      await PostModel.findByIdAndUpdate(postId, { deletedAt: new Date() });
+      await PostModel.findByIdAndUpdate(postId, {deletedAt: new Date()});
 
-      const group = await Group.findOne({ productId: postId });
+      const group = await Group.findOne({productId: postId});
       await sendSystemMessage(group._id, `Group has been deactivated.`);
 
       return res.status(200).json({
@@ -277,32 +267,32 @@ const PostController = {
 
     } catch (error) {
       console.error("Error in deletePost:", error);
-      return res.status(500).json({ error: "Internal server error." });
+      return res.status(500).json({error: "Internal server error."});
     }
   },
 
 
   transfer: async (req, res) => {
     try {
-      const { postId, newAdminId } = req.body;
+      const {postId, newAdminId} = req.body;
       const userId = req.User?._id;
 
       if (!postId) {
-        return res.status(400).json({ error: "Post ID is required." });
+        return res.status(400).json({error: "Post ID is required."});
       }
       if (!newAdminId) {
-        return res.status(400).json({ error: "New admin ID is required." });
+        return res.status(400).json({error: "New admin ID is required."});
       }
 
       // Fetch post and group together for efficiency
       const existingPost = await PostModel.findById(postId);
       if (!existingPost) {
-        return res.status(404).json({ error: "Post not found." });
+        return res.status(404).json({error: "Post not found."});
       }
 
       const group = await Group.findById(existingPost.groupId);
       if (!group) {
-        return res.status(404).json({ error: "Group not found." });
+        return res.status(404).json({error: "Group not found."});
       }
 
       // Check if the requester is the current admin
@@ -310,14 +300,14 @@ const PostController = {
         console.log("group.adminId", group.adminId)
         console.log("userId", userId)
 
-        return res.status(403).json({ error: "Only the current admin can transfer ownership." });
+        return res.status(403).json({error: "Only the current admin can transfer ownership."});
       }
 
 
       // Validate new admin
       const newAdmin = await User.findById(newAdminId);
       if (!newAdmin) {
-        return res.status(404).json({ error: "New admin not found." });
+        return res.status(404).json({error: "New admin not found."});
       }
 
       // Update admin ID in both post and group
@@ -325,9 +315,9 @@ const PostController = {
       existingPost.postOwnerId = newAdminId;
 
       // Delete club request for new post owner
-      const pendingRequest = await ClubRequest.findOne({ requester: newAdminId, postId });
+      const pendingRequest = await ClubRequest.findOne({requester: newAdminId, postId});
       if (pendingRequest) {
-        await ClubRequest.deleteOne({ _id: pendingRequest._id });
+        await ClubRequest.deleteOne({_id: pendingRequest._id});
       }
       // remove current owner from group
       group.members = group.members.filter(memberId => memberId.toString() !== userId.toString());
@@ -339,32 +329,18 @@ const PostController = {
       // Send system message
       await sendSystemMessage(group._id, `Admin rights transferred to ${newAdmin.firstName || "User"}.`);
 
-      return res.status(200).json({ message: "Admin rights transferred successfully.", group });
+      return res.status(200).json({message: "Admin rights transferred successfully.", group});
 
     } catch (error) {
       console.error("Error transferring admin rights:", error);
-      return res.status(500).json({ error: "Internal server error." });
+      return res.status(500).json({error: error.message || "Internal server error."});
     }
   },
 
   search: async (req, res) => {
     try {
       const {
-        productName,
-        lon,
-        lat,
-        gender,
-        date,
-        offerType,
-        clubMembers,
-        size,
-        sortBy,
-        rangeLat,
-        rangeLon,
-        rangeRadius,
-        category,
-        subCategory,
-        page = 1, // Default to page 1 if not provided
+        productName, lon, lat, gender, date, offerType, clubMembers, size, sortBy, rangeLat, rangeLon, rangeRadius, category, subCategory, page = 1, // Default to page 1 if not provided
         limit = 25 // Default limit is 25 if not provided
       } = req.query;
 
@@ -373,7 +349,7 @@ const PostController = {
       const parsedPage = parseInt(page) || 1;
       const skip = (parsedPage - 1) * parsedLimit;
 
-      let matchStage = { deletedAt: null, expiryAt: { $gte: new Date() } };
+      let matchStage = {deletedAt: null, expiryAt: {$gte: new Date()}};
       let aggregatePipeline = [];
 
       // GeoNear for distance calculation (within 200 KM if no range is provided)
@@ -386,32 +362,24 @@ const PostController = {
           const radiusInMeters = kmRadius * 1000;
           aggregatePipeline.push({
             $geoNear: {
-              near: { type: "Point", coordinates: [lon, lat] },
-              distanceField: "distance",
-              spherical: true,
-              maxDistance: radiusInMeters,
-              key: "store_location.coordinates",
+              near: {type: "Point", coordinates: [lon, lat]}, distanceField: "distance", spherical: true, maxDistance: radiusInMeters, key: "store_location.coordinates",
             },
           });
         }
       } else if (lon && lat) {
         aggregatePipeline.push({
           $geoNear: {
-            near: { type: "Point", coordinates: [parseFloat(lon), parseFloat(lat)] },
-            distanceField: "distance",
-            spherical: true,
-            maxDistance: 200000,
-            key: "store_location.coordinates",
+            near: {type: "Point", coordinates: [parseFloat(lon), parseFloat(lat)]}, distanceField: "distance", spherical: true, maxDistance: 200000, key: "store_location.coordinates",
           },
         });
       }
 
       if (productName) {
-        matchStage.itemName = { $regex: productName, $options: "i" };
+        matchStage.itemName = {$regex: productName, $options: "i"};
       }
 
       if (offerType) {
-        matchStage.offerType = { $in: offerType.split(',').map(type => type.trim()) };
+        matchStage.offerType = {$in: offerType.split(',').map(type => type.trim())};
       }
 
       if (clubMembers) {
@@ -425,7 +393,7 @@ const PostController = {
       if (date) {
         const startDate = new Date(date);
         if (!isNaN(startDate.getTime())) {
-          matchStage.createdAt = { $gte: startDate };
+          matchStage.createdAt = {$gte: startDate};
         }
       }
 
@@ -438,142 +406,146 @@ const PostController = {
       }
 
       if (Object.keys(matchStage).length > 0) {
-        aggregatePipeline.push({ $match: matchStage });
+        aggregatePipeline.push({$match: matchStage});
       }
 
       // Lookups
-      aggregatePipeline.push(
-        { $lookup: { from: "categories", localField: "category", foreignField: "_id", as: "categoryDetails" } },
-        { $unwind: { path: "$categoryDetails", preserveNullAndEmptyArrays: true } },
-        { $lookup: { from: "subcategories", localField: "subCategory", foreignField: "_id", as: "subCategoryDetails" } },
-        { $unwind: { path: "$subCategoryDetails", preserveNullAndEmptyArrays: true } }
-      );
+      aggregatePipeline.push({$lookup: {from: "categories", localField: "category", foreignField: "_id", as: "categoryDetails"}}, {$unwind: {path: "$categoryDetails", preserveNullAndEmptyArrays: true}}, {$lookup: {from: "subcategories", localField: "subCategory", foreignField: "_id", as: "subCategoryDetails"}}, {$unwind: {path: "$subCategoryDetails", preserveNullAndEmptyArrays: true}});
 
       // Projection
       aggregatePipeline.push({
         $project: {
-          _id: 1,
-          itemName: 1,
-          offerType: 1,
-          price: 1,
-          categoryName: "$categoryDetails.name",
-          subCategoryName: "$subCategoryDetails.name",
-          productImage: 1,
-          distance: { $divide: ["$distance", 1000] }, // Convert meters to km
+          _id: 1, itemName: 1, offerType: 1, price: 1, categoryName: "$categoryDetails.name", subCategoryName: "$subCategoryDetails.name", productImage: 1, distance: {$divide: ["$distance", 1000]}, // Convert meters to km
         },
       });
 
       // Sorting
       if (sortBy) {
         let sortOptions = {};
-        if (sortBy === "price_high_to_low") sortOptions.price = -1;
-        else if (sortBy === "price_low_to_high") sortOptions.price = 1;
-        else if (sortBy === "newest") sortOptions.createdAt = -1;
-        aggregatePipeline.push({ $sort: sortOptions });
+        if (sortBy === "price_high_to_low") sortOptions.price = -1; else if (sortBy === "price_low_to_high") sortOptions.price = 1; else if (sortBy === "newest") sortOptions.createdAt = -1;
+        aggregatePipeline.push({$sort: sortOptions});
       }
 
       // Pagination
-      aggregatePipeline.push({ $skip: skip }, { $limit: parsedLimit });
+      aggregatePipeline.push({$skip: skip}, {$limit: parsedLimit});
 
       const products = await PostModel.aggregate(aggregatePipeline);
       const totalProducts = await PostModel.countDocuments(matchStage);
       const totalPages = Math.ceil(totalProducts / parsedLimit);
 
       res.status(200).json({
-        success: true,
-        data: products,
-        pagination: {
-          totalItems: totalProducts,
-          totalPages,
-          currentPage: parsedPage,
-          itemsPerPage: parsedLimit,
+        success: true, data: products, pagination: {
+          totalItems: totalProducts, totalPages, currentPage: parsedPage, itemsPerPage: parsedLimit,
         },
       });
     } catch (error) {
       console.error("Error searching products:", error);
-      res.status(500).json({ success: false, message: "Server error", error: error.message });
+      res.status(500).json({success: false, message: "Server error", error: error.message});
     }
   },
 
   adminSearch: async (req, res) => {
     try {
-      const { keyword, status, startDate, endDate, page = 1, limit = 20 } = req.body;
+      const {keyword, status, startDate, endDate, page = 1, limit = 20} = req.body;
       const skip = (page - 1) * limit; // Calculate offset
 
       let matchQuery = {};
 
       // Keyword search in itemName (case-insensitive)
       if (keyword) {
-        matchQuery.itemName = { $regex: keyword, $options: "i" };
+        matchQuery.itemName = {$regex: keyword, $options: "i"};
       }
 
       // Status Filtering
       if (status) {
         if (status === "active") {
-          matchQuery.$or = [
-            { clubStatus: { $in: ["Active", "Created", "Full"] } }, // Active statuses
-            { deletedAt: null }, // Not soft-deleted
-            { expiryAt: { $gte: new Date() } }, // Not expired
+          matchQuery.$or = [{clubStatus: {$in: ["Active", "Created", "Full"]}}, // Active statuses
+            {deletedAt: null}, // Not soft-deleted
+            {expiryAt: {$gte: new Date()}}, // Not expired
           ];
         } else if (status === "inactive") {
-          matchQuery.$or = [
-            { clubStatus: "Inactive" },
-            { deletedAt: { $ne: null } }, // Soft-deleted posts
-            { expiryAt: { $lt: new Date() } }, // Expired posts
+          matchQuery.$or = [{clubStatus:  {$in: ["Inactive", "Wrap"]}}, {deletedAt: {$ne: null}}, // Soft-deleted posts
+            {expiryAt: {$lt: new Date()}}, // Expired posts
           ];
         } else if (status === "paid") {
           matchQuery.isPaid = true; // Filtering for paid posts
+        } else if(status === "wrapped"){
+          matchQuery.clubStatus = "Wrap";
+        } else if (status === "deactivated") {
+          matchQuery.deactivatedByAdminId = { $exists: true };
         }
       }
 
       // Time range filter (createdAt)
       if (startDate && endDate) {
         matchQuery.createdAt = {
-          $gte: new Date(startDate),
-          $lte: new Date(endDate),
+          $gte: new Date(startDate), $lte: new Date(endDate),
         };
       } else if (startDate) {
-        matchQuery.createdAt = { $gte: new Date(startDate) };
+        matchQuery.createdAt = {$gte: new Date(startDate)};
       } else if (endDate) {
-        matchQuery.createdAt = { $lte: new Date(endDate) };
+        matchQuery.createdAt = {$lte: new Date(endDate)};
       }
 
       // Aggregate pipeline with pagination
-      const aggregatePipeline = [
-        { $match: matchQuery },
-        { $sort: { createdAt: -1 } }, // Sort by latest posts
-        { $skip: skip }, // Skip records for pagination
-        { $limit: Number(limit) }, // Limit records per page
+      const aggregatePipeline = [{$match: matchQuery}, {$sort: {createdAt: -1}}, // Sort by latest posts
+        {$skip: skip}, // Skip records for pagination
+        {$limit: Number(limit)}, // Limit records per page
         {
           $project: { // Return only specific fields
-            _id: 1,
-            itemName: 1,
-            price: 1,
-            productImage: 1,
-            postId: 1,
+            _id: 1, itemName: 1, price: 1, productImage: 1, postId: 1,
           }
-        }
-      ];
+        }];
 
       // Fetch posts and total count
-      const [posts, total] = await Promise.all([
-        PostModel.aggregate(aggregatePipeline),
-        PostModel.countDocuments(matchQuery),
-      ]);
+      const [posts, total] = await Promise.all([PostModel.aggregate(aggregatePipeline), PostModel.countDocuments(matchQuery),]);
 
       res.status(200).json({
-        message: "Posts retrieved successfully",
-        posts,
-        pagination: {
-          currentPage: Number(page),
-          totalPages: Math.ceil(total / limit),
-          totalPosts: total,
-          limit: Number(limit),
+        message: "Posts retrieved successfully", posts, pagination: {
+          currentPage: Number(page), totalPages: Math.ceil(total / limit), totalPosts: total, limit: Number(limit),
         },
       });
     } catch (error) {
       console.error("Error fetching posts:", error);
-      res.status(500).json({ message: "Internal server error" });
+      res.status(500).json({message: error.message || "Internal server error"});
+    }
+  },
+
+
+  deactivatePost: async (req, res) => {
+    try {
+      const {postId} = req.params;
+      const {note} = req.body; // Get admin ID and note from request
+      const adminId = req.Admin?._id;
+
+      if (!postId) return res.status(400).json({error: "Post ID is required."});
+      if (!note || note.trim().length === 0) return res.status(400).json({error: "Deactivation note is required."});
+
+      // Check if the post exists
+      const existingPost = await PostModel.findOne({ postId: postId });
+      if (!existingPost) return res.status(404).json({error: "Post not found."});
+
+      // Soft delete the post with admin details
+      await PostModel.findOneAndUpdate(
+        { postId: postId },  // Find by postId, not _id
+        {
+          deletedAt: new Date(),
+          deactivatedByAdminId: adminId,
+          deactivationNote: note,
+        }
+      );
+
+      const group = await Group.findOne({productId: existingPost._id});
+      if (group) {
+        console.log("group", group)
+        await sendSystemMessage(group._id, `Group has been deactivated by admin. Reason: ${note}`);
+      }
+      return res.status(200).json({
+        message: "Post deactivated successfully."
+      });
+    } catch (error) {
+      console.error("Error in deactivatePost:", error);
+      return res.status(500).json({error: error.message || "Internal server error."});
     }
   },
 

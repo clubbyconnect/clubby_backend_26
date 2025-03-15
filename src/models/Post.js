@@ -110,6 +110,15 @@ const postSchema = new mongoose.Schema(
       ref: "Group",
       default: null,
     },
+    deactivatedByAdminId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Admin",
+      default: null,
+    },
+    deactivationNote: {
+      type: String,
+      default: null,
+    },
     expiryAt: {
       type: Date,
       required: true,
