@@ -22,7 +22,8 @@ const subcategorySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category', // Links to Category Model
     required: [true, "Parent Category is required"]
-  }
+  },
+  deletedAt: { type: Date, default: null },
 },{ timestamps: true });
 
 const SubcategoryModel = mongoose.model('Subcategory', subcategorySchema);

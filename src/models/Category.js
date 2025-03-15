@@ -21,7 +21,8 @@ const categorySchema = new mongoose.Schema({
   isPremium: {
     type: Boolean,
     default: false
-  }
+  },
+  deletedAt: { type: Date, default: null },
 },{ timestamps: true });
 
 const CategoryModel = mongoose.model('Category', categorySchema);

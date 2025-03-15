@@ -495,7 +495,7 @@ const PostController = {
 
       let matchQuery = {};
 
-      // Keyword search in itemName (case insensitive)
+      // Keyword search in itemName (case-insensitive)
       if (keyword) {
         matchQuery.itemName = { $regex: keyword, $options: "i" };
       }
