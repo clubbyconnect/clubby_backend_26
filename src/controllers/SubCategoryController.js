@@ -50,7 +50,7 @@ const SubcategoryController = {
 
     } catch (error) {
       console.error("Error:", error);
-      res.status(500).json({ error: "Internal Server Error" });
+      res.status(500).json({ error: error.message || "Internal Server Error" });
     }
   },
 
@@ -61,7 +61,7 @@ const SubcategoryController = {
       const subcategories = await SubcategoryModel.find().populate("category");
       return res.status(200).json(subcategories);
     } catch (error) {
-      res.status(500).json({ error: "Internal Server Error" });
+      res.status(500).json({ error: error.message || "Internal Server Error" });
     }
   },
 
@@ -135,7 +135,7 @@ const SubcategoryController = {
       });
     } catch (error) {
       console.error("Error:", error);
-      return res.status(500).json({ error: "Internal Server Error." });
+      return res.status(500).json({ error: error.message || "Internal Server Error." });
     }
   },
 
@@ -163,7 +163,7 @@ const SubcategoryController = {
       if (!subcategory) return res.status(404).json({ error: "Subcategory not found" });
       res.status(200).json({ message: "Subcategory soft deleted successfully" });
     } catch (error) {
-      res.status(500).json({ error: "Internal Server Error" });
+      res.status(500).json({ error:error.message || "Internal Server Error" });
     }
   },
 
@@ -178,7 +178,7 @@ const SubcategoryController = {
 
       res.status(200).json({ message: "Subcategory restored successfully" });
     } catch (error) {
-      res.status(500).json({ error: "Internal Server Error" });
+      res.status(500).json({ error:error.message || "Internal Server Error" });
     }
   },
 

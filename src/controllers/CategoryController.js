@@ -31,7 +31,7 @@ module.exports = {
       });
     } catch (error) {
       console.error("Error:", error);
-      res.status(500).json({error: "Internal Server Error"});
+      res.status(500).json({error: error.message || "Internal Server Error"});
     }
   },
 
@@ -146,7 +146,7 @@ module.exports = {
 
     } catch (error) {
       console.error("Error:", error);
-      res.status(500).json({error: "Internal Server Error"});
+      res.status(500).json({error: error.message || "Internal Server Error"});
     }
   },
 
@@ -175,7 +175,7 @@ module.exports = {
       if (!category) return res.status(404).json({error: "Category not found"});
       res.status(200).json({message: "Category soft deleted successfully"});
     } catch (error) {
-      res.status(500).json({error: "Internal Server Error"});
+      res.status(500).json({error: error.message || "Internal Server Error"});
     }
   },
 
@@ -190,7 +190,7 @@ module.exports = {
 
       res.status(200).json({ message: "Category restored successfully" });
     } catch (error) {
-      res.status(500).json({ error: "Internal Server Error" });
+      res.status(500).json({ error: error.message || "Internal Server Error" });
     }
   },
 
@@ -202,7 +202,7 @@ module.exports = {
       return res.status(200).json({message: `Deleted ${result.deletedCount} categories`});
     } catch (error) {
       console.error("Error:", error);
-      res.status(500).json({error: "Internal Server Error"});
+      res.status(500).json({error: error.message || "Internal Server Error"});
     }
   },
 
