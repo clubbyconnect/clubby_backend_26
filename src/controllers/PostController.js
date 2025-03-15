@@ -204,14 +204,15 @@ const PostController = {
 
   read: async (req, res) => {
     try {
-      const { productId } = req.params;
-      const userId = req.User._id;
+      const { productId, postId } = req.params;
 
-      if (!productId) {
+      const query = productId ? { _id: productId } : { postId: postId };
+
+      if (!productId && !postId) {
         return res.status(400).json({ success: false, error: "Product ID is required." });
       }
 
-      const product = await PostModel.findById(productId)
+      const product = await PostModel.findOne(query)
         .populate("userId", "firstName lastName")
         .populate("postOwnerId", "firstName lastName")
         .populate("category", "name description")
@@ -222,14 +223,20 @@ const PostController = {
       }
 
       const productData = product.toObject();
+      // Fetch group members if a group exists for this product
+      const group = await Group.findOne({ productId: product._id })
+        .populate("members", "firstName lastName userName _id avatar");
+      productData.members = group ? group.members : [];
 
-      // Check if the logged-in user has already sent a request for this post
-      const clubRequest = await ClubRequest.findOne({
-        requester: userId,
-        postId: productId,
-      }).select("status");
-      productData.requestStatus = clubRequest ? clubRequest.status : null; // Return the status or null if no request exists
-
+      // If it's a user request, check the request status
+      if (productId) {
+        const userId = req.User._id;
+        const clubRequest = await ClubRequest.findOne({
+          requester: userId,
+          postId: productId,
+        }).select("status");
+        productData.requestStatus = clubRequest ? clubRequest.status : null; // Return the status or null if no request exists
+      }
       return res.status(200).json({ success: true, data: productData });
 
     } catch (error) {
@@ -542,7 +549,8 @@ const PostController = {
             _id: 1,
             itemName: 1,
             price: 1,
-            productImage: 1
+            productImage: 1,
+            postId: 1,
           }
         }
       ];

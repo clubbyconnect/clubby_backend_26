@@ -38,6 +38,7 @@ router.patch("/subcategories/:id/restore",verifyAdminJWT, SubcategoryController.
 
 // POST ROUTES
 router.post("/search-post",verifyAdminJWT, PostController.adminSearch);
+router.get('/single-post/:postId', verifyAdminJWT, PostController.read);
 
 module.exports = router;
 
