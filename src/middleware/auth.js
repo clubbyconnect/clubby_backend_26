@@ -16,6 +16,11 @@ exports.verifyJWT = async (req, res, next) => {
 
     if (!user) return res.status(401).json({ error: "Invalid Access Token" });
 
+    // Check if the account is deactivated by an admin
+    if (user.deletedAt && user.deactivatedByAdminId) {
+      return res.status(403).json({ error: "Your account has been deactivated by an admin." });
+    }
+
     req.User = user;
     next()
   } catch (error) {

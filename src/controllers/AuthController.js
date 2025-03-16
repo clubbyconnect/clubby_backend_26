@@ -84,6 +84,11 @@ exports.signIn = async (req, res) => {
             return res.status(404).json({ error: "User does not exist" });
         }
 
+        // Check if the account is deactivated
+        if (user.deletedAt && user.deactivatedByAdminId) {
+            return res.status(403).json({ error: "Your account has been deactivated by an admin." });
+        }
+
         // Validate password
         const isPasswordValid = await user.isPasswordCorrect(password);
         if (!isPasswordValid) {
