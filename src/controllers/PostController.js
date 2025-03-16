@@ -459,9 +459,10 @@ const PostController = {
       // Status Filtering
       if (status) {
         if (status === "active") {
-          matchQuery.$or = [{clubStatus: {$in: ["Active", "Created", "Full"]}}, // Active statuses
-            {deletedAt: null}, // Not soft-deleted
-            {expiryAt: {$gte: new Date()}}, // Not expired
+          matchQuery.$and = [
+            { clubStatus: { $in: ["Active", "Created", "Full", "Pending"] } }, // Active statuses only
+            { deletedAt: null }, // Not soft-deleted
+            { expiryAt: { $gte: new Date() } }, // Not expired
           ];
         } else if (status === "inactive") {
           matchQuery.$or = [{clubStatus:  {$in: ["Inactive", "Wrap"]}}, {deletedAt: {$ne: null}}, // Soft-deleted posts

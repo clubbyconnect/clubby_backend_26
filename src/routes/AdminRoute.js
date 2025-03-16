@@ -9,6 +9,8 @@ const CategoryController = require('../controllers/CategoryController.js');
 const SubcategoryController = require("../controllers/SubCategoryController.js");
 const AdminController = require("../controllers/AdminController.js");
 const PostController = require("../controllers/PostController.js");
+const UserController = require("../controllers/UserController.js");
+
 const {getReports} = require("../controllers/GroupController.js");
 
 // ADMIN ROUTES
@@ -42,6 +44,13 @@ router.post("/search-post",verifyAdminJWT, PostController.adminSearch);
 router.get('/single-post/:postId', verifyAdminJWT, PostController.read);
 router.put("/deactivate-post/:postId", verifyAdminJWT, PostController.deactivatePost);
 router.post("/get-reports", verifyAdminJWT, getReports);
+
+
+//USER ROUTES
+router.post("/get-users",verifyAdminJWT, UserController.getUsers);
+router.get("/single-user/:id",verifyAdminJWT, UserController.getUserDetails);
+router.put("/deactivate-user/:id", verifyAdminJWT, UserController.deactivateUser);
+
 
 module.exports = router;
 
