@@ -59,6 +59,7 @@ const {
 } = require("../controllers/NotificationController.js")
 
 
+const { startCall, endCall, joinCall, leaveCall, trackCallStart, trackJoinCall } = require("../controllers/CallController.js")
 
 
 const PostController = require("../controllers/PostController.js");
@@ -155,6 +156,13 @@ router.get("/getAllNoti", verifyJWT, getNotifications);
 router.get("/getNotiReadCount", verifyJWT, getUnreadCount);
 router.patch("/readNoti/:notificationId", verifyJWT, readOneNotification);
 
+//startCall, endCall, joinCall,leaveCall
+router.post("/startCall", verifyJWT, startCall);
+router.post("/endCall", verifyJWT, endCall);
+router.post("/joinCall", verifyJWT, joinCall);
+router.post("/leaveCall", verifyJWT, leaveCall);
+router.post("/trackCallStart", verifyJWT, trackCallStart);
+router.post("/trackJoinCall", verifyJWT, trackJoinCall);
 
 
 module.exports = router;
