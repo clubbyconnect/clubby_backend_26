@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Group = require('../models/Group.js');
 const Post = require("../models/Post");
+const checkUserFCMAndDevice = require("../utils/FcmCheck.js")
 
 
 exports.getUserPosts = async (req, res) => {
@@ -8,6 +9,10 @@ exports.getUserPosts = async (req, res) => {
         const userId = req.User._id;
         const { lon, lat, status, page = 1, limit = 10 } = req.query;
 
+        if (checkUserFCMAndDevice(userId)) {
+            console.log('FCM and device type exits')
+        }
+        
         if (!lat || !lon) {
             return res.status(400).json({ success: false, message: "Latitude and longitude are required" });
         }
