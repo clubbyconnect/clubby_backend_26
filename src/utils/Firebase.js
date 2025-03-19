@@ -1,12 +1,12 @@
-const serverErrorHandler = require("./ServerErrorHandler.js");
 const admin = require('firebase-admin');
 
-//Firebase-setup
+
+console.log('process.env.private_key_id is ', process.env.private_key.replace(/\\n/g, '\n'))
 const serviceAccount = {
   type: process.env.type,
   project_id: process.env.project_id,
   private_key_id: process.env.private_key_id,
-  private_key: process.env.private_key,
+  private_key: process.env.private_key.replace(/\\n/g, '\n'),
   client_email: process.env.client_email,
   client_id: process.env.client_id,
   auth_uri: process.env.auth_uri,
@@ -15,8 +15,10 @@ const serviceAccount = {
   client_x509_cert_url: process.env.client_x509_cert_url,
   universe_domain: process.env.universe_domain
 }
+
+
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
-
+module.exports = admin;

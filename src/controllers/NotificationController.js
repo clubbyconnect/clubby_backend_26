@@ -2,35 +2,35 @@ const Notification = require('../models/Notification');
 const Product = require('../models/Post'); // Assuming Product model exists
 const Group = require('../models/Group'); // Assuming Group model exists
 
-exports.addNotification = async (req, res) => {
+const addNotification = async (name, message, userId, notificationType, deeplink, refId, refType, customData) => {
     try {
-        const { name, message, userId, notificationType, deeplink, refId, refType, customData } = req.body;
-
         // Validate required fields
         if (!name || !message || !userId || !notificationType || !refId || !refType) {
-            return res.status(400).json({ error: "Missing required fields" });
+            throw new Error("Missing required fields");
         }
 
         // Validate reference type and ID existence
         if (refType === "Product") {
             const product = await Product.findById(refId);
-            if (!product) return res.status(404).json({ error: "Product not found" });
+            if (!product) throw new Error("Product not found");
         } else if (refType === "Group") {
             const group = await Group.findById(refId);
-            if (!group) return res.status(404).json({ error: "Group not found" });
+            if (!group) throw new Error("Group not found");
         }
 
         // Create notification
         const notification = new Notification({ name, message, userId, notificationType, deeplink, refId, refType, customData });
         await notification.save();
 
-        res.status(201).json({ message: "Notification added successfully" });
+        return true; // Success
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error("Error adding notification:", error.message);
+        return false; // Failure
     }
 };
 
-exports.getNotifications = async (req, res) => {
+
+const getNotifications = async (req, res) => {
     try {
         const userId = req.User._id;
         console.log('user id ', userId)
@@ -75,7 +75,7 @@ exports.getNotifications = async (req, res) => {
 
 
 
-exports.getUnreadCount = async (req, res) => {
+const getUnreadCount = async (req, res) => {
     try {
         const userId = req.User._id;
 
@@ -87,7 +87,7 @@ exports.getUnreadCount = async (req, res) => {
     }
 };
 
-exports.readOneNotification = async (req, res) => {
+const readOneNotification = async (req, res) => {
     try {
         const { notificationId } = req.params;
 
@@ -104,3 +104,6 @@ exports.readOneNotification = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+
+module.exports = { addNotification, getNotifications, getUnreadCount, readOneNotification };

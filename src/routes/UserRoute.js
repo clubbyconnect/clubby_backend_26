@@ -55,7 +55,7 @@ const {
 } = require("../controllers/MessageController.js")
 
 const {
-  addNotification, getNotifications, getUnreadCount, readOneNotification
+  getNotifications, getUnreadCount, readOneNotification
 } = require("../controllers/NotificationController.js")
 
 
@@ -151,7 +151,6 @@ router.get("/getAllReports", verifyJWT, getAllReports);
 
 
 //Notifications
-router.post("/addNotification", verifyJWT, addNotification);
 router.get("/getAllNoti", verifyJWT, getNotifications);
 router.get("/getNotiReadCount", verifyJWT, getUnreadCount);
 router.patch("/readNoti/:notificationId", verifyJWT, readOneNotification);

@@ -146,7 +146,6 @@ exports.rejectCall = async (req, res) => {
 
 //
 
-// Track call start
 exports.trackCallStart = async (req, res) => {
     const { groupId, type, initiatorId } = req.body;
     const io = getIO();

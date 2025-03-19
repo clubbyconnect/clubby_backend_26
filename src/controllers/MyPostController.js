@@ -2,17 +2,51 @@ const mongoose = require('mongoose');
 const Group = require('../models/Group.js');
 const Post = require("../models/Post");
 const checkUserFCMAndDevice = require("../utils/FcmCheck.js")
+const admin = require("../utils/Firebase.js")
+const { addNotification } = require("./NotificationController.js");
 
 
 exports.getUserPosts = async (req, res) => {
     try {
+
         const userId = req.User._id;
         const { lon, lat, status, page = 1, limit = 10 } = req.query;
 
-        if (checkUserFCMAndDevice(userId)) {
-            console.log('FCM and device type exits')
+        const result = await checkUserFCMAndDevice(userId);
+
+        if (result.status) {
+            console.log("User has FCM Token:", result.fcmToken);
+
+            let message = {
+                token: result.fcmToken,
+                notification: {
+                    title: 'Bored Out of Your Mind? 🤨',
+                    body: 'Someone wants to spice up your product group! Check it out! 🌟'
+                }
+            };
+
+            admin.messaging().send(message)
+                .then(response => {
+                    console.log('Successfully sent message:', response);
+                })
+                .catch(error => {
+                    console.error('Error sending message:', error);
+                });
+
+        } else {
+            console.log("User does not have a valid FCM Token or Device Type.");
         }
-        
+
+        //add notification 
+        const success = addNotification("Bored Out of Your Mind? 🤨", "Someone wants to spice up your product group! Check it out! 🌟", userId, "JoinReq", `clubby://product/12345`, '6706ee5800ff26da8e2be0dc', "Group");
+        if (success) {
+            console.log('Add notification to controller')
+        }
+        else {
+            console.log('Error adding notification to controller')
+        }
+
+
         if (!lat || !lon) {
             return res.status(400).json({ success: false, message: "Latitude and longitude are required" });
         }
