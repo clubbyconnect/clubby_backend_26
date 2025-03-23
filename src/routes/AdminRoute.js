@@ -58,6 +58,9 @@ router.put("/deactivate-user/:id", verifyAdminJWT(), UserController.deactivateUs
 //REPORTS
 router.post("/get-reports", verifyAdminJWT(), getReports);
 
+//DEACTIVATED DATA
+router.get("/deactivated-data", verifyAdminJWT(), AdminController.getDeactivatedData);
+
 module.exports = router;
 
 

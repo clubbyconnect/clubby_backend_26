@@ -3,6 +3,9 @@ const Admin = require("../models/Admin.js");
 const dotenv = require("dotenv");
 const jwt = require("jsonwebtoken");
 const validateEmail = require("../utils/Helper.js");
+const Post = require("../models/Post.js");
+const User = require("../models/User.js");
+
 dotenv.config({
   path: "./.env",
 });
@@ -195,9 +198,27 @@ module.exports = {
 
       res.status(200).json({message: "Admin restored successfully", admin});
     } catch (error) {
-      console.error("Error restoring admin:", error);
       res.status(500).json({error: error.message || "Internal server error"});
     }
   },
+
+  getDeactivatedData: async (req, res) => {
+    try {
+      const adminId = req.Admin._id;
+
+      // Fetch deactivated posts with selected fields
+      const deactivatedPosts = await Post.find({deactivatedByAdminId: adminId}, "_id postId itemName");
+
+      // Fetch deactivated users with selected fields
+      const deactivatedUsers = await User.find({deactivatedByAdminId: adminId}, "_id firstName lastName userName");
+
+      return res.status(200).json({
+        message: "Deactivated data fetched successfully", deactivatedPosts, deactivatedUsers,
+      });
+
+    } catch (error) {
+      res.status(500).json({error: error.message || "Internal server error"});
+    }
+  }
 
 };
