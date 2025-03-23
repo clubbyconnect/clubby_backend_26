@@ -550,6 +550,50 @@ const PostController = {
     }
   },
 
+  getPostStatsByCategory: async (req, res) => {
+    try {
+      // Aggregate categories with post statistics in one query
+      const categoryStats = await CategoryModel.aggregate([
+        {
+          $lookup: {
+            from: "posts", // Collection name in MongoDB (ensure it's correct)
+            localField: "_id",
+            foreignField: "category",
+            as: "posts"
+          }
+        },
+        {
+          $addFields: {
+            totalPosts: { $size: "$posts" },
+            paidPosts: {
+              $size: {
+                $filter: {
+                  input: "$posts",
+                  as: "post",
+                  cond: { $eq: ["$$post.isPaid", true] }
+                }
+              }
+            }
+          }
+        },
+        {
+          $project: {
+            id: "$_id",
+            name: 1,
+            image: 1,
+            isPremium: 1,
+            totalPosts: 1,
+            paidPosts: 1
+          }
+        }
+      ]);
+
+      res.status(200).json({data: categoryStats});
+    } catch (error) {
+      res.status(500).json({ error: error.message || "Internal server error." });
+    }
+  }
+
 };
 
 module.exports = PostController;
