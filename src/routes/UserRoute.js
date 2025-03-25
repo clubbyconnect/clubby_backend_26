@@ -47,12 +47,6 @@ const {
   getGroupsForUser,
   groupMember
 } = require("../controllers/GroupController.js")
-const {
-  sendMessage,
-  getMessagesForGroup,
-  sendSystemMessage,
-  markMessageAsRead,
-} = require("../controllers/MessageController.js")
 
 const {
   getNotifications, getUnreadCount, readOneNotification
@@ -61,6 +55,12 @@ const {
 
 const { startCall, endCall, joinCall, leaveCall, trackCallStart, trackJoinCall } = require("../controllers/CallController.js")
 
+const {
+  sendMessage,
+  getMessagesForGroup,
+  sendSystemMessage,
+  markMessageAsRead,
+} = require("../controllers/MessageController.js")
 
 const PostController = require("../controllers/PostController.js");
 const ClubRequestController = require("../controllers/ClubRequestController.js");

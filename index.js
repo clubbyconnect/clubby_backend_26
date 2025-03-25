@@ -1,11 +1,13 @@
+
 const dotenv = require("dotenv");
 dotenv.config({
   path: "./.env",
 });
+const { setupSocket } = require("./src/sockets/Index.js");
+
 const connectDB = require("./src/config/connectDb.js");
 const app = require("./app.js");
 const http = require("http");
-const { setupSocket } = require("./src/sockets/Index.js");
 
 const server = http.createServer(app);
 

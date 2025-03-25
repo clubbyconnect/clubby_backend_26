@@ -1,7 +1,9 @@
 const Call = require('../models/Call');
 const Group = require('../models/Group');
 const { getIO } = require("../sockets/Chat.js");
+// const { sendSystemMessage } = require("./MessageController.js");
 
+console.log('IN call ', typeof getIO)
 
 // Start a call
 exports.startCall = async (req, res) => {

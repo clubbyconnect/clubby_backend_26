@@ -2,6 +2,7 @@ const uploadOnCloudinary = require("../utils/Cloudinary.js");
 const Group = require('../models/Group.js');
 const Message = require('../models/Message.js');
 const { getIO } = require("../sockets/Chat.js");
+console.log('IN MSG ', typeof getIO); // Should be 'function'
 
 const admin = require("../utils/Firebase.js")
 const { addNotification } = require("./NotificationController.js");
@@ -224,6 +225,7 @@ exports.sendSystemMessage = async (groupId, content) => {
     });
 
     console.log('In the system message ', groupId.toString())
+    console.log(typeof getIO); // Should be 'function'
     const io = getIO(); // Emit the updated admin to the group members
     // Emit groupId and content along with the new message
     io.to(groupId.toString()).emit("newMessage", newMessage);

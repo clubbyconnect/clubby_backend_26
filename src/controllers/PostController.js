@@ -7,7 +7,7 @@ const mongoose = require("mongoose");
 
 const { sendSystemMessage } = require("./MessageController.js");
 const ClubRequest = require("../models/ClubRequest.js");
-
+console.log('In POST ')
 const PostController = {
   create: async (req, res) => {
     try {
