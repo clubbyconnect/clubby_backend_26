@@ -94,14 +94,14 @@ const ClubRequestController = {
 
       const postOwner = await User.findById(postOwnerId);
       if (postOwner?.fcmToken) {
-        await sendPushNotification({
-          token: postOwner.fcmToken,
-          notification: {
-            title: "New Club Request",
-            body: `You have received a club request for your Post "${postData.title}".`,
-          },
-          data: { postId: postId.toString(), requesterId: requesterId.toString() },
-        });
+        // await sendPushNotification({
+        //   token: postOwner.fcmToken,
+        //   notification: {
+        //     title: "New Club Request",
+        //     body: `You have received a club request for your Post "${postData.title}".`,
+        //   },
+        //   data: { postId: postId.toString(), requesterId: requesterId.toString() },
+        // });
       }
       return res.status(200).json({ message: "Club request sent successfully." });
     } catch (error) {

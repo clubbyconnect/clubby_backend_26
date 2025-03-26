@@ -127,30 +127,30 @@ exports.sendMessage = async (req, res) => {
         });
 
 
-        const result = await checkUserFCMAndDevice(userId);
+        // const result = await checkUserFCMAndDevice(userId);
 
-        if (result.status) {
-            console.log("User has FCM Token:", result.fcmToken);
+        // if (result.status) {
+        //     console.log("User has FCM Token:", result.fcmToken);
 
-            let message = {
-                token: result.fcmToken,
-                notification: {
-                    title: `New Message from ${groupId}`,
-                    body: `${userId}: ${messageType === 'image' ? 'sent an image' : messageType === 'audio' ? 'sent an audio' : messageType === 'video' ? 'sent an video' : finalMessageContent}`
-                }
-            };
+        //     let message = {
+        //         token: result.fcmToken,
+        //         notification: {
+        //             title: `New Message from ${groupId}`,
+        //             body: `${userId}: ${messageType === 'image' ? 'sent an image' : messageType === 'audio' ? 'sent an audio' : messageType === 'video' ? 'sent an video' : finalMessageContent}`
+        //         }
+        //     };
 
-            admin.messaging().send(message)
-                .then(response => {
-                    console.log('Successfully sent message:', response);
-                })
-                .catch(error => {
-                    console.error('Error sending message:', error);
-                });
+        //     admin.messaging().send(message)
+        //         .then(response => {
+        //             console.log('Successfully sent message:', response);
+        //         })
+        //         .catch(error => {
+        //             console.error('Error sending message:', error);
+        //         });
 
-        } else {
-            console.log("User does not have a valid FCM Token or Device Type.");
-        }
+        // } else {
+        //     console.log("User does not have a valid FCM Token or Device Type.");
+        // }
 
         //add notification 
         const success = addNotification(`New Message from ${groupId}`, `${userId}: ${messageType === 'image' ? 'sent an image' : messageType === 'audio' ? 'sent an audio' : messageType === 'video' ? 'sent an video' : finalMessageContent}`, userId, "Message", `clubby://Message`, groupId, "Group");
