@@ -393,7 +393,6 @@ const PostController = {
             },
           });
         }
-
       }
 
       if (productName) {
@@ -431,7 +430,7 @@ const PostController = {
         aggregatePipeline.push({ $match: matchStage });
       }
 
-      // Lookups for category and subcategory
+      // Lookups for category, subcategory, and user favourites
       aggregatePipeline.push(
         { $lookup: { from: "categories", localField: "category", foreignField: "_id", as: "categoryDetails" } },
         { $unwind: { path: "$categoryDetails", preserveNullAndEmptyArrays: true } },
@@ -445,10 +444,18 @@ const PostController = {
             as: "groupInfo",
           },
         },
-        { $unwind: { path: "$groupInfo", preserveNullAndEmptyArrays: true } }
+        { $unwind: { path: "$groupInfo", preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: "users",
+            localField: "_id",
+            foreignField: "favourites",
+            as: "likedByUsers"
+          }
+        }
       );
 
-      // Projection: Convert distance to km
+      // Projection: Convert distance to km and include additional fields
       aggregatePipeline.push({
         $project: {
           _id: 1,
@@ -469,6 +476,15 @@ const PostController = {
               else: { $subtract: ["$clubMembers", 1] },
             },
           },
+          size: { $ifNull: ["$size", null] }, // Ensure size is null if missing
+          location: { $ifNull: ["$store_location.name", "Unknown"] }, // Default location
+          isLiked: {
+            $cond: {
+              if: { $gt: [{ $size: "$likedByUsers" }, 0] },
+              then: true,
+              else: false
+            }
+          }
         },
       });
 
