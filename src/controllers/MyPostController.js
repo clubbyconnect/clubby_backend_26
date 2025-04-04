@@ -12,39 +12,39 @@ exports.getUserPosts = async (req, res) => {
         const userId = req.User._id;
         const { lon, lat, status, page = 1, limit = 10 } = req.query;
 
-        const result = await checkUserFCMAndDevice(userId);
+        // const result = await checkUserFCMAndDevice(userId);
 
-        if (result.status) {
-            console.log("User has FCM Token:", result.fcmToken);
+        // if (result.status) {
+        //     console.log("User has FCM Token:", result.fcmToken);
 
-            let message = {
-                token: result.fcmToken,
-                notification: {
-                    title: 'Bored Out of Your Mind? 🤨',
-                    body: 'Someone wants to spice up your product group! Check it out! 🌟'
-                }
-            };
+        //     let message = {
+        //         token: result.fcmToken,
+        //         notification: {
+        //             title: 'Bored Out of Your Mind? 🤨',
+        //             body: 'Someone wants to spice up your product group! Check it out! 🌟'
+        //         }
+        //     };
 
-            admin.messaging().send(message)
-                .then(response => {
-                    console.log('Successfully sent message:', response);
-                })
-                .catch(error => {
-                    console.error('Error sending message:', error);
-                });
+        //     admin.messaging().send(message)
+        //         .then(response => {
+        //             console.log('Successfully sent message:', response);
+        //         })
+        //         .catch(error => {
+        //             console.error('Error sending message:', error);
+        //         });
 
-        } else {
-            console.log("User does not have a valid FCM Token or Device Type.");
-        }
+        // } else {
+        //     console.log("User does not have a valid FCM Token or Device Type.");
+        // }
 
-        //add notification 
-        const success = addNotification("Bored Out of Your Mind? 🤨", "Someone wants to spice up your product group! Check it out! 🌟", userId, "JoinReq", `clubby://product/12345`, '6706ee5800ff26da8e2be0dc', "Group");
-        if (success) {
-            console.log('Add notification to controller')
-        }
-        else {
-            console.log('Error adding notification to controller')
-        }
+        // //add notification 
+        // const success = addNotification("Bored Out of Your Mind? 🤨", "Someone wants to spice up your product group! Check it out! 🌟", userId, "JoinReq", `clubby://product/12345`, '6706ee5800ff26da8e2be0dc', "Group");
+        // if (success) {
+        //     console.log('Add notification to controller')
+        // }
+        // else {
+        //     console.log('Error adding notification to controller')
+        // }
 
 
         if (!lat || !lon) {

@@ -9,7 +9,7 @@ const NotificationSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Associated user
     notificationType: {
         type: String,
-        enum: ["Message", "JoinReq", "AccptReq"],
+        enum: ["Message", "JoinReq", "AccptReq","DecReq"],
         required: true
     }, // Notification type
     deeplink: { type: String, default: null }, // Actionable link
