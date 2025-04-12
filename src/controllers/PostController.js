@@ -480,12 +480,13 @@ const PostController = {
       // Time range filter (createdAt)
       if (startDate && endDate) {
         matchQuery.createdAt = {
-          $gte: new Date(startDate), $lte: new Date(endDate),
+          $gte: new Date(startDate),
+          $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
         };
       } else if (startDate) {
         matchQuery.createdAt = {$gte: new Date(startDate)};
       } else if (endDate) {
-        matchQuery.createdAt = {$lte: new Date(endDate)};
+        matchQuery.createdAt = { $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)) };
       }
 
       // Aggregate pipeline with pagination
