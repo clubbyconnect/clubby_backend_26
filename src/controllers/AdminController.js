@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const validateEmail = require("../utils/Helper.js");
 const Post = require("../models/Post.js");
 const User = require("../models/User.js");
+const AdminEmailOtp = require("../models/AdminEmailOtp.js");
 const uploadOnCloudinary = require("../utils/Cloudinary");
 
 dotenv.config({
@@ -59,7 +60,7 @@ module.exports = {
 
       // Check if the account is deactivated
       if (admin.deletedAt) {
-        return res.status(403).json({ error: "Your account has been deactivated." });
+        return res.status(403).json({error: "Your account has been deactivated."});
       }
 
       const isPasswordValid = await bcrypt.compare(password.trim(), admin.password);
@@ -84,6 +85,52 @@ module.exports = {
       res.status(200).json({message: "Admin details fetched successfully", admin});
     } catch (error) {
       res.status(500).json({error: error.message || "Internal server error"});
+    }
+  },
+
+  sendVerificationCode: async (req, res) => {
+    let {email} = req.body;
+    if (!email) return res.status(400).json({error: 'Email is required'});
+    email = email.toLowerCase();
+    try {
+      const admin = await Admin.findOne({email});
+      if (!admin) return res.status(404).json({error: 'Admin not found'});
+      // const otp = Math.floor(1000 + Math.random() * 9000); // 4-digit OTP
+      const otp = 5647
+      await AdminEmailOtp.findOneAndUpdate(
+        {email},
+        {otp},
+        {upsert: true, new: true}
+      );
+      // will use email template
+      // await sendEmail(email, 'Admin Verification Code', `Your OTP is: ${otp}`);
+      res.status(200).json({message: 'Verification code sent to email'});
+    } catch (error) {
+      res.status(500).json({
+        error: error.message || "Internal server error",
+      });
+    }
+  },
+
+  verifyOtpAndResetPassword: async (req, res) => {
+    let {email, otp, newPassword} = req.body;
+    if (!email || !otp || !newPassword)
+      return res.status(400).json({error: 'All fields are required'});
+    email = email.toLowerCase();
+    try {
+      const existingOtp = await AdminEmailOtp.findOne({email, otp});
+      if (!existingOtp) return res.status(400).json({error: 'Invalid or expired OTP'});
+      const admin = await Admin.findOne({email});
+      if (!admin) return res.status(404).json({error: 'Admin not found'});
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      admin.password = hashedPassword;
+      await admin.save();
+      await AdminEmailOtp.deleteMany({email}); // clear all OTPs for that email
+      res.status(200).json({message: 'Password reset successful'});
+    } catch (error) {
+      res.status(500).json({
+        error: error.message || "Internal server error",
+      });
     }
   },
 
@@ -122,9 +169,9 @@ module.exports = {
         return res.status(400).json({error: "New password must be at least 6 characters long."});
       }
       const admin = req.Admin;
-      console.log('admin',admin)
+      console.log('admin', admin)
       const isOldPasswordValid = await bcrypt.compare(oldPassword.trim(), admin.password);
-      console.log('isOldPasswordValid',isOldPasswordValid)
+      console.log('isOldPasswordValid', isOldPasswordValid)
       if (!isOldPasswordValid) {
         return res.status(400).json({error: "Old password is incorrect."});
       }
@@ -141,26 +188,26 @@ module.exports = {
 
   fetchAdmin: async (req, res) => {
     try {
-      const { page = 1, status } = req.body;
+      const {page = 1, status} = req.body;
       const limit = 10;
       const skip = (page - 1) * limit;
 
       const matchStage = {};
       if (status === "deactivated") {
-        matchStage.deletedAt = { $ne: null };
+        matchStage.deletedAt = {$ne: null};
       } else if (status === "active") {
         matchStage.deletedAt = null;
       }
 
       const admins = await Admin.aggregate([
-        { $match: matchStage },
+        {$match: matchStage},
         {
           $addFields: {
             rolePriority: {
               $switch: {
                 branches: [
-                  { case: { $eq: ["$role", "Owner"] }, then: 1 }, // Owners first
-                  { case: { $eq: ["$permission", "edit"] }, then: 2 }, // Editors next
+                  {case: {$eq: ["$role", "Owner"]}, then: 1}, // Owners first
+                  {case: {$eq: ["$permission", "edit"]}, then: 2}, // Editors next
                 ],
                 default: 3, // Everyone else
               },
@@ -173,8 +220,8 @@ module.exports = {
             createdAt: -1, // Newest first within each rolePriority
           },
         },
-        { $skip: skip },
-        { $limit: limit },
+        {$skip: skip},
+        {$limit: limit},
       ]);
 
       const totalAdmins = await Admin.countDocuments(matchStage);
@@ -187,7 +234,7 @@ module.exports = {
         admins,
       });
     } catch (error) {
-      res.status(500).json({ error: error.message || "Internal server error" });
+      res.status(500).json({error: error.message || "Internal server error"});
     }
   },
 
@@ -286,26 +333,26 @@ module.exports = {
     try {
       // Will Replace these with actual DB queries
       const usersData = [
-        { name: "Active Users", value: 738 },
-        { name: "Joined This Week", value: 49 },
-        { name: "Left This Week", value: 8 },
+        {name: "Active Users", value: 738},
+        {name: "Joined This Week", value: 49},
+        {name: "Left This Week", value: 8},
       ];
 
       const postsData = [
-        { name: "Total Wrap Deal", value: 238 },
-        { name: "Active Posts", value: 855 },
-        { name: "Deactivated Posts", value: 93 },
+        {name: "Total Wrap Deal", value: 238},
+        {name: "Active Posts", value: 855},
+        {name: "Deactivated Posts", value: 93},
       ];
 
       const paidUsersData = [
-        { name: "10 Days", value: 78 },
-        { name: "30 Days", value: 859 },
-        { name: "60 Days", value: 5509 },
+        {name: "10 Days", value: 78},
+        {name: "30 Days", value: 859},
+        {name: "60 Days", value: 5509},
       ];
 
-      res.json({ usersData, postsData, paidUsersData });
+      res.json({usersData, postsData, paidUsersData});
     } catch (err) {
-      res.status(500).json({ error: "Failed to fetch dashboard summary" });
+      res.status(500).json({error: "Failed to fetch dashboard summary"});
     }
   }
 

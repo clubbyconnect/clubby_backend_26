@@ -17,6 +17,9 @@ const {getReports} = require("../controllers/GroupController.js");
 // Admin Details
 router.post("/create", verifyAdminJWT(2), AdminController.createAdmin);
 router.post("/login", AdminController.loginAdmin);
+router.post('/send-verification-code', AdminController.sendVerificationCode);
+router.post('/verify-otp-reset-password', AdminController.verifyOtpAndResetPassword);
+
 router.get("/admin-details",verifyAdminJWT(), AdminController.getAdminDetails);
 router.put("/admin-details",verifyAdminJWT(),upload.single('image'), AdminController.updateAdminDetails);
 router.put("/admin-password",verifyAdminJWT(), AdminController.updateAdminPassword);
