@@ -331,29 +331,55 @@ module.exports = {
 
   getDashBoardData: async (req, res) => {
     try {
-      // Will Replace these with actual DB queries
+      // USER DATA
+      const now = new Date();
+
+      // Calculate Start of the Week (Sunday)
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay()); // Set to Sunday of the current week
+
+      // Calculate Start of the Month (1st day of the current month)
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1); // 1st of the current month
+
+      // Count Total Users, Users Joined this Week, and Users Joined this Month
+      const totalUsers = await User.countDocuments();
+      const joinedThisWeek = await User.countDocuments({createdAt: {$gte: startOfWeek}});
+      const joinedThisMonth = await User.countDocuments({createdAt: {$gte: startOfMonth}});
+
       const usersData = [
-        {name: "Active Users", value: 738},
-        {name: "Joined This Week", value: 49},
-        {name: "Left This Week", value: 8},
+        {name: "Total Users", value: totalUsers},
+        {name: "Joined This Week", value: joinedThisWeek},
+        {name: "Joined This Month", value: joinedThisMonth},
       ];
+
+      // POSTS DATA
+      const totalPosts = await Post.countDocuments();
+
+      const activePosts = await Post.countDocuments({
+        clubStatus: {$in: ["Active", "Created", "Full", "Pending"]},
+        deletedAt: null,
+        expiryAt: {$gte: now},
+      });
+
+      const wrapPosts = await Post.countDocuments({clubStatus: "Wrap"});
 
       const postsData = [
-        {name: "Total Wrap Deal", value: 238},
-        {name: "Active Posts", value: 855},
-        {name: "Deactivated Posts", value: 93},
+        {name: "Total Posts", value: totalPosts},
+        {name: "Active Posts", value: activePosts},
+        {name: "Wrap Posts", value: wrapPosts},
       ];
 
+      // PAID USERS STATIC DATA (Static for now)
       const paidUsersData = [
-        {name: "10 Days", value: 78},
-        {name: "30 Days", value: 859},
-        {name: "60 Days", value: 5509},
+        {name: "10 Days", value: 25},
+        {name: "30 Days", value: 89},
+        {name: "60 Days", value: 239},
       ];
 
       res.json({usersData, postsData, paidUsersData});
     } catch (err) {
+      console.error("Dashboard Error:", err);
       res.status(500).json({error: "Failed to fetch dashboard summary"});
     }
-  }
-
+  },
 };
