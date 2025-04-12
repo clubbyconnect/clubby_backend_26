@@ -47,6 +47,14 @@ const {
   getGroupsForUser,
   groupMember
 } = require("../controllers/GroupController.js")
+
+const {
+  getNotifications, getUnreadCount, readOneNotification
+} = require("../controllers/NotificationController.js")
+
+
+const { startCall, endCall, joinCall, leaveCall, trackCallStart, trackJoinCall } = require("../controllers/CallController.js")
+
 const {
   sendMessage,
   getMessagesForGroup,
@@ -104,8 +112,8 @@ router.get("/categoryname/:categoryId", CategoryController.getCategoryName);
 
 //--------------------Group chat Routes-------------------------------------------------
 
-router.post("/joinGroup", createOrJoinGroup);
-router.post("/leaveGroupRequest", leaveGroup);
+router.post("/joinGroup", verifyJWT, createOrJoinGroup);
+router.post("/leaveGroupRequest", verifyJWT, leaveGroup);
 router.post("/myGroups", verifyJWT, getGroupsForUser);
 
 router.post(
@@ -133,15 +141,27 @@ router.get("/getFilteredFavoriteProducts", verifyJWT, getFilteredFavoriteProduct
 router.get("/getUserPosts", verifyJWT, getUserPosts);
 
 //Group Profile
-router.post("/removeUserFromGroup", removeUserFromGroup);
-router.get("/getSortmedia/:groupId", getFirst4MediaMessages);
-router.get("/getAllMediaMessages/:groupId", getAllMediaMessages);
-router.post("/wrapDeal", wrapDeal);
-router.post("/createReport", createReport);
-router.get("/getAllReports", getAllReports);
+router.post("/removeUserFromGroup", verifyJWT, removeUserFromGroup);
+router.get("/getSortmedia/:groupId", verifyJWT, getFirst4MediaMessages);
+router.get("/getAllMediaMessages/:groupId", verifyJWT, getAllMediaMessages);
+router.post("/wrapDeal", verifyJWT, wrapDeal);
+router.post("/createReport", verifyJWT, createReport);
+router.get("/getAllReports", verifyJWT, getAllReports);
 
 
 
+//Notifications
+router.get("/getAllNoti", verifyJWT, getNotifications);
+router.get("/getNotiReadCount", verifyJWT, getUnreadCount);
+router.patch("/readNoti/:notificationId", verifyJWT, readOneNotification);
+
+//startCall, endCall, joinCall,leaveCall
+router.post("/startCall", verifyJWT, startCall);
+router.post("/endCall", verifyJWT, endCall);
+router.post("/joinCall", verifyJWT, joinCall);
+router.post("/leaveCall", verifyJWT, leaveCall);
+router.post("/trackCallStart", verifyJWT, trackCallStart);
+router.post("/trackJoinCall", verifyJWT, trackJoinCall);
 
 
 module.exports = router;

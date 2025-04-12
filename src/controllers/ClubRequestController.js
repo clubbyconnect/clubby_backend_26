@@ -5,6 +5,10 @@ const Group = require("../models/Group.js");
 const { sendSystemMessage } = require("./MessageController.js");
 const Post = require("../models/Post");
 const { sendPushNotification } = require("../utils/Firebase.js");
+const checkUserFCMAndDevice = require("../utils/FcmCheck.js")
+const admin = require("../utils/Firebase.js")
+const { addNotification } = require("./NotificationController.js");
+
 
 const ClubRequestController = {
   list: async (req, res) => {
@@ -90,21 +94,65 @@ const ClubRequestController = {
       }
 
       await new ClubRequest({ requester: requesterId, postId }).save();
+      //postOwnerId
+      const postInformation = await Post.findOne({ _id: postId })
+        .select("itemName")
+        .lean();
 
-
-      const postOwner = await User.findById(postOwnerId);
-      if (postOwner?.fcmToken) {
-        await sendPushNotification({
-          token: postOwner.fcmToken,
-          notification: {
-            title: "New Club Request",
-            body: `You have received a club request for your Post "${postData.title}".`,
-          },
-          data: { postId: postId.toString(), requesterId: requesterId.toString() },
-        });
+      if (!postInformation) {
+        return { error: "Post not found" };
       }
+
+      const requesterInfo = await User.findOne({ _id: requesterId })
+        .select("firstName")
+        .lean();
+
+      if (!requesterInfo) {
+        return { error: "Requester not found" };
+      }
+
+      const itemName = postInformation.itemName;
+      const requesterFirstName = requesterInfo.firstName;
+
+
+      const result = await checkUserFCMAndDevice(postOwnerId);
+
+      if (result.status) {
+        console.log("User has FCM Token:", result.fcmToken);
+
+        let message = {
+          token: result.fcmToken,
+          notification: {
+            title: `New Request for ${itemName}! 🎉`,
+            body: `${requesterFirstName} is interested in your product group! Take a look and make something amazing happen! ✨`
+          }
+
+        };
+
+        admin.messaging().send(message)
+          .then(response => {
+            console.log('Successfully sent message:', response);
+          })
+          .catch(error => {
+            console.error('Error sending message:', error);
+          });
+
+      } else {
+        console.log("User does not have a valid FCM Token or Device Type.");
+      }
+
+      //add notification 
+      const success = addNotification(`New Request for ${itemName}! 🎉`, `${requesterFirstName} is interested in your product group! Take a look and make something amazing happen! ✨`, postOwnerId, "JoinReq", `clubby://product/${postId}`, postId, "Product");
+      if (success) {
+        console.log('Add notification to controller')
+      }
+      else {
+        console.log('Error adding notification to controller')
+      }
+
       return res.status(200).json({ message: "Club request sent successfully." });
     } catch (error) {
+      console.log('Error is ', error)
       return res.status(500).json({ error: "Internal server error." });
     }
   },
@@ -150,6 +198,16 @@ const ClubRequestController = {
       pendingRequest.updatedAt = Date.now();
       await pendingRequest.save();
 
+      const postInformation = await Post.findOne({ _id: postId })
+        .select("itemName")
+        .lean();
+
+      if (!postInformation) {
+        return { error: "Post not found" };
+      }
+
+      const itemName = postInformation.itemName;
+
       if (status === "accepted") {
         console.log("inside accepted")
         const group = await Group.findOne({ productId: postId });
@@ -170,8 +228,86 @@ const ClubRequestController = {
         await group.save();
         await sendSystemMessage(group._id, `${requester.firstName || "User"} has been added to the group.`);
 
+
+        const result = await checkUserFCMAndDevice(requesterId);
+
+        if (result.status) {
+          console.log("User has FCM Token:", result.fcmToken);
+
+          let message = {
+            token: result.fcmToken,
+            notification: {
+              title: `Your Request for ${itemName} is Accepted! 🎉`,
+              body: `Great news! Your request for ${itemName} has been accepted. Go ahead and seal the deal! 🤝`
+            }
+
+
+          };
+
+          admin.messaging().send(message)
+            .then(response => {
+              console.log('Successfully sent message:', response);
+            })
+            .catch(error => {
+              console.error('Error sending message:', error);
+            });
+
+        } else {
+          console.log("User does not have a valid FCM Token or Device Type.");
+        }
+
+        //add notification 
+        const success = addNotification(`Your Request for ${itemName} is Accepted! 🎉`, `Great news! Your request for ${itemName} has been accepted. Go ahead and seal the deal! 🤝`, requesterId, "AccptReq", `clubby://product/${postId}`, postId, "Product");
+        if (success) {
+          console.log('Add notification to controller')
+        }
+        else {
+          console.log('Error adding notification to controller')
+        }
+
+
         return res.status(200).json({ message: "Club request accepted and user added to the group.", group });
       }
+
+
+
+      const result = await checkUserFCMAndDevice(requesterId);
+
+      if (result.status) {
+        console.log("User has FCM Token:", result.fcmToken);
+
+        let message = {
+          token: result.fcmToken,
+          notification: {
+            title: `Request Declined for ${itemName}`,
+            body: `Unfortunately, your request for ${itemName} was declined. Don't worry—there are plenty of great deals waiting for you! 🔍`
+          }
+
+
+
+        };
+
+        admin.messaging().send(message)
+          .then(response => {
+            console.log('Successfully sent message:', response);
+          })
+          .catch(error => {
+            console.error('Error sending message:', error);
+          });
+
+      } else {
+        console.log("User does not have a valid FCM Token or Device Type.");
+      }
+
+      //add notification 
+      const success = addNotification(`Request Declined for ${itemName}`, `Unfortunately, your request for ${itemName} was declined. Don't worry—there are plenty of great deals waiting for you! 🔍`, requesterId, "DecReq", `clubby://product/${postId}`, postId, "Product");
+      if (success) {
+        console.log('Add notification to controller')
+      }
+      else {
+        console.log('Error adding notification to controller')
+      }
+
 
       return res.status(200).json({ message: "Club request declined successfully." });
 

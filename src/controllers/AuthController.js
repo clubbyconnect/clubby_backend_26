@@ -74,7 +74,7 @@ exports.signIn = async (req, res) => {
         const { email, password, deviceType, fcmToken } = req.body;
 
         // Validate required fields
-        if (!email || !password || !deviceType || !fcmToken) {
+        if (!email || !password) {
             return res.status(400).json({ error: "All fields are required" });
         }
 
@@ -95,9 +95,8 @@ exports.signIn = async (req, res) => {
             return res.status(401).json({ error: "Invalid user credentials" });
         }
 
-        // Update deviceType and fcmToken
-        user.deviceType = deviceType;
-        user.fcmToken = fcmToken;
+        // user.deviceType = deviceType;
+        // user.fcmToken = fcmToken;
         await user.save();
 
         // Generate tokens

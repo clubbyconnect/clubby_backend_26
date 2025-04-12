@@ -63,12 +63,14 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
 
         // Fetch user to get their favorite products
         const user = await User.findById(userId).select("favourites").lean();
+        console.log("User Favorites:", user.favourites);
+
         if (!user) {
             return res.status(404).json({ success: false, message: "User not found" });
         }
 
         if (!user.favourites || user.favourites.length === 0) {
-            return res.status(404).json({ success: false, message: "No favorite products found" });
+            return res.status(404).json({ success: false, message: "No favorite products found!" });
         }
 
         let aggregatePipeline = [];
@@ -82,7 +84,7 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
                 },
                 distanceField: "distance",
                 spherical: true,
-                maxDistance: 200000,
+                maxDistance: 5000000,
                 key: "store_location.coordinates",
             },
         });
@@ -91,7 +93,7 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
         aggregatePipeline.push({
             $match: {
                 _id: { $in: user.favourites.map(id => new mongoose.Types.ObjectId(id)) },
-                deletedAt: { $exists: false },
+                deletedAt: null,
                 expiryAt: { $gt: new Date() }, // Only include products whose expiry date is in the future
                 ...statusFilter,
             },
@@ -192,12 +194,22 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
             { $limit: limitNum }
         );
 
-        console.log("Aggregation Pipeline:", JSON.stringify(aggregatePipeline, null, 2));
+        // console.log("Aggregation Pipeline:", JSON.stringify(aggregatePipeline, null, 2));
+        const productsBeforeFilter = await Post.find({
+            _id: { $in: user.favourites.map(id => new mongoose.Types.ObjectId(id)) }
+        });
+        console.log("Products Before Filtering:", productsBeforeFilter);
+        const sampleProduct = await Post.findOne();
+        console.log("Sample Product Location:", sampleProduct.store_location);
+
 
         const filteredFavoriteProducts = await Post.aggregate(aggregatePipeline);
 
+        console.log("GeoNear Distance Check:", filteredFavoriteProducts.map(p => p.distance));
+
+
         if (filteredFavoriteProducts.length === 0) {
-            return res.status(404).json({ success: false, message: "No favorite products found within 200 KM" });
+            return res.status(404).json({ success: false, message: "No favorite products found" });
         }
 
         res.status(200).json({
@@ -215,5 +227,7 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
         res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
 };
+
+
 
 

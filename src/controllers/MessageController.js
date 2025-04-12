@@ -2,6 +2,11 @@ const uploadOnCloudinary = require("../utils/Cloudinary.js");
 const Group = require('../models/Group.js');
 const Message = require('../models/Message.js');
 const { getIO } = require("../sockets/Chat.js");
+console.log('IN MSG ', typeof getIO); // Should be 'function'
+
+const admin = require("../utils/Firebase.js")
+const { addNotification } = require("./NotificationController.js");
+
 
 exports.sendMessage = async (req, res) => {
     console.log('Request body:', req.body);
@@ -121,6 +126,42 @@ exports.sendMessage = async (req, res) => {
             io.to(member.toString()).emit('recentChats', newMessage);
         });
 
+
+        // const result = await checkUserFCMAndDevice(userId);
+
+        // if (result.status) {
+        //     console.log("User has FCM Token:", result.fcmToken);
+
+        //     let message = {
+        //         token: result.fcmToken,
+        //         notification: {
+        //             title: `New Message from ${groupId}`,
+        //             body: `${userId}: ${messageType === 'image' ? 'sent an image' : messageType === 'audio' ? 'sent an audio' : messageType === 'video' ? 'sent an video' : finalMessageContent}`
+        //         }
+        //     };
+
+        //     admin.messaging().send(message)
+        //         .then(response => {
+        //             console.log('Successfully sent message:', response);
+        //         })
+        //         .catch(error => {
+        //             console.error('Error sending message:', error);
+        //         });
+
+        // } else {
+        //     console.log("User does not have a valid FCM Token or Device Type.");
+        // }
+
+        //add notification 
+        const success = addNotification(`New Message from ${groupId}`, `${userId}: ${messageType === 'image' ? 'sent an image' : messageType === 'audio' ? 'sent an audio' : messageType === 'video' ? 'sent an video' : finalMessageContent}`, userId, "Message", `clubby://Message`, groupId, "Group");
+        if (success) {
+            console.log('Add notification to controller')
+        }
+        else {
+            console.log('Error adding notification to controller')
+        }
+
+
         return res.status(200).json(newMessage);
 
     } catch (error) {
@@ -184,6 +225,7 @@ exports.sendSystemMessage = async (groupId, content) => {
     });
 
     console.log('In the system message ', groupId.toString())
+    console.log(typeof getIO); // Should be 'function'
     const io = getIO(); // Emit the updated admin to the group members
     // Emit groupId and content along with the new message
     io.to(groupId.toString()).emit("newMessage", newMessage);

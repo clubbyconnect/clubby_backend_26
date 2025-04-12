@@ -33,7 +33,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
-  limits: { fileSize: 50 * 1024 * 1024 } // Increased limit to 50MB for videos and audio
+  limits: { fileSize: 50 * 1024 * 1024 } // Increased limit to 50MB for img, videos and audio
 });
 
 module.exports = upload;

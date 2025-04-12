@@ -5,8 +5,10 @@ const Group = require("../models/Group.js");
 const User = require("../models/User.js");
 const Admin = require("../models/Admin.js");
 const {sendSystemMessage} = require("./MessageController.js");
-const ClubRequest = require("../models/ClubRequest.js");
+const mongoose = require("mongoose");
 
+const ClubRequest = require("../models/ClubRequest.js");
+console.log('In POST ')
 const PostController = {
   create: async (req, res) => {
     try {
@@ -340,8 +342,8 @@ const PostController = {
   search: async (req, res) => {
     try {
       const {
-        productName, lon, lat, gender, date, offerType, clubMembers, size, sortBy, rangeLat, rangeLon, rangeRadius, category, subCategory, page = 1, // Default to page 1 if not provided
-        limit = 25 // Default limit is 25 if not provided
+        productName, lon, lat, gender, date, offerType, clubMembers, size, sortBy, rangeLat, rangeLon, rangeRadius, category, subCategory, page = 1,
+        limit = 25
       } = req.query;
 
       const userId = req.User._id;
@@ -352,26 +354,24 @@ const PostController = {
       let matchStage = {deletedAt: null, expiryAt: {$gte: new Date()}};
       let aggregatePipeline = [];
 
-      // GeoNear for distance calculation (within 200 KM if no range is provided)
-      if (rangeLat && rangeLon && rangeRadius) {
-        const lat = parseFloat(rangeLat);
-        const lon = parseFloat(rangeLon);
-        const kmRadius = parseFloat(rangeRadius);
+      // Handle GeoNear for distance filtering (from 0 to 2000km)
+      if ((rangeLat && rangeLon && rangeRadius) || (lon && lat)) {
+        const latitude = parseFloat(rangeLat || lat);
+        const longitude = parseFloat(rangeLon || lon);
+        let kmRadius = parseFloat(rangeRadius) || 2000; // Default to 2000km if not provided
 
-        if (!isNaN(lat) && !isNaN(lon) && !isNaN(kmRadius) && kmRadius > 0) {
+        if (!isNaN(latitude) && !isNaN(longitude)) {
+          kmRadius = Math.max(1, Math.min(kmRadius, 2000)); // Ensure within 1 - 2000 km range
           const radiusInMeters = kmRadius * 1000;
+
+          console.log("GeoNear Params:", { latitude, longitude, radiusInMeters });
+
           aggregatePipeline.push({
             $geoNear: {
-              near: {type: "Point", coordinates: [lon, lat]}, distanceField: "distance", spherical: true, maxDistance: radiusInMeters, key: "store_location.coordinates",
+              near: {type: "Point", coordinates: [longitude, latitude]}, distanceField: "distance", spherical: true, maxDistance: radiusInMeters, key: "store_location.coordinates",
             },
           });
         }
-      } else if (lon && lat) {
-        aggregatePipeline.push({
-          $geoNear: {
-            near: {type: "Point", coordinates: [parseFloat(lon), parseFloat(lat)]}, distanceField: "distance", spherical: true, maxDistance: 200000, key: "store_location.coordinates",
-          },
-        });
       }
 
       if (productName) {
@@ -409,13 +409,47 @@ const PostController = {
         aggregatePipeline.push({$match: matchStage});
       }
 
-      // Lookups
-      aggregatePipeline.push({$lookup: {from: "categories", localField: "category", foreignField: "_id", as: "categoryDetails"}}, {$unwind: {path: "$categoryDetails", preserveNullAndEmptyArrays: true}}, {$lookup: {from: "subcategories", localField: "subCategory", foreignField: "_id", as: "subCategoryDetails"}}, {$unwind: {path: "$subCategoryDetails", preserveNullAndEmptyArrays: true}});
+      // Lookups for category, subcategory, and user favourites
+      aggregatePipeline.push({$lookup: {from: "categories", localField: "category", foreignField: "_id", as: "categoryDetails"}}, {$unwind: {path: "$categoryDetails", preserveNullAndEmptyArrays: true}}, {$lookup: {from: "subcategories", localField: "subCategory", foreignField: "_id", as: "subCategoryDetails"}}, {$unwind: {path: "$subCategoryDetails", preserveNullAndEmptyArrays: true}},
+        {
+          $lookup: {
+            from: "groups",
+            let: { productId: { $toString: "$_id" } },
+            pipeline: [{ $match: { $expr: { $eq: ["$productId", "$$productId"] } } }],
+            as: "groupInfo",
+          },
+        },
+        { $unwind: { path: "$groupInfo", preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: "users",
+            localField: "_id",
+            foreignField: "favourites",
+            as: "likedByUsers"
+          }
+        }
+      );
 
-      // Projection
+      // Projection: Convert distance to km and include additional fields
       aggregatePipeline.push({
         $project: {
-          _id: 1, itemName: 1, offerType: 1, price: 1, categoryName: "$categoryDetails.name", subCategoryName: "$subCategoryDetails.name", productImage: 1, distance: {$divide: ["$distance", 1000]}, // Convert meters to km
+          _id: 1, itemName: 1, additionalInformation: 1, price: 1,categoryImage: "$categoryDetails.image", categoryName: "$categoryDetails.name", subCategoryName: "$subCategoryDetails.name",subCategoryImage: "$subCategoryDetails.image", productImage: 1, distance: {$divide: ["$distance", 1000]}, // Convert meters to kmclubMembers: 1,
+          clubToJoin: {
+            $cond: {
+              if: { $isArray: "$groupInfo.members" },
+              then: { $subtract: ["$clubMembers", { $size: "$groupInfo.members" }] },
+              else: { $subtract: ["$clubMembers", 1] },
+            },
+          },
+          size: { $ifNull: ["$size", null] }, // Ensure size is null if missing
+          location: { $ifNull: ["$store_location.name", "Unknown"] }, // Default location
+          isLiked: {
+            $cond: {
+              if: { $gt: [{ $size: "$likedByUsers" }, 0] },
+              then: true,
+              else: false
+            }
+          }
         },
       });
 
@@ -430,7 +464,9 @@ const PostController = {
       aggregatePipeline.push({$skip: skip}, {$limit: parsedLimit});
 
       const products = await PostModel.aggregate(aggregatePipeline);
-      const totalProducts = await PostModel.countDocuments(matchStage);
+      const totalCountPipeline = [...aggregatePipeline, { $count: "total" }];
+      const countResult = await PostModel.aggregate(totalCountPipeline);
+      const totalProducts = countResult.length > 0 ? countResult[0].total : 0;
       const totalPages = Math.ceil(totalProducts / parsedLimit);
 
       res.status(200).json({
@@ -594,6 +630,7 @@ const PostController = {
       res.status(500).json({ error: error.message || "Internal server error." });
     }
   }
+
 
 };
 
