@@ -17,6 +17,9 @@ const {getReports} = require("../controllers/GroupController.js");
 // Admin Details
 router.post("/create", verifyAdminJWT(2), AdminController.createAdmin);
 router.post("/login", AdminController.loginAdmin);
+router.get("/admin-details",verifyAdminJWT(), AdminController.getAdminDetails);
+router.put("/admin-details",verifyAdminJWT(),upload.single('image'), AdminController.updateAdminDetails);
+router.put("/admin-password",verifyAdminJWT(), AdminController.updateAdminPassword);
 router.post("/get-admins", verifyAdminJWT(), AdminController.fetchAdmin);
 router.put("/update-admin/:id", verifyAdminJWT(2), AdminController.updateAdmin);
 router.put("/deactivate-admin/:id", verifyAdminJWT(2), AdminController.deactivateAdmin);
@@ -54,6 +57,9 @@ router.get("/get-post-stats", verifyAdminJWT(), PostController.getPostStatsByCat
 router.post("/get-users", verifyAdminJWT(), UserController.getUsers);
 router.get("/single-user/:id", verifyAdminJWT(), UserController.getUserDetails);
 router.put("/deactivate-user/:id", verifyAdminJWT(1), UserController.deactivateUser);
+
+// DASHBOARD
+router.get("/dashboard-data", verifyAdminJWT(), AdminController.getDashBoardData);
 
 //REPORTS
 router.post("/get-reports", verifyAdminJWT(), getReports);

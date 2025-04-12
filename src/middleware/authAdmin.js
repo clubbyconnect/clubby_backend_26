@@ -19,7 +19,7 @@ exports.verifyAdminJWT = (accessLevel = 0) => {
         return res.status(401).json({error: "Invalid Token Structure"});
       }
 
-      const admin = await Admin.findById(decodedToken.id).select("-password");
+      const admin = await Admin.findById(decodedToken.id);
       if (!admin) return res.status(401).json({error: "Invalid Admin Access Token"});
 
       // Check if the account is deactivated

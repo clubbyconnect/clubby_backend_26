@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const validateEmail = require("../utils/Helper.js");
 const Post = require("../models/Post.js");
 const User = require("../models/User.js");
+const uploadOnCloudinary = require("../utils/Cloudinary");
 
 dotenv.config({
   path: "./.env",
@@ -77,6 +78,66 @@ module.exports = {
     }
   },
 
+  getAdminDetails: async (req, res) => {
+    try {
+      const admin = req.Admin;
+      res.status(200).json({message: "Admin details fetched successfully", admin});
+    } catch (error) {
+      res.status(500).json({error: error.message || "Internal server error"});
+    }
+  },
+
+  updateAdminDetails: async (req, res) => {
+    try {
+      const {name, email} = req.body;
+      const admin = req.Admin;
+
+      admin.name = name;
+      admin.email = email.toLowerCase();
+
+      if (req.file) {
+        const uploadedImage = await uploadOnCloudinary(req.file.path);
+        admin.image = uploadedImage.secure_url;
+      }
+
+      await admin.save();
+
+      res.status(200).json({
+        message: "Admin details updated successfully", admin,
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: error.message || "Internal server error",
+      });
+    }
+  },
+
+  updateAdminPassword: async (req, res) => {
+    try {
+      const {oldPassword, newPassword} = req.body;
+      if (!oldPassword || !newPassword) {
+        return res.status(400).json({error: "Both old password and new password are required."});
+      }
+      if (newPassword.length < 6) {
+        return res.status(400).json({error: "New password must be at least 6 characters long."});
+      }
+      const admin = req.Admin;
+      console.log('admin',admin)
+      const isOldPasswordValid = await bcrypt.compare(oldPassword.trim(), admin.password);
+      console.log('isOldPasswordValid',isOldPasswordValid)
+      if (!isOldPasswordValid) {
+        return res.status(400).json({error: "Old password is incorrect."});
+      }
+
+      // Update the password in the database
+      admin.password = await bcrypt.hash(newPassword.trim(), 10);
+      await admin.save();
+      res.status(200).json({message: "Password updated successfully."});
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({error: "Internal server error."});
+    }
+  },
 
   fetchAdmin: async (req, res) => {
     try {
@@ -218,6 +279,33 @@ module.exports = {
 
     } catch (error) {
       res.status(500).json({error: error.message || "Internal server error"});
+    }
+  },
+
+  getDashBoardData: async (req, res) => {
+    try {
+      // Will Replace these with actual DB queries
+      const usersData = [
+        { name: "Active Users", value: 738 },
+        { name: "Joined This Week", value: 49 },
+        { name: "Left This Week", value: 8 },
+      ];
+
+      const postsData = [
+        { name: "Total Wrap Deal", value: 238 },
+        { name: "Active Posts", value: 855 },
+        { name: "Deactivated Posts", value: 93 },
+      ];
+
+      const paidUsersData = [
+        { name: "10 Days", value: 78 },
+        { name: "30 Days", value: 859 },
+        { name: "60 Days", value: 5509 },
+      ];
+
+      res.json({ usersData, postsData, paidUsersData });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch dashboard summary" });
     }
   }
 
