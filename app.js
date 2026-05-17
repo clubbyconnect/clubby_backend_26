@@ -6,6 +6,10 @@ const connectDB = require("./src/config/connectDb.js");
 
 const app = express();
 
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 //global midellware
 app.use(cors({ origin: "*", credentials: true, }));
 app.use(express.json({ limit: "16kb" }));
