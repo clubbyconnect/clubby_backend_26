@@ -1,6 +1,8 @@
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
+const mongoose = require("mongoose");
+const connectDB = require("./src/config/connectDb.js");
 
 const app = express();
 
@@ -10,6 +12,17 @@ app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(express.static("public"));
 app.use(cookieParser());
+
+app.use(async (req, res, next) => {
+  if (mongoose.connection.readyState === 1) return next();
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.log("Unable to connect to database", error);
+    res.status(500).json({ error: "Database unavailable" });
+  }
+});
 
 //import routers
 const userRoutes = require("./src/routes/UserRoute.js");

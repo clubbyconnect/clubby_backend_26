@@ -7,20 +7,6 @@ dotenv.config({
 const connectDB = require("./src/config/connectDb.js");
 const app = require("./app.js");
 
-let dbReady = false;
-
-app.use(async (req, res, next) => {
-  if (dbReady) return next();
-  try {
-    await connectDB();
-    dbReady = true;
-    next();
-  } catch (error) {
-    console.log("Unable to connect to database", error);
-    res.status(500).json({ error: "Database unavailable" });
-  }
-});
-
 module.exports = app;
 
 if (!process.env.VERCEL && require.main === module) {
@@ -30,7 +16,6 @@ if (!process.env.VERCEL && require.main === module) {
 
   connectDB()
     .then(() => {
-      dbReady = true;
       server.listen(process.env.PORT || 8000, () => {
         console.log(`Server is listening on port ${process.env.PORT}`);
       });
