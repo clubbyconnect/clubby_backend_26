@@ -58,7 +58,7 @@ const { startCall, endCall, joinCall, leaveCall, trackCallStart, trackJoinCall }
 const {
   sendMessage,
   getMessagesForGroup,
-  sendSystemMessage,
+  sendSystemMessageHandler,
   markMessageAsRead,
 } = require("../controllers/MessageController.js")
 
@@ -103,6 +103,8 @@ router.post("/UpdateUserDetails", verifyJWT, upload.single('avatar'), UpdateUser
 
 
 router.post("/fetchallcategory", verifyJWT, CategoryController.getAllCategories);
+router.post("/fetchOfflinecategory", verifyJWT, CategoryController.getAllCategories);
+router.post("/fetchOnlinecategory", verifyJWT, CategoryController.onlineDiscontinued);
 router.post("/fetchsubcategory", verifyJWT, SubcategoryController.fetchsubcategory);
 
 
@@ -130,7 +132,7 @@ router.post("/markMessageAsRead", verifyJWT, markMessageAsRead);
 router.get("/getMessages/:groupId", verifyJWT, getMessagesForGroup);
 router.get("/getAdminUser/:groupId", getGroupMembersAndAdmin);
 router.get("/getGroupDetails/:groupId", getGroupDetails)
-router.post("/sendSystemMessage", sendSystemMessage);
+router.post("/sendSystemMessage", sendSystemMessageHandler);
 
 
 //Favourite

@@ -224,5 +224,10 @@ module.exports = {
       console.error(e);
       res.status(500).json({success: false, message: "Server error"});
     }
-  }
+  },
+
+  /** Legacy clients calling fetchOnlinecategory — offline-only product. */
+  onlineDiscontinued: async (req, res) => {
+    return res.status(410).json({ error: 'Online mode discontinued' });
+  },
 };

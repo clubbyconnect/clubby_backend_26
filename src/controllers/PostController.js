@@ -8,13 +8,30 @@ const {sendSystemMessage} = require("./MessageController.js");
 const mongoose = require("mongoose");
 
 const ClubRequest = require("../models/ClubRequest.js");
-console.log('In POST ')
+const {
+  findOnlineOnlyFields,
+  validateShowroomLocation,
+  validateShowroomLocationIfPresent,
+} = require("../utils/offlinePostValidation.js");
+
 const PostController = {
   create: async (req, res) => {
     try {
       const {
         category, subCategory, itemName, offerType, price, price_type, clubMembers, store_location_latitude, store_location_longitude, additionalInformation, size, productImages, showroomAddress
       } = req.body;
+
+      const onlineFields = findOnlineOnlyFields(req.body);
+      if (onlineFields.length > 0) {
+        return res.status(400).json({
+          error: `Online-only fields are not supported: ${onlineFields.join(", ")}`,
+        });
+      }
+
+      const showroomError = validateShowroomLocation(req.body);
+      if (showroomError) {
+        return res.status(400).json({ error: showroomError });
+      }
 
       // Validate required fields
       if ([category, subCategory, itemName, offerType, price, price_type, clubMembers].some((field) => !field || field.trim() === "")) {
@@ -118,7 +135,18 @@ const PostController = {
         return res.status(404).json({error: "Post not found."});
       }
 
-      console.log("req.body", req.body)
+      const onlineFields = findOnlineOnlyFields(req.body);
+      if (onlineFields.length > 0) {
+        return res.status(400).json({
+          error: `Online-only fields are not supported: ${onlineFields.join(", ")}`,
+        });
+      }
+
+      const showroomError = validateShowroomLocationIfPresent(req.body);
+      if (showroomError) {
+        return res.status(400).json({ error: showroomError });
+      }
+
       if ([category, subCategory, itemName, offerType, price, price_type, clubMembers].some((field) => !field || field.trim() === "")) {
         return res.status(400).json({error: "Please fill all required fields."});
       }
@@ -148,9 +176,18 @@ const PostController = {
         await Group.updateOne({productId: existingPost._id}, {limit: memberLimit});
       }
 
-      if (store_location_latitude && store_location_longitude) {
+      if (
+        store_location_latitude !== undefined ||
+        store_location_longitude !== undefined ||
+        showroomAddress !== undefined
+      ) {
         updates.store_location = {
-          name: showroomAddress, type: "Point", coordinates: [parseFloat(store_location_longitude), parseFloat(store_location_latitude)],
+          name: showroomAddress,
+          type: "Point",
+          coordinates: [
+            parseFloat(store_location_longitude),
+            parseFloat(store_location_latitude),
+          ],
         };
       }
 
