@@ -23,7 +23,7 @@ app.use(async (req, res, next) => {
 
 module.exports = app;
 
-if (require.main === module) {
+if (!process.env.VERCEL && require.main === module) {
   const { setupSocket } = require("./src/sockets/Index.js");
   const http = require("http");
   const server = http.createServer(app);
