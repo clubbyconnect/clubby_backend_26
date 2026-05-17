@@ -14,10 +14,13 @@ app.use(cookieParser());
 //import routers
 const userRoutes = require("./src/routes/UserRoute.js");
 const adminRoutes = require("./src/routes/AdminRoute.js");
+const authRoutes = require("./src/routes/AuthRoute.js");
 
 //routes declaration
 app.use("/api/user", userRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/auth", authRoutes);
 
 module.exports = app;
 

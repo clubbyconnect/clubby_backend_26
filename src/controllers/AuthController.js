@@ -95,27 +95,30 @@ exports.signIn = async (req, res) => {
             return res.status(401).json({ error: "Invalid user credentials" });
         }
 
-        // user.deviceType = deviceType;
-        // user.fcmToken = fcmToken;
-        await user.save();
+        if (deviceType) user.deviceType = deviceType;
+        if (fcmToken) user.fcmToken = fcmToken;
+        if (deviceType || fcmToken) {
+            await user.save({ validateBeforeSave: false });
+        }
 
-        // Generate tokens
         const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
         const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
 
-        // Set cookies
         const options = {
             httpOnly: true,
             secure: true,
         };
 
-        res.cookie("accessToken", accessToken, options);
-        res.cookie("refreshToken", refreshToken, options);
-
-        return res.status(200).json({
-            message: "User signed in successfully",
-            data: { accessToken: accessToken, userInfo: loggedInUser },
-        });
+        return res
+            .status(200)
+            .cookie("accessToken", accessToken, options)
+            .cookie("refreshToken", refreshToken, options)
+            .json({
+                message: "User signed in successfully",
+                token: accessToken,
+                accessToken,
+                data: { accessToken, userInfo: loggedInUser },
+            });
     } catch (error) {
         serverErrorHandler(error, res);
     }
