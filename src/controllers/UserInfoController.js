@@ -1,7 +1,9 @@
-
 const uploadOnCloudinary = require("../utils/Cloudinary.js");
 const serverErrorHandler = require("../utils/ServerErrorHandler.js");
 const User = require("../models/User.js");
+
+const excludeField =
+  "-password -refreshToken -UserRating -homelocationChangeCount -lastHomelocationChange -emailChangeCount -lastEmailChange -phoneNumberChangeCount -lastPhoneNumberChange -googleAuthId -blockedUsers -reportCount";
 
 
 exports.uploadAvatar = async (req, res) => {
@@ -58,23 +60,38 @@ exports.UpdateUserDetails = async (req, res) => {
         }
 
         if (userName) {
-            isUserNameExist = await User.findOne({ userName });
+            const trimmedUserName = userName.trim();
+            const isUserNameExist = await User.findOne({ userName: trimmedUserName });
 
-            if (isUserNameExist) {
-                return res.status(404).json({ error: "userName Already exist" });
+            if (
+                isUserNameExist &&
+                isUserNameExist._id.toString() !== userId.toString()
+            ) {
+                return res.status(409).json({ error: "userName Already exist" });
             }
-            updateDetails.userName = userName.trim();
+            updateDetails.userName = trimmedUserName;
         }
 
         if (firstName) updateDetails.firstName = firstName.trim();
         if (lastName) updateDetails.lastName = lastName.trim();
         if (gender) updateDetails.gender = gender.trim();
         if (email) updateDetails.email = email.trim();
-        if (phoneNumber) updateDetails.phoneNumber = phoneNumber.trim();
+        if (phoneNumber != null && phoneNumber !== "") {
+            updateDetails.phoneNumber = String(phoneNumber).trim();
+        }
         if (address) {
-            updateDetails.address.address_text = address.address_text;
-            updateDetails.address.latitude = address.latitude;
-            updateDetails.address.longitude = address.longitude;
+            if (!updateDetails.address) {
+                updateDetails.address = {};
+            }
+            if (address.address_text != null) {
+                updateDetails.address.address_text = address.address_text;
+            }
+            if (address.latitude != null) {
+                updateDetails.address.latitude = address.latitude;
+            }
+            if (address.longitude != null) {
+                updateDetails.address.longitude = address.longitude;
+            }
         }
         if (birthdate) {
             const parsedBirthdate = new Date(birthdate);
