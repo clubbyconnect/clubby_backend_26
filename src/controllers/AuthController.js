@@ -1,5 +1,5 @@
-const { appleAuth } = require("apple-auth");
 const { OAuth2Client } = require("google-auth-library");
+const verifyAppleIdToken = require("../utils/verifyAppleIdToken.js");
 const Facebook = require("facebook-node-sdk");
 const serverErrorHandler = require("../utils/ServerErrorHandler.js");
 const User = require("../models/User.js");
@@ -182,12 +182,107 @@ exports.googleAuth = async (req, res) => {
 
 exports.appleAuth = async (req, res) => {
     try {
-        const { idToken, user } = req.body;
-        const userInfo = await appleAuth.verifyIdToken(idToken, {
-            audience: process.env.APPLE_CLIENT_ID,
-            ignoreExpiration: true,
-        });
+        const { idToken, token, deviceType, fcmToken, user: appleProfile } = req.body;
+        const appleIdToken = idToken || token;
+
+        if (!appleIdToken || !deviceType || !fcmToken) {
+            return res.status(400).json({ error: "All fields are required" });
+        }
+
+        if (!process.env.APPLE_CLIENT_ID) {
+            return res.status(500).json({ error: "Apple Sign-In is not configured" });
+        }
+
+        const payload = await verifyAppleIdToken(
+            appleIdToken,
+            process.env.APPLE_CLIENT_ID
+        );
+
+        const appleAuthId = payload.sub;
+        const emailFromToken = payload.email;
+
+        let profile = appleProfile;
+        if (typeof profile === "string") {
+            try {
+                profile = JSON.parse(profile);
+            } catch {
+                profile = null;
+            }
+        }
+
+        const emailFromProfile = profile?.email;
+        const email = emailFromToken || emailFromProfile;
+
+        let user = await User.findOne({ appleAuthId });
+        let isNewUser = false;
+
+        if (!user && email) {
+            user = await User.findOne({
+                email: { $regex: new RegExp(`^${email}$`, "i") },
+            });
+            if (user) {
+                user.appleAuthId = appleAuthId;
+            }
+        }
+
+        if (!user) {
+            if (!email) {
+                return res.status(400).json({
+                    error: "Email is required for first-time Apple Sign-In",
+                });
+            }
+
+            const createData = {
+                email,
+                appleAuthId,
+                deviceType,
+                fcmToken,
+                emailVerified: payload.email_verified === true || payload.email_verified === "true",
+            };
+
+            if (profile?.name?.firstName) createData.firstName = profile.name.firstName;
+            if (profile?.name?.lastName) createData.lastName = profile.name.lastName;
+
+            const newUser = await User.create(createData);
+            user = await User.findById(newUser._id).select("-password -refreshToken");
+            isNewUser = true;
+        } else {
+            if (user.deletedAt && user.deactivatedByAdminId) {
+                return res.status(403).json({
+                    error: "Your account has been deactivated by an admin.",
+                });
+            }
+            user.deviceType = deviceType;
+            user.fcmToken = fcmToken;
+            if (!user.appleAuthId) user.appleAuthId = appleAuthId;
+            await user.save({ validateBeforeSave: false });
+        }
+
+        const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
+        const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
+
+        const options = {
+            httpOnly: true,
+            secure: true,
+        };
+
+        return res
+            .status(200)
+            .cookie("accessToken", accessToken, options)
+            .cookie("refreshToken", refreshToken, options)
+            .json({
+                message: isNewUser
+                    ? "User Created and signed in successfully"
+                    : "User signed in successfully",
+                token: accessToken,
+                accessToken,
+                data: { accessToken, userInfo: loggedInUser },
+            });
     } catch (error) {
+        console.error("Apple auth error:", error);
+        if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
+            return res.status(401).json({ error: "Invalid Apple identity token" });
+        }
         serverErrorHandler(error, res);
     }
 };

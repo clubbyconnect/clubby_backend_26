@@ -121,6 +121,11 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: null
     },
+    appleAuthId: {
+      type: String,
+      trim: true,
+      default: null
+    },
     avatar: {
       type: String,
       default: "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721381617/default%20images/lbzfg1b3wzyhru4j9vjw.png",
