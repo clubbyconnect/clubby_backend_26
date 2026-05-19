@@ -3,6 +3,7 @@ const Post = require("../models/Post.js");
 const Report = require('../models/ReportSchema.js');
 const Group = require('../models/Group.js');
 const Message = require('../models/Message.js');
+const { sendSystemMessage } = require("./MessageController.js");
 
 
 exports.removeUserFromGroup = async (req, res) => {
@@ -41,7 +42,7 @@ exports.removeUserFromGroup = async (req, res) => {
         }
         const userFirstName = user.firstName || "User";
 
-        await exports.sendSystemMessage(group._id, `${userFirstName} has been removed from the group by Admin.`);
+        await sendSystemMessage(group._id, `${userFirstName} has been removed from the group by Admin.`);
 
         // Return success response
         return res.status(200).json({ message: `${userFirstName} has been removed from the group.`, group });
@@ -147,7 +148,7 @@ exports.wrapDeal = async (req, res) => {
             }
         }
 
-        await exports.sendSystemMessage(groupId, `Deal has been wrapped.`);
+        await sendSystemMessage(groupId, `Deal has been wrapped.`);
         res
             .status(200)
             .json({ message: "Group and Post wrapped successfully, ratings updated." });

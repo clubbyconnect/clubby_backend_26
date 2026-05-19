@@ -13,10 +13,20 @@ const fileFilter = (req, file, cb) => {
     'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp3'
   ];
 
-  if (allowedTypes.includes(file.mimetype)) {
+  const mime = file.mimetype || '';
+  const isOctetImage =
+    mime === 'application/octet-stream' &&
+    /\.(jpe?g|png|gif|webp|heic)$/i.test(file.originalname || '');
+
+  if (allowedTypes.includes(mime) || isOctetImage || mime === '') {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only images, videos, and audio files are allowed.'), false);
+    cb(
+      new Error(
+        `Invalid file type (${mime}). Only images, videos, and audio files are allowed.`,
+      ),
+      false,
+    );
   }
 };
 

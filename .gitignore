@@ -35,6 +35,8 @@ bower_components/
 
 # Ignore the local environment configuration
 .env.local
+.env.vercel.pull
 
 # Ignore specific files or directories
 /path/to/file_or_directory
+.vercel

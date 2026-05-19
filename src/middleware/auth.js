@@ -24,6 +24,17 @@ exports.verifyJWT = async (req, res, next) => {
     req.User = user;
     next()
   } catch (error) {
+    if (
+      error.name === "JsonWebTokenError" ||
+      error.name === "TokenExpiredError"
+    ) {
+      return res.status(401).json({
+        message:
+          error.name === "TokenExpiredError"
+            ? "Session expired. Please sign in again."
+            : "Invalid session. Please sign in again.",
+      });
+    }
     serverErrorHandler(error, res);
   }
 };

@@ -129,30 +129,59 @@ exports.googleAuth = async (req, res) => {
     try {
         const { token, deviceType, fcmToken } = req.body;
 
-        // Validate required fields
-        if (!token || !deviceType || !fcmToken) {
-            return res.status(400).json({ error: "All fields are required" });
+        if (!token || !deviceType) {
+            return res.status(400).json({ error: "Token and deviceType are required" });
         }
 
-        // Verify Google token
-        const result = await client.verifyIdToken({
-            idToken: token,
-            audience: process.env.GOOGLE_CLIENT_ID,
-        });
+        const audiences = [
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_ANDROID_CLIENT_ID,
+        ].filter(Boolean);
+
+        let result;
+        try {
+            result = await client.verifyIdToken({
+                idToken: token,
+                audience: audiences.length === 1 ? audiences[0] : audiences,
+            });
+        } catch (verifyError) {
+            const hint =
+                verifyError?.message?.includes("audience")
+                    ? " GOOGLE_CLIENT_ID in .env must match the app Web client (463251283140-...ld3pg0.apps.googleusercontent.com from google-services.json)."
+                    : "";
+            return res.status(500).json({
+                message: (verifyError?.message || "Google token verification failed") + hint,
+            });
+        }
 
         const googleAuthId = result.payload.sub;
-        const email = result.payload.email;
+        const email = result.payload.email?.toLowerCase?.() ?? result.payload.email;
 
-        // Find or create user
         let user = await User.findOne({ googleAuthId });
+        let isNewUser = false;
+
+        if (!user && email) {
+            user = await User.findOne({
+                email: { $regex: new RegExp(`^${email}$`, "i") },
+            });
+            if (user) {
+                if (user.googleAuthId && user.googleAuthId !== googleAuthId) {
+                    return res.status(409).json({
+                        error: "This email is linked to a different Google account.",
+                    });
+                }
+                user.googleAuthId = googleAuthId;
+            }
+        }
+
         if (!user) {
             const newUser = await User.create({ email, googleAuthId, deviceType, fcmToken });
             user = await User.findById(newUser._id).select("-password -refreshToken");
+            isNewUser = true;
         } else {
-            // Update deviceType and fcmToken
             user.deviceType = deviceType;
-            user.fcmToken = fcmToken;
-            await user.save();
+            if (fcmToken) user.fcmToken = fcmToken;
+            await user.save({ validateBeforeSave: false });
         }
 
         // Generate tokens
@@ -170,10 +199,12 @@ exports.googleAuth = async (req, res) => {
             .cookie("accessToken", accessToken, options)
             .cookie("refreshToken", refreshToken, options)
             .json({
-                message: user
-                    ? "User signed in successfully"
-                    : "User Created and signed in successfully",
-                data: { accessToken: accessToken, userInfo: loggedInUser },
+                message: isNewUser
+                    ? "User Created and signed in successfully"
+                    : "User signed in successfully",
+                token: accessToken,
+                accessToken,
+                data: { accessToken, userInfo: loggedInUser },
             });
     } catch (error) {
         serverErrorHandler(error, res);

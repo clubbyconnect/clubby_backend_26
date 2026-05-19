@@ -12,14 +12,24 @@ const FileController = {
       // Upload image to Cloudinary
       const uploadedImage = await uploadOnCloudinary(req.file.path);
 
-      console.log("uploadedImage", uploadedImage)
+      if (uploadedImage?.error) {
+        return res.status(500).json({
+          success: false,
+          error: uploadedImage.error,
+        });
+      }
 
-      if (!uploadedImage?.url) {
-        return res.status(500).json({ success: false, error: "Image upload failed" });
+      if (!uploadedImage?.secure_url && !uploadedImage?.url) {
+        return res.status(500).json({
+          success: false,
+          error: "Image upload failed (no URL from Cloudinary)",
+        });
       }
 
       return res.status(200).json({
-        success: true, message: "Image uploaded successfully", imageUrl: uploadedImage.url
+        success: true,
+        message: "Image uploaded successfully",
+        imageUrl: uploadedImage.secure_url || uploadedImage.url,
       });
 
     } catch (error) {

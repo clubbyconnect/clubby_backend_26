@@ -70,7 +70,6 @@ const postSchema = new mongoose.Schema(
       },
       coordinates: {
         type: [Number],
-        index: "2dsphere",
       },
     },
     additionalInformation: {

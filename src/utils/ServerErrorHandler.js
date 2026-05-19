@@ -17,8 +17,14 @@ const serverErrorHandler = (error, res) => {
     return new ErrorHandler(`${errors[0].message}`, 400, res);
   }
 
-  console.log(error);
-  return new ErrorHandler("User is not verified ", 500, res);
+  console.error(error);
+  const statusCode = error.statusCode || error.status || 500;
+  const message =
+    error.message ||
+    (error.name === "TokenExpiredError"
+      ? "Session expired. Please sign in again."
+      : "Something went wrong. Please try again.");
+  return new ErrorHandler(message, statusCode, res);
 };
 
 module.exports = serverErrorHandler;

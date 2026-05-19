@@ -79,18 +79,26 @@ exports.UpdateUserDetails = async (req, res) => {
         if (phoneNumber != null && phoneNumber !== "") {
             updateDetails.phoneNumber = String(phoneNumber).trim();
         }
-        if (address) {
+        let addressPayload = address;
+        if (typeof addressPayload === "string") {
+            try {
+                addressPayload = JSON.parse(addressPayload);
+            } catch {
+                addressPayload = null;
+            }
+        }
+        if (addressPayload && typeof addressPayload === "object") {
             if (!updateDetails.address) {
                 updateDetails.address = {};
             }
-            if (address.address_text != null) {
-                updateDetails.address.address_text = address.address_text;
+            if (addressPayload.address_text != null) {
+                updateDetails.address.address_text = addressPayload.address_text;
             }
-            if (address.latitude != null) {
-                updateDetails.address.latitude = address.latitude;
+            if (addressPayload.latitude != null) {
+                updateDetails.address.latitude = addressPayload.latitude;
             }
-            if (address.longitude != null) {
-                updateDetails.address.longitude = address.longitude;
+            if (addressPayload.longitude != null) {
+                updateDetails.address.longitude = addressPayload.longitude;
             }
         }
         if (birthdate) {

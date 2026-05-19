@@ -5,6 +5,7 @@ const Post = require("../models/Post.js");
 const ClubRequest = require("../models/ClubRequest.js");
 const { sendPushNotification } = require('../utils/Firebase.js');
 const { getIO } = require("../sockets/Chat.js");
+const { sendSystemMessage } = require("./MessageController.js");
 const Report = require("../models/ReportSchema.js");
 
 
@@ -306,7 +307,7 @@ exports.createOrJoinGroup = async (req, res) => {
     await group.save();
 
     try {
-      await exports.sendSystemMessage(group._id, `${userId} has joined the group.`);
+      await sendSystemMessage(group._id, `${userId} has joined the group.`);
     } catch (error) {
       console.error("Error in sendSystemMessage:", error); // Log the error for more details
     }
@@ -404,8 +405,8 @@ exports.leaveGroup = async (req, res) => {
         }
 
         await group.save();
-        await exports.sendSystemMessage(group._id, `${userFirstName} transferred admin rights to ${newAdminFirstName}.`);
-        await exports.sendSystemMessage(group._id, `${userFirstName} left the group.`);
+        await sendSystemMessage(group._id, `${userFirstName} transferred admin rights to ${newAdminFirstName}.`);
+        await sendSystemMessage(group._id, `${userFirstName} left the group.`);
 
         return res.status(200).json({ message: "Admin rights transferred", group });
       } else {
@@ -421,7 +422,7 @@ exports.leaveGroup = async (req, res) => {
 
         group.isActive = false;
         await group.save();
-        await exports.sendSystemMessage(group._id, `${userFirstName} deactivated the group. No one can send messages now.`);
+        await sendSystemMessage(group._id, `${userFirstName} deactivated the group. No one can send messages now.`);
 
         return res.status(200).json({ message: "Group deactivated" });
       }
@@ -430,7 +431,7 @@ exports.leaveGroup = async (req, res) => {
       // Normal user leaving the group without voting
       group.members = group.members.filter(member => !member.equals(userObjectId));
       await group.save();
-      await exports.sendSystemMessage(group._id, `${userFirstName} has left the group.`);
+      await sendSystemMessage(group._id, `${userFirstName} has left the group.`);
 
       return res.status(200).json({ message: "User has left the group", group });
     }

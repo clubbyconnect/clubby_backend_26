@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const PostModel = require("../models/Post.js");
 const ClubRequest = require("../models/ClubRequest.js");
 const User = require("../models/User.js");
@@ -6,9 +7,20 @@ const { sendSystemMessage } = require("./MessageController.js");
 const Post = require("../models/Post");
 const { sendPushNotification } = require("../utils/Firebase.js");
 const checkUserFCMAndDevice = require("../utils/FcmCheck.js")
-const admin = require("../utils/Firebase.js")
 const { addNotification } = require("./NotificationController.js");
 
+const isSameId = (a, b) => String(a) === String(b);
+
+const getOwnerId = (post) => post?.postOwnerId?._id ?? post?.postOwnerId;
+
+const isPostOwner = (post, userId) => isSameId(getOwnerId(post), userId);
+
+const isGroupMember = (group, userId) =>
+  Boolean(
+    group?.members?.some((member) =>
+      isSameId(member?._id ?? member, userId),
+    ),
+  );
 
 const ClubRequestController = {
   list: async (req, res) => {
@@ -24,15 +36,19 @@ const ClubRequestController = {
         return res.status(404).json({ error: "Post not found" });
       }
 
-      if (!postData.postOwnerId.equals(userId)) {
+      if (!isPostOwner(postData, userId)) {
         return res.status(403).json({ error: "You are not authorized to view requests for this Post" });
       }
 
       const clubRequests = await ClubRequest.find({ postId: productId })
-        .populate("requester", "firstName lastName email avatar gender");
+        .populate("requester", "firstName lastName email avatar gender")
+        .sort({ status: 1, createdAt: -1 });
+
+      const pendingCount = clubRequests.filter((r) => r.status === "pending").length;
 
       return res.status(200).json({
         message: "Request list retrieved successfully",
+        pendingCount,
         requests: clubRequests.map((request) => ({
           _id: request._id,
           requester: request.requester,
@@ -88,7 +104,7 @@ const ClubRequestController = {
           return res.status(400).json({ error: "The group is already full. You cannot send a club request." });
         }
         // Check if requester is already in the group
-        if (group.members.includes(requesterId)) {
+        if (isGroupMember(group, requesterId)) {
           return res.status(400).json({ error: "You are already a member of this group." });
         }
       }
@@ -129,25 +145,24 @@ const ClubRequestController = {
 
         };
 
-        admin.messaging().send(message)
-          .then(response => {
-            console.log('Successfully sent message:', response);
-          })
-          .catch(error => {
-            console.error('Error sending message:', error);
-          });
+        await sendPushNotification(message);
 
       } else {
         console.log("User does not have a valid FCM Token or Device Type.");
       }
 
       //add notification 
-      const success = addNotification(`New Request for ${itemName}! 🎉`, `${requesterFirstName} is interested in your product group! Take a look and make something amazing happen! ✨`, postOwnerId, "JoinReq", `clubby://product/${postId}`, postId, "Product");
-      if (success) {
-        console.log('Add notification to controller')
-      }
-      else {
-        console.log('Error adding notification to controller')
+      const success = await addNotification(
+        `New Request for ${itemName}! 🎉`,
+        `${requesterFirstName} is interested in your product group! Review and accept or decline the request.`,
+        postOwnerId,
+        "JoinReq",
+        `clubby://product/${postId}`,
+        postId,
+        "Product",
+      );
+      if (!success) {
+        console.log("Error adding notification to controller");
       }
 
       return res.status(200).json({ message: "Club request sent successfully." });
@@ -176,22 +191,29 @@ const ClubRequestController = {
         return res.status(404).json({ error: "Post Not Found" });
       }
 
-      if (!postData.postOwnerId.equals(userId)) {
-        return res.status(403).json({ error: "You are not authorized to view requests for this Post" });
+      if (!isPostOwner(postData, userId)) {
+        return res.status(403).json({ error: "You are not authorized to manage requests for this Post" });
       }
 
-      const requester = await User.findById(requesterId);
+      const requesterObjectId = new mongoose.Types.ObjectId(requesterId);
+
+      const requester = await User.findById(requesterObjectId);
       if (!requester) {
         return res.status(404).json({ error: "Requester Not Found" });
       }
 
-      const pendingRequest = await ClubRequest.findOne({ requester: requesterId, postId });
+      const pendingRequest = await ClubRequest.findOne({
+        requester: requesterObjectId,
+        postId,
+      });
       if (!pendingRequest) {
         return res.status(400).json({ error: "Pending Request Not Found" });
       }
 
-      if (pendingRequest.status === status) {
-        return res.status(400).json({ error: `Club request already ${status}.` });
+      if (pendingRequest.status !== "pending") {
+        return res.status(400).json({
+          error: `This request has already been ${pendingRequest.status}.`,
+        });
       }
 
       pendingRequest.status = status;
@@ -220,11 +242,11 @@ const ClubRequestController = {
           return res.status(400).json({ error: "The group is full. Cannot add more members." });
         }
 
-        if (group.members.includes(requesterId)) {
+        if (isGroupMember(group, requesterObjectId)) {
           return res.status(400).json({ error: "Requester is already a member of the group." });
         }
 
-        group.members.push(requesterId);
+        group.members.push(requesterObjectId);
         await group.save();
         await sendSystemMessage(group._id, `${requester.firstName || "User"} has been added to the group.`);
 
@@ -244,26 +266,22 @@ const ClubRequestController = {
 
           };
 
-          admin.messaging().send(message)
-            .then(response => {
-              console.log('Successfully sent message:', response);
-            })
-            .catch(error => {
-              console.error('Error sending message:', error);
-            });
+          await sendPushNotification(message);
 
         } else {
           console.log("User does not have a valid FCM Token or Device Type.");
         }
 
         //add notification 
-        const success = addNotification(`Your Request for ${itemName} is Accepted! 🎉`, `Great news! Your request for ${itemName} has been accepted. Go ahead and seal the deal! 🤝`, requesterId, "AccptReq", `clubby://product/${postId}`, postId, "Product");
-        if (success) {
-          console.log('Add notification to controller')
-        }
-        else {
-          console.log('Error adding notification to controller')
-        }
+        await addNotification(
+          `Your Request for ${itemName} is Accepted! 🎉`,
+          `Great news! Your request for ${itemName} has been accepted. You can now chat in the group.`,
+          requesterObjectId,
+          "AccptReq",
+          `clubby://product/${postId}`,
+          postId,
+          "Product",
+        );
 
 
         return res.status(200).json({ message: "Club request accepted and user added to the group.", group });
@@ -287,26 +305,22 @@ const ClubRequestController = {
 
         };
 
-        admin.messaging().send(message)
-          .then(response => {
-            console.log('Successfully sent message:', response);
-          })
-          .catch(error => {
-            console.error('Error sending message:', error);
-          });
+        await sendPushNotification(message);
 
       } else {
         console.log("User does not have a valid FCM Token or Device Type.");
       }
 
       //add notification 
-      const success = addNotification(`Request Declined for ${itemName}`, `Unfortunately, your request for ${itemName} was declined. Don't worry—there are plenty of great deals waiting for you! 🔍`, requesterId, "DecReq", `clubby://product/${postId}`, postId, "Product");
-      if (success) {
-        console.log('Add notification to controller')
-      }
-      else {
-        console.log('Error adding notification to controller')
-      }
+      await addNotification(
+        `Request Declined for ${itemName}`,
+        `Unfortunately, your request for ${itemName} was declined.`,
+        requesterObjectId,
+        "DecReq",
+        `clubby://product/${postId}`,
+        postId,
+        "Product",
+      );
 
 
       return res.status(200).json({ message: "Club request declined successfully." });

@@ -50,7 +50,9 @@ exports.sendMessage = async (req, res) => {
         console.log('group is ', group.isActive);
 
         // Check if the user is a member of the group
-        const isMember = group.members.includes(userId);
+        const isMember = group.members.some((member) =>
+            String(member?._id ?? member) === String(userId),
+        );
         if (!isMember) {
             return res.status(403).json({ error: "You are not a member of this group." });
         }
@@ -117,14 +119,22 @@ exports.sendMessage = async (req, res) => {
         group.messages.push(newMessage._id);
         await group.save();
 
-        // Emit the new message to the group members
-        const io = getIO();
-        io.to(groupId.toString()).emit("newMessage", newMessage);
-
-        // Emit an event to update the recent chats list for all group members
-        group.members.forEach((member) => {
-            io.to(member.toString()).emit('recentChats', newMessage);
-        });
+        try {
+            const io = getIO();
+            const payload = {
+                ...newMessage.toObject?.() ?? newMessage,
+                groupId: groupId.toString(),
+            };
+            io.to(groupId.toString()).emit("newMessage", payload);
+            group.members.forEach((member) => {
+                io.to(member.toString()).emit('recentChats', payload);
+            });
+        } catch (socketError) {
+            console.warn(
+                'Realtime emit skipped (Socket.IO not running on this host):',
+                socketError.message,
+            );
+        }
 
 
         // const result = await checkUserFCMAndDevice(userId);
@@ -212,6 +222,22 @@ exports.getMessagesForGroup = async (req, res) => {
         return res.status(200).json(messages);
     } catch (error) {
         console.error("Error fetching messages:", error);
+        return res.status(500).json({ message: "Internal server error." });
+    }
+};
+
+exports.sendSystemMessageHandler = async (req, res) => {
+    const { groupId, content } = req.body;
+
+    if (!groupId || !content) {
+        return res.status(400).json({ message: "groupId and content are required." });
+    }
+
+    try {
+        await exports.sendSystemMessage(groupId, content);
+        return res.status(200).json({ message: "System message sent." });
+    } catch (error) {
+        console.error("Error sending system message:", error);
         return res.status(500).json({ message: "Internal server error." });
     }
 };

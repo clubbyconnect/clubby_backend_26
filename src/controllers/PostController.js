@@ -251,13 +251,23 @@ const PostController = {
         .populate("members", "firstName lastName userName _id avatar");
       productData.members = group ? group.members : [];
 
-      // If it's a user request, check the request status
+      // If it's a user request, check join-request status for requester and owner
       if (productId) {
         const userId = req.User._id;
+        const ownerId = product.postOwnerId?._id ?? product.postOwnerId;
+
         const clubRequest = await ClubRequest.findOne({
-          requester: userId, postId: productId,
+          requester: userId,
+          postId: productId,
         }).select("status");
-        productData.requestStatus = clubRequest ? clubRequest.status : null; // Return the status or null if no request exists
+        productData.requestStatus = clubRequest ? clubRequest.status : null;
+
+        if (String(ownerId) === String(userId)) {
+          productData.pendingRequestCount = await ClubRequest.countDocuments({
+            postId: productId,
+            status: "pending",
+          });
+        }
       }
 
       // If the product was deactivated by an admin, fetch admin details
@@ -489,6 +499,9 @@ const PostController = {
           }
         },
       });
+
+      // Hide full clubs from discovery (reappear when a member leaves and spots open)
+      aggregatePipeline.push({ $match: { clubToJoin: { $gt: 0 } } });
 
       // Sorting
       if (sortBy) {

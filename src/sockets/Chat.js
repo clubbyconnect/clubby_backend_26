@@ -3,7 +3,6 @@ const socketIO = require("socket.io");
 const { Server } = require("socket.io");
 const { sendPushNotification } = require('../utils/Firebase.js');
 const Call = require('../models/Call.js');
-const { listenerCount } = require("../models/Message.js");
 
 let io;
 const activeCalls = new Map(); // Stores userId -> callID
@@ -17,13 +16,20 @@ const initializeSockets = (server) => {
 
   io = require('socket.io')(server, {
     cors: { origin: "*", methods: ["GET", "POST"] },
-    transports: ['websocket'],
+    transports: ['websocket', 'polling'],
     pingTimeout: 60000,
     pingInterval: 25000
   });
 
   io.on("connection", (socket) => {
     console.log("New client connected:", socket.id);
+
+    socket.on("joinUser", (userId) => {
+      if (!userId) return;
+      const room = String(userId);
+      socket.join(room);
+      console.log(`Socket ${socket.id} joined user room ${room}`);
+    });
 
     socket.on('start-call', async ({ groupId, type }) => {
       try {
