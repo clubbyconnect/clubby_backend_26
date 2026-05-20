@@ -451,9 +451,20 @@ const PostController = {
       }
 
       if (date) {
-        const startDate = new Date(date);
-        if (!isNaN(startDate.getTime())) {
-          matchStage.createdAt = {$gte: startDate};
+        const dateStr = String(date).trim();
+        const dayMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+        if (dayMatch) {
+          const year = parseInt(dayMatch[1], 10);
+          const month = parseInt(dayMatch[2], 10) - 1;
+          const day = parseInt(dayMatch[3], 10);
+          const startDate = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+          const endDate = new Date(Date.UTC(year, month, day + 1, 0, 0, 0, 0));
+          matchStage.createdAt = {$gte: startDate, $lt: endDate};
+        } else {
+          const startDate = new Date(dateStr);
+          if (!isNaN(startDate.getTime())) {
+            matchStage.createdAt = {$gte: startDate};
+          }
         }
       }
 
@@ -469,13 +480,34 @@ const PostController = {
         aggregatePipeline.push({$match: matchStage});
       }
 
+      const genderFilter =
+        gender && String(gender).trim() !== "" && String(gender).trim() !== "Any"
+          ? String(gender).trim()
+          : null;
+      if (genderFilter) {
+        aggregatePipeline.push(
+          {
+            $lookup: {
+              from: "users",
+              localField: "postOwnerId",
+              foreignField: "_id",
+              as: "postOwner",
+            },
+          },
+          {$unwind: "$postOwner"},
+          {$match: {"postOwner.gender": genderFilter}},
+        );
+      }
+
       // Lookups for category, subcategory, and user favourites
       aggregatePipeline.push({$lookup: {from: "categories", localField: "category", foreignField: "_id", as: "categoryDetails"}}, {$unwind: {path: "$categoryDetails", preserveNullAndEmptyArrays: true}}, {$lookup: {from: "subcategories", localField: "subCategory", foreignField: "_id", as: "subCategoryDetails"}}, {$unwind: {path: "$subCategoryDetails", preserveNullAndEmptyArrays: true}},
         {
           $lookup: {
             from: "groups",
-            let: { productId: { $toString: "$_id" } },
-            pipeline: [{ $match: { $expr: { $eq: ["$productId", "$$productId"] } } }],
+            let: { productId: "$_id" },
+            pipeline: [
+              { $match: { $expr: { $eq: ["$productId", "$$productId"] } } },
+            ],
             as: "groupInfo",
           },
         },

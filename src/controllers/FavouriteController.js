@@ -132,7 +132,7 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
             {
                 $lookup: {
                     from: "groups",
-                    let: { productId: { $toString: "$_id" } },
+                    let: { productId: "$_id" },
                     pipeline: [
                         { $match: { $expr: { $eq: ["$productId", "$$productId"] } } },
                     ],
