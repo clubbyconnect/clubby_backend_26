@@ -77,14 +77,41 @@ module.exports = {
 
   getAllCategories: async (req, res) => {
     try {
-      const categories = await CategoryModel.aggregate([{
-        $lookup: {
-          from: "subcategories", localField: "_id", foreignField: "category", as: "subcategories"
+      const DEFAULT_IMAGE =
+        "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721381426/default%20images/y9yzagqvwgeyk2g1o0bj.png";
+
+      const categories = await CategoryModel.aggregate([
+        {
+          $lookup: {
+            from: "subcategories",
+            let: {categoryId: "$_id"},
+            pipeline: [
+              {
+                $match: {
+                  $expr: {$eq: ["$category", "$$categoryId"]},
+                  deletedAt: null,
+                  name: {$not: {$regex: /^new$/i}},
+                },
+              },
+            ],
+            as: "subcategories",
+          },
+        },
+      ]);
+
+      const normalized = categories.map((cat) => {
+        let image =
+          typeof cat.image === "string" && cat.image.trim() !== ""
+            ? cat.image.trim()
+            : DEFAULT_IMAGE;
+        if (image.startsWith("http://")) {
+          image = image.replace("http://", "https://");
         }
-      }]);
+        return { ...cat, image };
+      });
 
       return res.status(200).json({
-        message: "Categories fetched successfully", data: categories
+        message: "Categories fetched successfully", data: normalized
       });
     } catch (error) {
       console.error("Error:", error);

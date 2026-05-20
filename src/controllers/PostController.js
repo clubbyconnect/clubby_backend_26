@@ -458,8 +458,19 @@ const PostController = {
           const month = parseInt(dayMatch[2], 10) - 1;
           const day = parseInt(dayMatch[3], 10);
           const startDate = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
-          const endDate = new Date(Date.UTC(year, month, day + 1, 0, 0, 0, 0));
-          matchStage.createdAt = {$gte: startDate, $lt: endDate};
+          const now = new Date();
+          const startOfTomorrowUtc = new Date(
+            Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0),
+          );
+          const oldestAllowedUtc = new Date(
+            Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 30, 0, 0, 0, 0),
+          );
+          if (startDate >= startOfTomorrowUtc || startDate < oldestAllowedUtc) {
+            matchStage.createdAt = {$gte: startOfTomorrowUtc, $lt: startOfTomorrowUtc};
+          } else {
+            const endDate = new Date(Date.UTC(year, month, day + 1, 0, 0, 0, 0));
+            matchStage.createdAt = {$gte: startDate, $lt: endDate};
+          }
         } else {
           const startDate = new Date(dateStr);
           if (!isNaN(startDate.getTime())) {
