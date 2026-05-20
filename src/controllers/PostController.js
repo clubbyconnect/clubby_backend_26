@@ -13,6 +13,7 @@ const {
   validateShowroomLocation,
   validateShowroomLocationIfPresent,
 } = require("../utils/offlinePostValidation.js");
+const { resolvePostSize } = require("../utils/clothingSizes.js");
 
 const PostController = {
   create: async (req, res) => {
@@ -72,7 +73,14 @@ const PostController = {
         }, expiryAt,
       };
 
-      if (size) postData.size = size;
+      const sizeResult = resolvePostSize(category, size);
+      if (!sizeResult.ok) {
+        return res.status(400).json({ error: sizeResult.error });
+      }
+      if (sizeResult.size) {
+        postData.size = sizeResult.size;
+      }
+
       if (additionalInformation) postData.additionalInformation = additionalInformation;
 
       // Generate unique Post ID
@@ -191,7 +199,12 @@ const PostController = {
         };
       }
 
-      if (size) updates.size = size;
+      const sizeResult = resolvePostSize(category, size);
+      if (!sizeResult.ok) {
+        return res.status(400).json({ error: sizeResult.error });
+      }
+      updates.size = sizeResult.size;
+
       if (additionalInformation) updates.additionalInformation = additionalInformation;
 
       // Handle product images
