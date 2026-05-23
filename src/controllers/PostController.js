@@ -14,13 +14,76 @@ const {
   validateShowroomLocationIfPresent,
 } = require("../utils/offlinePostValidation.js");
 const { resolvePostSize } = require("../utils/clothingSizes.js");
+const {
+  asTrimmedString,
+  isBlank,
+  parsePrice,
+  parseProductImages,
+} = require("../utils/requestBody.js");
+const {
+  getOwnerId,
+  isPostOwner,
+  normalizePostOwner,
+} = require("../utils/postOwnership.js");
+
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function resolveSubcategory(subCategoryInput, categoryId) {
+  const trimmed = asTrimmedString(subCategoryInput);
+  if (
+    mongoose.Types.ObjectId.isValid(trimmed) &&
+    String(new mongoose.Types.ObjectId(trimmed)) === trimmed
+  ) {
+    return SubcategoryModel.findOne({
+      _id: trimmed,
+      category: categoryId,
+      deletedAt: null,
+    });
+  }
+  const byExact = await SubcategoryModel.findOne({
+    name: trimmed,
+    category: categoryId,
+    deletedAt: null,
+  });
+  if (byExact) {
+    return byExact;
+  }
+  return SubcategoryModel.findOne({
+    name: { $regex: new RegExp(`^${escapeRegex(trimmed)}$`, "i") },
+    category: categoryId,
+    deletedAt: null,
+  });
+}
+
+function logCreatePostError(error, req) {
+  console.error("createPost failed:", {
+    message: error.message,
+    name: error.name,
+    stack: error.stack,
+    body: req.body,
+    userId: req.User?._id,
+  });
+}
 
 const PostController = {
   create: async (req, res) => {
     try {
       const {
-        category, subCategory, itemName, offerType, price, price_type, clubMembers, store_location_latitude, store_location_longitude, additionalInformation, size, productImages, showroomAddress
+        category, subCategory, itemName, offerType, price, price_type, clubMembers, store_location_latitude, store_location_longitude, additionalInformation, size, productImages: rawProductImages, showroomAddress
       } = req.body;
+
+      const categoryName = asTrimmedString(category);
+      const subCategoryName = asTrimmedString(subCategory);
+      const itemNameTrimmed = asTrimmedString(itemName);
+      const offerTypeTrimmed = asTrimmedString(offerType);
+      const priceTypeTrimmed = asTrimmedString(price_type);
+      const productImages = parseProductImages(rawProductImages);
+      const priceResult = parsePrice(price);
+      if (!priceResult.ok) {
+        return res.status(400).json({ error: priceResult.error });
+      }
 
       const onlineFields = findOnlineOnlyFields(req.body);
       if (onlineFields.length > 0) {
@@ -34,30 +97,40 @@ const PostController = {
         return res.status(400).json({ error: showroomError });
       }
 
-      // Validate required fields
-      if ([category, subCategory, itemName, offerType, price, price_type, clubMembers].some((field) => !field || field.trim() === "")) {
+      if (
+        [categoryName, subCategoryName, itemNameTrimmed, offerTypeTrimmed, priceTypeTrimmed, clubMembers].some(
+          isBlank,
+        )
+      ) {
         return res.status(400).json({error: "Please fill all required fields."});
       }
 
-      // Validate club members limit (minimum 2, maximum 4)
       const memberLimit = parseInt(clubMembers, 10);
       if (isNaN(memberLimit) || memberLimit < 2 || memberLimit > 4) {
         return res.status(400).json({error: "Club members must be between 2 and 4."});
       }
 
-      // Fetch category and subcategory
-      const categoryObj = await CategoryModel.findOne({name: category});
-      if (!categoryObj) return res.status(400).json({error: "Invalid category."});
-
-      const subcategoryObj = await SubcategoryModel.findOne({
-        name: subCategory, category: categoryObj._id,
+      const categoryObj = await CategoryModel.findOne({
+        name: categoryName,
+        deletedAt: null,
       });
-      if (!subcategoryObj) return res.status(400).json({error: "Invalid subcategory."});
+      if (!categoryObj) {
+        return res.status(400).json({
+          error: "Invalid category.",
+          hint: "Send category as the display name (e.g. \"Fit & Sport\"), not an ObjectId.",
+        });
+      }
 
-      // Handle product image
+      const subcategoryObj = await resolveSubcategory(subCategory, categoryObj._id);
+      if (!subcategoryObj) {
+        return res.status(400).json({
+          error: "Invalid subcategory.",
+          hint: "Send subCategory as the picker label (e.g. \"Sports Gear\") for the selected category.",
+        });
+      }
+
       let productImageUrls = [subcategoryObj.image];
-
-      if (productImages && productImages.length > 0) {
+      if (productImages.length > 0) {
         productImageUrls = productImages;
       }
 
@@ -67,13 +140,25 @@ const PostController = {
 
       // Prepare post data
       const postData = {
-        userId: req.User._id, postOwnerId: req.User._id, // Initially, user and post owner are the same
-        itemName, offerType, price, price_type, clubMembers, category: categoryObj._id, subCategory: subcategoryObj._id, productImage: productImageUrls?.[0], productImages: productImageUrls, store_location: {
-          name: showroomAddress, type: "Point", coordinates: [parseFloat(store_location_longitude), parseFloat(store_location_latitude)],
-        }, expiryAt,
+        userId: req.User._id, postOwnerId: req.User._id,
+        itemName: itemNameTrimmed,
+        offerType: offerTypeTrimmed,
+        price: priceResult.price,
+        price_type: priceTypeTrimmed,
+        clubMembers: memberLimit,
+        category: categoryObj._id,
+        subCategory: subcategoryObj._id,
+        productImage: productImageUrls[0],
+        productImages: productImageUrls,
+        store_location: {
+          name: asTrimmedString(showroomAddress),
+          type: "Point",
+          coordinates: [parseFloat(store_location_longitude), parseFloat(store_location_latitude)],
+        },
+        expiryAt,
       };
 
-      const sizeResult = resolvePostSize(category, size);
+      const sizeResult = resolvePostSize(categoryName, size);
       if (!sizeResult.ok) {
         return res.status(400).json({ error: sizeResult.error });
       }
@@ -100,7 +185,12 @@ const PostController = {
 
       // Create group
       const groupData = {
-        productId: createdPost._id, productName: itemName, adminId: req.User._id, members: [req.User._id], limit: memberLimit, isActive: true,
+        productId: createdPost._id,
+        productName: itemNameTrimmed,
+        adminId: req.User._id,
+        members: [req.User._id],
+        limit: memberLimit,
+        isActive: true,
       };
 
       const createdGroup = await Group.create(groupData);
@@ -115,19 +205,30 @@ const PostController = {
         .populate("category", "name")
         .populate("subCategory", "name");
 
-      console.log(populatedPost, "Post Created Successfully");
-
-      // Send system message
-      await sendSystemMessage(createdGroup._id, `Group is created.`);
-
-      return res.status(200).json({
-        message: "Post created successfully.", post: {
-          ...populatedPost._doc, category: populatedPost.category.name, subCategory: populatedPost.subCategory.name, group: createdGroup._id,
-        },
+      const postId = populatedPost._id;
+      res.status(200).json({
+        message: "Post created successfully.",
+        post: { _id: postId },
       });
+
+      setImmediate(() => {
+        sendSystemMessage(createdGroup._id, "Group is created.").catch((err) => {
+          console.error("createPost: background system message failed:", err?.message || err);
+        });
+      });
+      return;
     } catch (error) {
-      console.error("Error in createPost:", error);
-      res.status(500).json({error: error.message || "Internal Server Error"});
+      logCreatePostError(error, req);
+      if (error.name === "ValidationError") {
+        return res.status(400).json({
+          error: error.message,
+          details: Object.values(error.errors || {}).map((e) => e.message),
+        });
+      }
+      res.status(500).json({
+        error: error.message || "Internal Server Error",
+        code: error.code || error.name,
+      });
     }
   },
 
@@ -135,12 +236,19 @@ const PostController = {
     try {
       const {postId} = req.params;
       const {
-        category, subCategory, itemName, offerType, price, price_type, clubMembers, store_location_latitude, store_location_longitude, additionalInformation, size, productImages, showroomAddress
+        category, subCategory, itemName, offerType, price, price_type, clubMembers, store_location_latitude, store_location_longitude, additionalInformation, size, productImages: rawProductImages, showroomAddress
       } = req.body;
 
       const existingPost = await PostModel.findById(postId);
       if (!existingPost) {
         return res.status(404).json({error: "Post not found."});
+      }
+
+      if (!isPostOwner(existingPost, req.User._id)) {
+        return res.status(403).json({
+          error: "You do not have permission to update this post.",
+          code: "NOT_POST_OWNER",
+        });
       }
 
       const onlineFields = findOnlineOnlyFields(req.body);
@@ -155,17 +263,25 @@ const PostController = {
         return res.status(400).json({ error: showroomError });
       }
 
-      if ([category, subCategory, itemName, offerType, price, price_type, clubMembers].some((field) => !field || field.trim() === "")) {
+      const categoryName = asTrimmedString(category);
+      const subCategoryName = asTrimmedString(subCategory);
+      const productImages = parseProductImages(rawProductImages);
+
+      if (
+        [categoryName, subCategoryName, asTrimmedString(itemName), asTrimmedString(offerType), asTrimmedString(price), asTrimmedString(price_type), clubMembers].some(
+          isBlank,
+        )
+      ) {
         return res.status(400).json({error: "Please fill all required fields."});
       }
 
       let updates = {};
 
-      const categoryObj = await CategoryModel.findOne({name: category});
+      const categoryObj = await CategoryModel.findOne({name: categoryName});
       if (!categoryObj) return res.status(400).json({error: "Invalid category."});
       updates.category = categoryObj._id;
 
-      const subcategoryObj = await SubcategoryModel.findOne({name: subCategory, category: updates.category});
+      const subcategoryObj = await SubcategoryModel.findOne({name: subCategoryName, category: updates.category});
       if (!subcategoryObj) return res.status(400).json({error: "Invalid subcategory."});
       updates.subCategory = subcategoryObj._id;
 
@@ -199,7 +315,7 @@ const PostController = {
         };
       }
 
-      const sizeResult = resolvePostSize(category, size);
+      const sizeResult = resolvePostSize(categoryName, size);
       if (!sizeResult.ok) {
         return res.status(400).json({ error: sizeResult.error });
       }
@@ -207,8 +323,7 @@ const PostController = {
 
       if (additionalInformation) updates.additionalInformation = additionalInformation;
 
-      // Handle product images
-      if (productImages && productImages.length > 0) {
+      if (productImages.length > 0) {
         updates.productImages = productImages;
         updates.productImage = productImages[0];
       } else {
@@ -259,28 +374,31 @@ const PostController = {
       }
 
       const productData = product.toObject();
-      // Fetch group members if a group exists for this product
+      const userId = req.User._id;
+      const ownerId = getOwnerId(product);
+
+      productData.postOwnerId = await normalizePostOwner(product.postOwnerId);
+      productData.isPostOwner = isPostOwner(product, userId);
+
       const group = await Group.findOne({productId: product._id})
         .populate("members", "firstName lastName userName _id avatar");
       productData.members = group ? group.members : [];
 
-      // If it's a user request, check join-request status for requester and owner
-      if (productId) {
-        const userId = req.User._id;
-        const ownerId = product.postOwnerId?._id ?? product.postOwnerId;
+      const postMongoId = String(product._id);
+      const postObjectId = product._id;
+      const clubRequest = await ClubRequest.findOne({
+        requester: userId,
+        postId: { $in: [postObjectId, postMongoId] },
+      }).select("status");
+      productData.requestStatus = clubRequest ? clubRequest.status : null;
 
-        const clubRequest = await ClubRequest.findOne({
-          requester: userId,
-          postId: productId,
-        }).select("status");
-        productData.requestStatus = clubRequest ? clubRequest.status : null;
-
-        if (String(ownerId) === String(userId)) {
-          productData.pendingRequestCount = await ClubRequest.countDocuments({
-            postId: productId,
-            status: "pending",
-          });
-        }
+      if (productData.isPostOwner) {
+        productData.pendingRequestCount = await ClubRequest.countDocuments({
+          postId: { $in: [postObjectId, postMongoId] },
+          status: "pending",
+        });
+      } else {
+        productData.pendingRequestCount = 0;
       }
 
       // If the product was deactivated by an admin, fetch admin details
@@ -312,9 +430,11 @@ const PostController = {
 
       console.log("existingPost", existingPost)
       console.log("req.user", req.User);
-      // Ensure the user has rights to delete the post
-      if (existingPost.postOwnerId.toString() !== req.User._id.toString()) {
-        return res.status(403).json({error: "You do not have the rights to delete this post."});
+      if (!isPostOwner(existingPost, req.User._id)) {
+        return res.status(403).json({
+          error: "You do not have permission to delete this post.",
+          code: "NOT_POST_OWNER",
+        });
       }
 
       //Soft Delete the post and do not change anything in group
@@ -536,7 +656,18 @@ const PostController = {
       // Projection: Convert distance to km and include additional fields
       aggregatePipeline.push({
         $project: {
-          _id: 1, itemName: 1, additionalInformation: 1, price: 1,categoryImage: "$categoryDetails.image", categoryName: "$categoryDetails.name", subCategoryName: "$subCategoryDetails.name",subCategoryImage: "$subCategoryDetails.image", productImage: 1, distance: {$divide: ["$distance", 1000]}, // Convert meters to kmclubMembers: 1,
+          _id: 1,
+          itemName: 1,
+          additionalInformation: 1,
+          price: 1,
+          createdAt: 1,
+          categoryImage: "$categoryDetails.image",
+          categoryName: "$categoryDetails.name",
+          subCategoryName: "$subCategoryDetails.name",
+          subCategoryImage: "$subCategoryDetails.image",
+          productImage: 1,
+          distance: { $divide: ["$distance", 1000] },
+          clubMembers: 1,
           clubToJoin: {
             $cond: {
               if: { $isArray: "$groupInfo.members" },
@@ -544,26 +675,37 @@ const PostController = {
               else: { $subtract: ["$clubMembers", 1] },
             },
           },
-          size: { $ifNull: ["$size", null] }, // Ensure size is null if missing
-          location: { $ifNull: ["$store_location.name", "Unknown"] }, // Default location
+          size: { $ifNull: ["$size", null] },
+          offerType: 1,
+          price_type: 1,
+          expiryAt: 1,
+          location: { $ifNull: ["$store_location.name", "Unknown"] },
           isLiked: {
             $cond: {
               if: { $gt: [{ $size: "$likedByUsers" }, 0] },
               then: true,
-              else: false
-            }
-          }
+              else: false,
+            },
+          },
         },
       });
 
       // Hide full clubs from discovery (reappear when a member leaves and spots open)
       aggregatePipeline.push({ $match: { clubToJoin: { $gt: 0 } } });
 
-      // Sorting
-      if (sortBy) {
-        let sortOptions = {};
-        if (sortBy === "price_high_to_low") sortOptions.price = -1; else if (sortBy === "price_low_to_high") sortOptions.price = 1; else if (sortBy === "newest") sortOptions.createdAt = -1;
-        aggregatePipeline.push({$sort: sortOptions});
+      // Sorting (createdAt must be present in $project above)
+      const sortOptions = {};
+      if (sortBy === "price_high_to_low") {
+        sortOptions.price = -1;
+      } else if (sortBy === "price_low_to_high") {
+        sortOptions.price = 1;
+      } else if (sortBy === "newest") {
+        sortOptions.createdAt = -1;
+      } else if (sortBy === "distance") {
+        sortOptions.distance = 1;
+      }
+      if (Object.keys(sortOptions).length > 0) {
+        aggregatePipeline.push({ $sort: sortOptions });
       }
 
       // Pagination

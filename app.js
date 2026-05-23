@@ -3,11 +3,18 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const connectDB = require("./src/config/connectDb.js");
+const {
+  getCloudinaryConfigError,
+} = require("./src/utils/Cloudinary.js");
 
 const app = express();
 
 app.get("/api/health", (req, res) => {
-  res.status(200).json({ status: "ok" });
+  const cloudinaryError = getCloudinaryConfigError();
+  res.status(200).json({
+    status: "ok",
+    cloudinary: cloudinaryError ? "misconfigured" : "configured",
+  });
 });
 
 app.use(cors({ origin: "*", credentials: true }));
@@ -53,5 +60,15 @@ if (process.env.VERCEL) {
 } else {
   loadRoutes();
 }
+
+app.use((err, req, res, next) => {
+  if (err?.code === "LIMIT_FILE_SIZE") {
+    return res.status(413).json({ success: false, error: "File too large (max 50MB)." });
+  }
+  if (err?.name === "MulterError" || err?.message?.includes("Invalid file type")) {
+    return res.status(400).json({ success: false, error: err.message || "Invalid upload." });
+  }
+  next(err);
+});
 
 module.exports = app;

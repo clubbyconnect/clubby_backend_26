@@ -37,11 +37,11 @@ if (!process.env.VERCEL && require.main === module) {
 
   connectDB()
     .then(() => {
+      setupSocket(server);
       server.listen(PORT, HOST, () => {
         console.log(`HTTP + Socket.IO on http://${HOST}:${PORT}`);
         console.log(`API base: http://localhost:${PORT}/api/`);
       });
-      setupSocket(server);
     })
     .catch((error) => {
       console.log("Unable to start server", error);

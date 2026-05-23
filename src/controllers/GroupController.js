@@ -19,7 +19,12 @@ exports.groupMember = async (req, res) => {
     }
 
     // Find the group by productId and select only members
-    const group = await Group.findOne({ productId: postId }).populate(
+    const postObjectId = mongoose.Types.ObjectId.isValid(postId)
+      ? new mongoose.Types.ObjectId(postId)
+      : postId;
+    const group = await Group.findOne({
+      productId: { $in: [postObjectId, postId] },
+    }).populate(
       'members',
       '_id firstName lastName email avatar'
     );
@@ -151,13 +156,14 @@ exports.getGroupsForUser = async (req, res) => {
       // Project the required fields
       {
         $project: {
+          _id: 1,
           productImage: '$productDetails.productImage',
           productName: '$productDetails.itemName',
           clubStatus: '$productDetails.clubStatus',
           expiryAt: '$productDetails.expiryAt',
           deletedAt: '$productDetails.deletedAt',
-          lastMessage: 1, // Include the last message
-          memberCount: 1, // Include the member count
+          lastMessage: 1,
+          memberCount: 1,
         },
       },
 
@@ -259,9 +265,10 @@ exports.createOrJoinGroup = async (req, res) => {
         members: [adminId || userId],
       });
 
-      // Emit group creation event
       const io = getIO();
-      io.emit("groupCreated", { groupId: group._id, productName, adminId: group.adminId });
+      if (io) {
+        io.emit("groupCreated", { groupId: group._id, productName, adminId: group.adminId });
+      }
 
       // **Push Notification for Group Creation**
       const admin = await User.findById(adminId || userId); // Find the admin who created the group
@@ -312,9 +319,10 @@ exports.createOrJoinGroup = async (req, res) => {
       console.error("Error in sendSystemMessage:", error); // Log the error for more details
     }
 
-    // Emit member joining event
     const io = getIO();
-    io.to(group._id).emit("memberJoined", { userId });
+    if (io) {
+      io.to(group._id).emit("memberJoined", { userId });
+    }
 
     // **Push Notification for User Joining**
     const user = await User.findById(userId); // Find the user who joined the group
@@ -480,19 +488,23 @@ exports.getGroupMembersAndAdmin = async (req, res) => {
       return res.status(404).json({ message: "Group not found." });
     }
 
-    // Extract clubStatus from Post
     const status = group.productId ? group.productId.clubStatus : null;
+    const adminDoc = group.adminId;
+    const adminId =
+      adminDoc?._id ?? adminDoc ?? group.adminId;
 
-    // Format the response with role information
-    const admin = {
-      ...group.adminId.toObject(),
-      role: "Admin",
-    };
+    const admin =
+      adminDoc && typeof adminDoc.toObject === "function"
+        ? { ...adminDoc.toObject(), role: "Admin" }
+        : null;
 
-    const members = group.members.map((member) => ({
-      ...member.toObject(),
-      role: member._id.equals(group.adminId._id) ? "Admin" : "Member",
-    }));
+    const members = (group.members || [])
+      .filter((member) => member && typeof member.toObject === "function")
+      .map((member) => ({
+        ...member.toObject(),
+        role:
+          adminId && member._id.equals(adminId) ? "Admin" : "Member",
+      }));
 
     return res.status(200).json({
       message: "Group details fetched successfully",

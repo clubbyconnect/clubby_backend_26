@@ -2,7 +2,6 @@ const uploadOnCloudinary = require("../utils/Cloudinary.js");
 const Group = require('../models/Group.js');
 const Message = require('../models/Message.js');
 const { getIO } = require("../sockets/Chat.js");
-console.log('IN MSG ', typeof getIO); // Should be 'function'
 
 const admin = require("../utils/Firebase.js")
 const { addNotification } = require("./NotificationController.js");
@@ -119,21 +118,16 @@ exports.sendMessage = async (req, res) => {
         group.messages.push(newMessage._id);
         await group.save();
 
-        try {
-            const io = getIO();
+        const io = getIO();
+        if (io) {
             const payload = {
                 ...newMessage.toObject?.() ?? newMessage,
                 groupId: groupId.toString(),
             };
             io.to(groupId.toString()).emit("newMessage", payload);
             group.members.forEach((member) => {
-                io.to(member.toString()).emit('recentChats', payload);
+                io.to(member.toString()).emit("recentChats", payload);
             });
-        } catch (socketError) {
-            console.warn(
-                'Realtime emit skipped (Socket.IO not running on this host):',
-                socketError.message,
-            );
         }
 
 
@@ -197,9 +191,10 @@ exports.markMessageAsRead = async (req, res) => {
         );
 
         if (updateResult.modifiedCount > 0) {
-            // Emit the read receipt to all users in the group only if the update occurred
             const io = getIO();
-            io.to(message.groupId.toString()).emit("messageRead", { messageId, userId });
+            if (io) {
+                io.to(message.groupId.toString()).emit("messageRead", { messageId, userId });
+            }
         }
 
         return res.status(200).json({ message: "Message marked as read." });
@@ -243,19 +238,21 @@ exports.sendSystemMessageHandler = async (req, res) => {
 };
 
 exports.sendSystemMessage = async (groupId, content) => {
-    const newMessage = await Message.create({
-        groupId,
-        content,
-        type: "system", // Assuming there's a 'system' type in your Message model
-        timestamp: new Date(),
-    });
+    try {
+        const newMessage = await Message.create({
+            groupId,
+            content,
+            type: "system",
+        });
 
-    console.log('In the system message ', groupId.toString())
-    console.log(typeof getIO); // Should be 'function'
-    const io = getIO(); // Emit the updated admin to the group members
-    // Emit groupId and content along with the new message
-    io.to(groupId.toString()).emit("newMessage", newMessage);
+        const io = getIO();
+        if (io) {
+            io.to(groupId.toString()).emit("newMessage", newMessage);
+        }
 
-    console.log(`Emitting new message to.. group ${groupId}:`, newMessage);
-
+        return newMessage;
+    } catch (error) {
+        console.error("sendSystemMessage failed (non-fatal):", error?.stack || error);
+        return null;
+    }
 };

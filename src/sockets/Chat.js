@@ -234,12 +234,17 @@ const initializeSockets = (server) => {
   });
 };
 
-// Function to get the Socket.IO instance
-const getIO = () => {
-  if (!io) {
-    throw new Error("Socket.io not initialized!");
-  }
-  return io;
+/** Returns Socket.IO instance or null (never throws — safe for Vercel / pre-init). */
+const getIO = () => io ?? null;
+
+const tryGetIO = getIO;
+
+/** Best-effort realtime emit; ignores missing Socket.IO. */
+const emitToRoom = (roomId, event, payload) => {
+  const socket = getIO();
+  if (!socket || !roomId) return false;
+  socket.to(String(roomId)).emit(event, payload);
+  return true;
 };
 
-module.exports = { initializeSockets, getIO, io };
+module.exports = { initializeSockets, getIO, tryGetIO, emitToRoom, io };

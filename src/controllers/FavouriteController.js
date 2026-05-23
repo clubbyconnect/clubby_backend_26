@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const User = require("../models/User.js");
 const Post = require("../models/Post.js");
+const Group = require("../models/Group.js");
+const ClubRequest = require("../models/ClubRequest.js");
 
 
 exports.addToFavourites = async (req, res) => {
@@ -58,7 +60,12 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
         const validStatuses = ["Active", "Inactive", "Full", "Pending", "Created"];
         let statusFilter = {};
         if (status && validStatuses.includes(status)) {
-            statusFilter = { clubStatus: status };
+            // "Created" = posts the user owns, not post.clubStatus "Created"
+            if (status === "Created") {
+                statusFilter = { postOwnerId: new mongoose.Types.ObjectId(userId) };
+            } else {
+                statusFilter = { clubStatus: status };
+            }
         }
 
         // Fetch user to get their favorite products
@@ -163,8 +170,13 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
                     },
                 },
                 size: 1,
+                price: 1,
+                price_type: 1,
+                offerType: 1,
+                additionalInformation: 1,
                 productImage: 1,
                 clubStatus: 1,
+                location: { $ifNull: ["$store_location.name", "Unknown"] },
                 categoryName: "$categoryDetails.name",
                 categoryImage: "$categoryDetails.image",
                 subCategoryName: "$subCategoryDetails.name",
@@ -212,9 +224,48 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
             return res.status(404).json({ success: false, message: "No favorite products found" });
         }
 
+        const userIdStr = userId.toString();
+        const data = await Promise.all(
+            filteredFavoriteProducts.map(async (post) => {
+                let postStatus;
+                const ownerId = post.postOwnerId?._id ?? post.postOwnerId;
+                const ownerStr =
+                    ownerId != null && typeof ownerId.toString === "function"
+                        ? ownerId.toString()
+                        : String(ownerId);
+
+                if (ownerStr === userIdStr) {
+                    postStatus = "I Created";
+                } else {
+                    const group = await Group.findOne({
+                        productId: post._id,
+                        members: userId,
+                    }).lean();
+                    if (group) {
+                        postStatus = "I Joined";
+                    } else {
+                        const pendingRequest = await ClubRequest.findOne({
+                            requester: userId,
+                            postId: post._id,
+                            status: "pending",
+                        }).lean();
+                        if (pendingRequest) {
+                            postStatus = "Pending";
+                        } else {
+                            const cs = post.clubStatus;
+                            // clubStatus "Created" = post lifecycle, not viewer ownership
+                            postStatus = cs === "Created" ? "Active" : cs;
+                        }
+                    }
+                }
+
+                return { ...post, postStatus };
+            }),
+        );
+
         res.status(200).json({
             success: true,
-            data: filteredFavoriteProducts,
+            data,
             pagination: {
                 totalItems: total,
                 currentPage: pageNum,

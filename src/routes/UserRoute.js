@@ -83,7 +83,7 @@ router.post("/resetPassword", resetPassword);
 router.post("/uploadAvatar", verifyJWT, upload.single('avatar'), uploadAvatar);
 
 // POST ROUTES 123
-router.post("/post/create", verifyJWT, upload.single('productImage'), PostController.create);
+router.post("/post/create", verifyJWT, PostController.create);
 router.get('/post/:productId', verifyJWT, PostController.read)
 router.put("/post/:postId", verifyJWT, upload.single('productImage'), PostController.update);
 router.delete("/post/:postId", verifyJWT, PostController.delete)
@@ -93,6 +93,8 @@ router.get("/searchProducts", verifyJWT, PostController.search);
 // CLUB ROUTES
 router.get("/club/:productId", verifyJWT, ClubRequestController.list);
 router.get("/club/join/:postId", verifyJWT, ClubRequestController.sendClubRequest);
+router.post("/club/cancel-join/:postId", verifyJWT, ClubRequestController.cancelClubRequest);
+router.delete("/club/join/:postId", verifyJWT, ClubRequestController.cancelClubRequest);
 router.post("/club-request/action", verifyJWT, ClubRequestController.handleClubRequest);
 
 

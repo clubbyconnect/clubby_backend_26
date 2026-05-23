@@ -114,6 +114,9 @@ exports.getUserPosts = async (req, res) => {
                     postStatus: 1,
                     price: 1,
                     price_type: 1,
+                    offerType: 1,
+                    expiryAt: 1,
+                    store_location: 1,
                     productImage: 1,
                     categoryName: "$categoryDetails.name",
                     categoryImage: "$categoryDetails.image",
@@ -185,6 +188,16 @@ exports.getUserPosts = async (req, res) => {
                     clubToJoin: post.clubToJoin,
                     productImage: post.productImage,
                     status: post.clubStatus,
+                    price: post.price,
+                    price_type: post.price_type,
+                    offerType: post.offerType,
+                    expiryAt: post.expiryAt,
+                    additionalInformation: post.additionalInformation,
+                    location:
+                      post.store_location?.name ??
+                      (typeof post.store_location === 'string'
+                        ? post.store_location
+                        : undefined),
                 };
             })
         );

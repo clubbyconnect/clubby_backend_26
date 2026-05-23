@@ -8,12 +8,14 @@ const Post = require("../models/Post");
 const { sendPushNotification } = require("../utils/Firebase.js");
 const checkUserFCMAndDevice = require("../utils/FcmCheck.js")
 const { addNotification } = require("./NotificationController.js");
+const Notification = require("../models/Notification.js");
+const { emitToRoom } = require("../sockets/Chat.js");
+const { isPostOwner, isSameId } = require("../utils/postOwnership.js");
 
-const isSameId = (a, b) => String(a) === String(b);
-
-const getOwnerId = (post) => post?.postOwnerId?._id ?? post?.postOwnerId;
-
-const isPostOwner = (post, userId) => isSameId(getOwnerId(post), userId);
+const toPostObjectId = (postId) =>
+  mongoose.Types.ObjectId.isValid(postId)
+    ? new mongoose.Types.ObjectId(postId)
+    : postId;
 
 const isGroupMember = (group, userId) =>
   Boolean(
@@ -37,23 +39,77 @@ const ClubRequestController = {
       }
 
       if (!isPostOwner(postData, userId)) {
-        return res.status(403).json({ error: "You are not authorized to view requests for this Post" });
+        return res.status(403).json({
+          error: "You are not authorized to view requests for this post.",
+          code: "NOT_POST_OWNER",
+        });
       }
 
-      const clubRequests = await ClubRequest.find({ postId: productId })
+      const postObjectId = toPostObjectId(productId);
+      const clubRequests = await ClubRequest.find({
+        postId: postObjectId,
+      })
         .populate("requester", "firstName lastName email avatar gender")
-        .sort({ status: 1, createdAt: -1 });
+        .sort({ createdAt: -1 });
+
+      const group = await Group.findOne({ productId: postObjectId })
+        .select("members isActive")
+        .lean();
+      const memberCount = group?.members?.length ?? 0;
+      const clubSize = postData.clubMembers ?? 0;
+      const spotsOpen = Math.max(0, clubSize - memberCount);
+      const isExpired =
+        Boolean(postData.expiryAt) &&
+        new Date(postData.expiryAt).getTime() < Date.now();
+      const isAdminDeactivated = Boolean(postData.deactivatedByAdminId);
+      const isOwnerInactive =
+        postData.clubStatus === "Inactive" ||
+        postData.clubStatus === "Wrap" ||
+        group?.isActive === false;
+      const isDeleted = Boolean(postData.deletedAt);
+      const isFull = spotsOpen === 0;
+      const canAcceptMore =
+        !isFull &&
+        !isExpired &&
+        !isAdminDeactivated &&
+        !isDeleted &&
+        !isOwnerInactive;
+
+      const statusOrder = { pending: 0, accepted: 1, declined: 2 };
+      const sortedRequests = [...clubRequests].sort((a, b) => {
+        const orderA = statusOrder[a.status] ?? 9;
+        const orderB = statusOrder[b.status] ?? 9;
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
 
       const pendingCount = clubRequests.filter((r) => r.status === "pending").length;
 
       return res.status(200).json({
         message: "Request list retrieved successfully",
         pendingCount,
-        requests: clubRequests.map((request) => ({
+        postSummary: {
+          clubMembers: clubSize,
+          memberCount,
+          spotsOpen,
+          clubStatus: postData.clubStatus,
+          expiryAt: postData.expiryAt,
+          isExpired,
+          isAdminDeactivated,
+          isOwnerInactive: isOwnerInactive && !isAdminDeactivated,
+          isDeleted,
+          isFull,
+          canAcceptMore,
+          deactivationNote: postData.deactivationNote ?? null,
+        },
+        requests: sortedRequests.map((request) => ({
           _id: request._id,
           requester: request.requester,
           createdAt: request.createdAt,
-          status: request.status
+          status: request.status,
+          updatedAt: request.updatedAt,
         })),
       });
     } catch (error) {
@@ -70,8 +126,8 @@ const ClubRequestController = {
       const { postId } = req.params;
       const requesterId = req.User?._id;
 
-      if (!postId) {
-        return res.status(400).json({ error: "Post ID is required." });
+      if (!postId || !mongoose.Types.ObjectId.isValid(postId)) {
+        return res.status(400).json({ error: "Valid post ID is required." });
       }
 
       const postData = await Post.findById(postId);
@@ -84,7 +140,11 @@ const ClubRequestController = {
         return res.status(400).json({ error: "You cannot send a club request to your own Post." });
       }
 
-      const existingRequest = await ClubRequest.findOne({ requester: requesterId, postId });
+      const postObjectId = new mongoose.Types.ObjectId(postId);
+      const existingRequest = await ClubRequest.findOne({
+        requester: requesterId,
+        postId: postObjectId,
+      });
       if (existingRequest) {
         if (existingRequest.status === "accepted") {
           return res.status(400).json({ error: "You have already joined this club." });
@@ -109,7 +169,7 @@ const ClubRequestController = {
         }
       }
 
-      await new ClubRequest({ requester: requesterId, postId }).save();
+      await new ClubRequest({ requester: requesterId, postId: postObjectId }).save();
       //postOwnerId
       const postInformation = await Post.findOne({ _id: postId })
         .select("itemName")
@@ -160,18 +220,96 @@ const ClubRequestController = {
         `clubby://product/${postId}`,
         postId,
         "Product",
+        { requesterId: String(requesterId) },
       );
       if (!success) {
         console.log("Error adding notification to controller");
       }
 
-      return res.status(200).json({ message: "Club request sent successfully." });
+      return res.status(200).json({
+        message: "Club request sent successfully.",
+        requestStatus: "pending",
+      });
     } catch (error) {
       console.log('Error is ', error)
       return res.status(500).json({ error: "Internal server error." });
     }
   },
 
+  cancelClubRequest: async (req, res) => {
+    try {
+      const { postId } = req.params;
+      const requesterId = req.User?._id;
+
+      if (!postId || !mongoose.Types.ObjectId.isValid(postId)) {
+        return res.status(400).json({ error: "Valid post ID is required." });
+      }
+
+      const postData = await Post.findById(postId);
+      if (!postData) {
+        return res.status(404).json({ error: "Post not found." });
+      }
+
+      const postObjectId = new mongoose.Types.ObjectId(postId);
+      const requesterObjectId = new mongoose.Types.ObjectId(requesterId);
+
+      const pendingRequest = await ClubRequest.findOne({
+        requester: requesterObjectId,
+        postId: { $in: [postObjectId, postId] },
+        status: "pending",
+      });
+
+      if (!pendingRequest) {
+        const anyRequest = await ClubRequest.findOne({
+          requester: requesterObjectId,
+          postId: { $in: [postObjectId, postId] },
+        });
+        if (anyRequest?.status === "accepted") {
+          return res.status(400).json({
+            error: "You are already in this club. Leave the group to withdraw.",
+          });
+        }
+        if (anyRequest?.status === "declined") {
+          return res.status(200).json({
+            message: "No active request.",
+            requestStatus: null,
+          });
+        }
+        return res.status(404).json({ error: "No pending join request to cancel." });
+      }
+
+      await ClubRequest.deleteMany({
+        requester: requesterObjectId,
+        postId: { $in: [postObjectId, postId] },
+        status: "pending",
+      });
+
+      const postOwnerId = postData.postOwnerId?._id ?? postData.postOwnerId;
+      if (postOwnerId) {
+        await Notification.deleteMany({
+          userId: postOwnerId,
+          notificationType: "JoinReq",
+          refId: postObjectId,
+          $or: [
+            { "customData.requesterId": requesterObjectId },
+            { "customData.requesterId": String(requesterId) },
+          ],
+        });
+        emitToRoom(String(postOwnerId), "clubRequestCancelled", {
+          postId: String(postId),
+          requesterId: String(requesterId),
+        });
+      }
+
+      return res.status(200).json({
+        message: "Join request cancelled successfully.",
+        requestStatus: null,
+      });
+    } catch (error) {
+      console.error("Error cancelling club request:", error);
+      return res.status(500).json({ error: "Internal server error." });
+    }
+  },
 
   handleClubRequest: async (req, res) => {
     try {
@@ -192,7 +330,10 @@ const ClubRequestController = {
       }
 
       if (!isPostOwner(postData, userId)) {
-        return res.status(403).json({ error: "You are not authorized to manage requests for this Post" });
+        return res.status(403).json({
+          error: "You are not authorized to accept or decline requests for this post.",
+          code: "NOT_POST_OWNER",
+        });
       }
 
       const requesterObjectId = new mongoose.Types.ObjectId(requesterId);
@@ -202,12 +343,17 @@ const ClubRequestController = {
         return res.status(404).json({ error: "Requester Not Found" });
       }
 
+      const postObjectId = toPostObjectId(postId);
       const pendingRequest = await ClubRequest.findOne({
         requester: requesterObjectId,
-        postId,
+        postId: postObjectId,
+        status: "pending",
       });
       if (!pendingRequest) {
-        return res.status(400).json({ error: "Pending Request Not Found" });
+        return res.status(404).json({
+          error: "This join request is no longer pending. It may have been cancelled.",
+          code: "REQUEST_NOT_PENDING",
+        });
       }
 
       if (pendingRequest.status !== "pending") {
