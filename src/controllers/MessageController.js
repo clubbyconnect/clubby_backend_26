@@ -1,6 +1,7 @@
 const uploadOnCloudinary = require("../utils/Cloudinary.js");
 const Group = require('../models/Group.js');
 const Message = require('../models/Message.js');
+const User = require('../models/User.js');
 const { getIO } = require("../sockets/Chat.js");
 
 const admin = require("../utils/Firebase.js")
@@ -156,13 +157,38 @@ exports.sendMessage = async (req, res) => {
         //     console.log("User does not have a valid FCM Token or Device Type.");
         // }
 
-        //add notification 
-        const success = addNotification(`New Message from ${groupId}`, `${userId}: ${messageType === 'image' ? 'sent an image' : messageType === 'audio' ? 'sent an audio' : messageType === 'video' ? 'sent an video' : finalMessageContent}`, userId, "Message", `clubby://Message`, groupId, "Group");
-        if (success) {
-            console.log('Add notification to controller')
-        }
-        else {
-            console.log('Error adding notification to controller')
+        const sender = await User.findById(userId).select('firstName').lean();
+        const senderLabel = sender?.firstName || 'Someone';
+        const groupTitle =
+            group.productName?.trim() ||
+            post?.itemName?.trim() ||
+            'Group chat';
+        const preview =
+            messageType === 'image'
+                ? 'sent a photo'
+                : messageType === 'audio'
+                    ? 'sent a voice message'
+                    : messageType === 'video'
+                        ? 'sent a video'
+                        : String(finalMessageContent || '').trim();
+
+        for (const member of group.members) {
+            const memberId = member?._id ?? member;
+            if (String(memberId) === String(userId)) {
+                continue;
+            }
+            const success = await addNotification(
+                groupTitle,
+                `${senderLabel}: ${preview}`,
+                memberId,
+                'Message',
+                `clubby://Message/${groupId}`,
+                groupId,
+                'Group',
+            );
+            if (!success) {
+                console.log('Error adding message notification for member', memberId);
+            }
         }
 
 

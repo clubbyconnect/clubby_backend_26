@@ -55,11 +55,17 @@ const getNotifications = async (req, res) => {
                 } else if (notification.refType === "Group") {
                     const group = await Group.findById(notification.refId);
                     if (group) {
+                        prodName =
+                            group.productName?.trim() ||
+                            null;
                         const product = await Product.findById(group.productId);
                         if (product) {
                             image = product.productImage;
-                            prodName = product.itemName;
-
+                            prodName =
+                                product.itemName?.trim() ||
+                                prodName ||
+                                group.productName?.trim() ||
+                                null;
                         }
                     }
                 }

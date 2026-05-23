@@ -14,6 +14,8 @@ const {
   signIn,
   logout,
   resetPassword,
+  changePassword,
+  getPasswordSettings,
 } = require('../controllers/AuthController.js')
 const {
   sendOtp,
@@ -80,6 +82,8 @@ router.post("/verifyOtpToVerfiyMobileNumber", verifyJWT, verifyOtpToVerfiyMobile
 router.post("/verifyOtp", verifyOtp);
 router.post("/logout", verifyJWT, logout);
 router.post("/resetPassword", resetPassword);
+router.get("/password-settings", verifyJWT, getPasswordSettings);
+router.post("/changePassword", verifyJWT, changePassword);
 router.post("/uploadAvatar", verifyJWT, upload.single('avatar'), uploadAvatar);
 
 // POST ROUTES 123

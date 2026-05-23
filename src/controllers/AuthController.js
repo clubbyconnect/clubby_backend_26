@@ -364,6 +364,95 @@ exports.logout = async (req, res) => {
     }
 };
 
+exports.getPasswordSettings = async (req, res) => {
+    try {
+        const user = await User.findById(req.User._id).select(
+            "googleAuthId appleAuthId",
+        );
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        let authProvider = "email";
+        if (user.googleAuthId) {
+            authProvider = "google";
+        } else if (user.appleAuthId) {
+            authProvider = "apple";
+        }
+
+        return res.status(200).json({
+            canChangePassword: authProvider === "email",
+            authProvider,
+        });
+    } catch (error) {
+        serverErrorHandler(error, res);
+    }
+};
+
+exports.changePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword, confirmPassword } = req.body;
+
+        if (
+            [currentPassword, newPassword, confirmPassword].some(
+                (field) => !field || String(field).trim() === "",
+            )
+        ) {
+            return res.status(400).json({ error: "All fields are required" });
+        }
+
+        const user = await User.findById(req.User._id);
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        if (user.googleAuthId) {
+            return res.status(403).json({
+                error:
+                    "You signed in with Google. Password cannot be changed here.",
+                code: "SOCIAL_AUTH_ACCOUNT",
+            });
+        }
+
+        if (user.appleAuthId) {
+            return res.status(403).json({
+                error:
+                    "You signed in with Apple. Password cannot be changed here.",
+                code: "SOCIAL_AUTH_ACCOUNT",
+            });
+        }
+
+        const currentOk = await user.isPasswordCorrect(currentPassword);
+        if (!currentOk) {
+            return res.status(401).json({ error: "Current password is incorrect" });
+        }
+
+        if (String(newPassword).length < 8) {
+            return res.status(400).json({
+                error: "New password must be at least 8 characters",
+            });
+        }
+
+        if (newPassword !== confirmPassword) {
+            return res.status(400).json({ error: "Passwords do not match" });
+        }
+
+        const sameAsCurrent = await user.isPasswordCorrect(newPassword);
+        if (sameAsCurrent) {
+            return res.status(400).json({
+                error: "New password must be different from your current password",
+            });
+        }
+
+        user.password = newPassword;
+        await user.save({ validateBeforeSave: false });
+
+        return res.status(200).json({ message: "Password changed successfully" });
+    } catch (error) {
+        serverErrorHandler(error, res);
+    }
+};
+
 exports.resetPassword = async (req, res) => {
     try {
         const { contact, confirmPassword, newPassword } = req.body;
