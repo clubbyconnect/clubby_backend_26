@@ -109,8 +109,6 @@ router.post("/UpdateUserDetails", verifyJWT, upload.single('avatar'), UpdateUser
 
 
 router.post("/fetchallcategory", verifyJWT, CategoryController.getAllCategories);
-router.post("/fetchOfflinecategory", verifyJWT, CategoryController.getAllCategories);
-router.post("/fetchOnlinecategory", verifyJWT, CategoryController.onlineDiscontinued);
 router.post("/fetchsubcategory", verifyJWT, SubcategoryController.fetchsubcategory);
 
 
