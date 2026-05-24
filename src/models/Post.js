@@ -128,6 +128,11 @@ const postSchema = new mongoose.Schema(
 );
 
 postSchema.index({ "store_location.coordinates": "2dsphere" });
+postSchema.index({ deletedAt: 1, expiryAt: 1, createdAt: -1 });
+postSchema.index({ category: 1, deletedAt: 1, expiryAt: 1 });
+postSchema.index({ subCategory: 1, deletedAt: 1, expiryAt: 1 });
+postSchema.index({ createdAt: -1 });
+postSchema.index({ category: 1, subCategory: 1, deletedAt: 1, expiryAt: 1 });
 
 const Post = mongoose.models.Post || mongoose.model("Post", postSchema);
 module.exports = Post;

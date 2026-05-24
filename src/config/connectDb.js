@@ -27,6 +27,19 @@ const connectDB = async () => {
   try {
     cached.conn = await cached.promise;
     console.log(`MongoDB connected !! DB HOST : ${cached.conn.connection.host}`);
+
+    if (process.env.SYNC_INDEXES !== "false") {
+      const Post = require("../models/Post.js");
+      const Message = require("../models/Message.js");
+      const Group = require("../models/Group.js");
+      await Promise.all([
+        Post.syncIndexes(),
+        Message.syncIndexes(),
+        Group.syncIndexes(),
+      ]);
+      console.log("MongoDB indexes synced (Post, Message, Group)");
+    }
+
     return cached.conn;
   } catch (error) {
     cached.promise = null;

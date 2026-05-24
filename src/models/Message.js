@@ -38,8 +38,8 @@ const MessageSchema = new Schema({
   timestamps: true,
 });
 
-// Create a compound index for frequently queried combinations, if needed
 MessageSchema.index({ groupId: 1, senderId: 1 });
+MessageSchema.index({ groupId: 1, createdAt: -1 });
 
 const Message = mongoose.model('Message', MessageSchema);
 module.exports = Message;

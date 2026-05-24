@@ -94,6 +94,7 @@ router.put("/post/:postId", verifyJWT, upload.single('productImage'), PostContro
 router.delete("/post/:postId", verifyJWT, PostController.delete)
 router.post("/post/transfer", verifyJWT, PostController.transfer)
 router.get("/searchProducts", verifyJWT, PostController.search);
+router.get("/homeBootstrap", verifyJWT, PostController.homeBootstrap);
 
 // CLUB ROUTES
 router.get("/club/:productId", verifyJWT, ClubRequestController.list);
@@ -110,6 +111,8 @@ router.post("/UpdateUserDetails", verifyJWT, upload.single('avatar'), UpdateUser
 
 
 router.post("/fetchallcategory", verifyJWT, CategoryController.getAllCategories);
+router.get("/categories", verifyJWT, CategoryController.getAllCategories);
+router.get("/fetchAllCategories", verifyJWT, CategoryController.getAllCategories);
 router.post("/fetchsubcategory", verifyJWT, SubcategoryController.fetchsubcategory);
 
 
@@ -122,6 +125,7 @@ router.get("/categoryname/:categoryId", requireValidObjectId("categoryId"), Cate
 router.post("/joinGroup", verifyJWT, createOrJoinGroup);
 router.post("/leaveGroupRequest", verifyJWT, leaveGroup);
 router.post("/myGroups", verifyJWT, getGroupsForUser);
+router.post("/getMyGroups", verifyJWT, getGroupsForUser);
 
 router.post(
   "/sendMessage",

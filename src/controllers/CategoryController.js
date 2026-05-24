@@ -1,6 +1,7 @@
 const CategoryModel = require('../models/Category.js');
 const SubcategoryModel = require("../models/Subcategory.js");
 const uploadOnCloudinary = require("../utils/Cloudinary.js");
+const { fetchNormalizedCategories } = require("../utils/categoryList.js");
 
 module.exports = {
   // Create Category
@@ -77,41 +78,13 @@ module.exports = {
 
   getAllCategories: async (req, res) => {
     try {
-      const DEFAULT_IMAGE =
-        "https://res.cloudinary.com/dlb8pmzph/image/upload/v1721381426/default%20images/y9yzagqvwgeyk2g1o0bj.png";
+      const { data, fetchedAt } = await fetchNormalizedCategories();
 
-      const categories = await CategoryModel.aggregate([
-        {
-          $lookup: {
-            from: "subcategories",
-            let: {categoryId: "$_id"},
-            pipeline: [
-              {
-                $match: {
-                  $expr: {$eq: ["$category", "$$categoryId"]},
-                  deletedAt: null,
-                  name: {$not: {$regex: /^new$/i}},
-                },
-              },
-            ],
-            as: "subcategories",
-          },
-        },
-      ]);
-
-      const normalized = categories.map((cat) => {
-        let image =
-          typeof cat.image === "string" && cat.image.trim() !== ""
-            ? cat.image.trim()
-            : DEFAULT_IMAGE;
-        if (image.startsWith("http://")) {
-          image = image.replace("http://", "https://");
-        }
-        return { ...cat, image };
-      });
-
+      res.setHeader("Cache-Control", "public, max-age=86400");
       return res.status(200).json({
-        message: "Categories fetched successfully", data: normalized
+        message: "Categories fetched successfully",
+        data,
+        fetchedAt,
       });
     } catch (error) {
       console.error("Error:", error);

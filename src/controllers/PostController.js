@@ -26,6 +26,10 @@ const {
   normalizePostOwner,
 } = require("../utils/postOwnership.js");
 const { isValidObjectId } = require("../utils/validators.js");
+const { withProductThumb } = require("../utils/imageUrls.js");
+const crypto = require("crypto");
+const { executeProductSearch } = require("../services/productSearch.js");
+const { fetchNormalizedCategories } = require("../utils/categoryList.js");
 
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -521,225 +525,91 @@ const PostController = {
   },
 
   search: async (req, res) => {
+    const startedAt = Date.now();
     try {
-      const {
-        productName, lon, lat, gender, date, offerType, clubMembers, size, sortBy, rangeLat, rangeLon, rangeRadius, category, subCategory, page = 1,
-        limit = 25
-      } = req.query;
+      const result = await executeProductSearch(
+        req.User._id,
+        req.query,
+        { ifNoneMatch: req.headers["if-none-match"] },
+      );
 
-      const userId = req.User._id;
-      const parsedLimit = parseInt(limit) || 25;
-      const parsedPage = parseInt(page) || 1;
-      const skip = (parsedPage - 1) * parsedLimit;
-
-      let matchStage = {deletedAt: null, expiryAt: {$gte: new Date()}};
-      let aggregatePipeline = [];
-
-      // Handle GeoNear for distance filtering (from 0 to 2000km)
-      if ((rangeLat && rangeLon && rangeRadius) || (lon && lat)) {
-        const latitude = parseFloat(rangeLat || lat);
-        const longitude = parseFloat(rangeLon || lon);
-        let kmRadius = parseFloat(rangeRadius) || 2000; // Default to 2000km if not provided
-
-        if (!isNaN(latitude) && !isNaN(longitude)) {
-          kmRadius = Math.max(1, Math.min(kmRadius, 2000)); // Ensure within 1 - 2000 km range
-          const radiusInMeters = kmRadius * 1000;
-
-          console.log("GeoNear Params:", { latitude, longitude, radiusInMeters });
-
-          aggregatePipeline.push({
-            $geoNear: {
-              near: {type: "Point", coordinates: [longitude, latitude]}, distanceField: "distance", spherical: true, maxDistance: radiusInMeters, key: "store_location.coordinates",
-            },
-          });
-        }
+      if (result.error) {
+        return res.status(result.error.status).json(result.error.body);
+      }
+      if (result.notModified) {
+        res.setHeader("ETag", result.etag);
+        return res.status(304).end();
       }
 
-      if (productName) {
-        matchStage.itemName = {$regex: productName, $options: "i"};
-      }
-
-      if (offerType) {
-        matchStage.offerType = {$in: offerType.split(',').map(type => type.trim())};
-      }
-
-      if (clubMembers) {
-        matchStage.clubMembers = parseInt(clubMembers);
-      }
-
-      if (size) {
-        matchStage.size = size;
-      }
-
-      if (date) {
-        const dateStr = String(date).trim();
-        const dayMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
-        if (dayMatch) {
-          const year = parseInt(dayMatch[1], 10);
-          const month = parseInt(dayMatch[2], 10) - 1;
-          const day = parseInt(dayMatch[3], 10);
-          const startDate = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
-          const now = new Date();
-          const startOfTomorrowUtc = new Date(
-            Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0),
-          );
-          const oldestAllowedUtc = new Date(
-            Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 30, 0, 0, 0, 0),
-          );
-          if (startDate >= startOfTomorrowUtc || startDate < oldestAllowedUtc) {
-            matchStage.createdAt = {$gte: startOfTomorrowUtc, $lt: startOfTomorrowUtc};
-          } else {
-            const endDate = new Date(Date.UTC(year, month, day + 1, 0, 0, 0, 0));
-            matchStage.createdAt = {$gte: startDate, $lt: endDate};
-          }
-        } else {
-          const startDate = new Date(dateStr);
-          if (!isNaN(startDate.getTime())) {
-            matchStage.createdAt = {$gte: startDate};
-          }
-        }
-      }
-
-      if (category) {
-        if (!isValidObjectId(category)) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid category id",
-            received: { category },
-          });
-        }
-        matchStage.category = new mongoose.Types.ObjectId(category);
-      }
-
-      if (subCategory) {
-        if (!isValidObjectId(subCategory)) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid subCategory id",
-            received: { subCategory },
-          });
-        }
-        matchStage.subCategory = new mongoose.Types.ObjectId(subCategory);
-      }
-
-      if (Object.keys(matchStage).length > 0) {
-        aggregatePipeline.push({$match: matchStage});
-      }
-
-      const genderFilter =
-        gender && String(gender).trim() !== "" && String(gender).trim() !== "Any"
-          ? String(gender).trim()
-          : null;
-      if (genderFilter) {
-        aggregatePipeline.push(
-          {
-            $lookup: {
-              from: "users",
-              localField: "postOwnerId",
-              foreignField: "_id",
-              as: "postOwner",
-            },
-          },
-          {$unwind: "$postOwner"},
-          {$match: {"postOwner.gender": genderFilter}},
+      const durationMs = Date.now() - startedAt;
+      if (durationMs >= 500) {
+        console.warn(
+          `[slow-query] GET searchProducts ${durationMs}ms page=${result.pagination.currentPage}`,
         );
       }
 
-      // Lookups for category, subcategory, and user favourites
-      aggregatePipeline.push({$lookup: {from: "categories", localField: "category", foreignField: "_id", as: "categoryDetails"}}, {$unwind: {path: "$categoryDetails", preserveNullAndEmptyArrays: true}}, {$lookup: {from: "subcategories", localField: "subCategory", foreignField: "_id", as: "subCategoryDetails"}}, {$unwind: {path: "$subCategoryDetails", preserveNullAndEmptyArrays: true}},
-        {
-          $lookup: {
-            from: "groups",
-            let: { productId: "$_id" },
-            pipeline: [
-              { $match: { $expr: { $eq: ["$productId", "$$productId"] } } },
-            ],
-            as: "groupInfo",
-          },
-        },
-        { $unwind: { path: "$groupInfo", preserveNullAndEmptyArrays: true } },
-        {
-          $lookup: {
-            from: "users",
-            localField: "_id",
-            foreignField: "favourites",
-            as: "likedByUsers"
-          }
-        }
-      );
-
-      // Projection: Convert distance to km and include additional fields
-      aggregatePipeline.push({
-        $project: {
-          _id: 1,
-          itemName: 1,
-          additionalInformation: 1,
-          price: 1,
-          createdAt: 1,
-          categoryImage: "$categoryDetails.image",
-          categoryName: "$categoryDetails.name",
-          subCategoryName: "$subCategoryDetails.name",
-          subCategoryImage: "$subCategoryDetails.image",
-          productImage: 1,
-          distance: { $divide: ["$distance", 1000] },
-          clubMembers: 1,
-          clubToJoin: {
-            $cond: {
-              if: { $isArray: "$groupInfo.members" },
-              then: { $subtract: ["$clubMembers", { $size: "$groupInfo.members" }] },
-              else: { $subtract: ["$clubMembers", 1] },
-            },
-          },
-          size: { $ifNull: ["$size", null] },
-          offerType: 1,
-          price_type: 1,
-          expiryAt: 1,
-          location: { $ifNull: ["$store_location.name", "Unknown"] },
-          isLiked: {
-            $cond: {
-              if: { $gt: [{ $size: "$likedByUsers" }, 0] },
-              then: true,
-              else: false,
-            },
-          },
-        },
-      });
-
-      // Hide full clubs from discovery (reappear when a member leaves and spots open)
-      aggregatePipeline.push({ $match: { clubToJoin: { $gt: 0 } } });
-
-      // Sorting (createdAt must be present in $project above)
-      const sortOptions = {};
-      if (sortBy === "price_high_to_low") {
-        sortOptions.price = -1;
-      } else if (sortBy === "price_low_to_high") {
-        sortOptions.price = 1;
-      } else if (sortBy === "newest") {
-        sortOptions.createdAt = -1;
-      } else if (sortBy === "distance") {
-        sortOptions.distance = 1;
-      }
-      if (Object.keys(sortOptions).length > 0) {
-        aggregatePipeline.push({ $sort: sortOptions });
-      }
-
-      // Pagination
-      aggregatePipeline.push({$skip: skip}, {$limit: parsedLimit});
-
-      const products = await PostModel.aggregate(aggregatePipeline);
-      const totalCountPipeline = [...aggregatePipeline, { $count: "total" }];
-      const countResult = await PostModel.aggregate(totalCountPipeline);
-      const totalProducts = countResult.length > 0 ? countResult[0].total : 0;
-      const totalPages = Math.ceil(totalProducts / parsedLimit);
-
+      res.setHeader("ETag", result.etag);
       res.status(200).json({
-        success: true, data: products, pagination: {
-          totalItems: totalProducts, totalPages, currentPage: parsedPage, itemsPerPage: parsedLimit,
-        },
+        success: true,
+        data: result.products,
+        pagination: result.pagination,
+        fetchedAt: new Date().toISOString(),
       });
     } catch (error) {
       console.error("Error searching products:", error);
-      res.status(500).json({success: false, message: "Server error", error: error.message});
+      res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+  },
+
+  homeBootstrap: async (req, res) => {
+    const startedAt = Date.now();
+    try {
+      const query = {
+        ...req.query,
+        page: req.query.page || 1,
+        limit: req.query.limit || 30,
+      };
+      const ifNoneMatch = req.headers["if-none-match"];
+
+      const [categoriesResult, productsResult] = await Promise.all([
+        fetchNormalizedCategories(),
+        executeProductSearch(req.User._id, query, { skip304: true }),
+      ]);
+
+      if (productsResult.error) {
+        return res.status(productsResult.error.status).json(productsResult.error.body);
+      }
+
+      const etagSource = JSON.stringify({
+        categories: categoriesResult.fingerprint,
+        productsEtag: productsResult.etag,
+      });
+      const etag = `"${crypto.createHash("md5").update(etagSource).digest("hex")}"`;
+      if (ifNoneMatch && ifNoneMatch === etag) {
+        res.setHeader("ETag", etag);
+        return res.status(304).end();
+      }
+
+      const durationMs = Date.now() - startedAt;
+      if (durationMs >= 500) {
+        console.warn(`[slow-query] GET homeBootstrap ${durationMs}ms`);
+      }
+
+      res.setHeader("ETag", etag);
+      res.setHeader("Cache-Control", "private, max-age=60");
+      return res.status(200).json({
+        success: true,
+        categories: categoriesResult.data,
+        products: {
+          data: productsResult.products,
+          pagination: productsResult.pagination,
+        },
+        productsEtag: productsResult.etag,
+        fetchedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Error in homeBootstrap:", error);
+      res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
   },
 

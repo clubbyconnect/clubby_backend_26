@@ -23,17 +23,23 @@ exports.addToFavourites = async (req, res) => {
         const productIndex = user.favourites.indexOf(productId);
 
         if (productIndex !== -1) {
-            // Remove product from favourites
             user.favourites.splice(productIndex, 1);
             await user.save();
-            return res.status(200).json({ message: "Product removed from favourites", favourites: user.favourites });
+            return res.status(200).json({
+                message: "Product removed from favourites",
+                isLiked: false,
+                productId,
+            });
         }
 
-        // Add product to favourites
         user.favourites.push(productId);
         await user.save();
 
-        res.status(200).json({ message: "Product added to favourites", favourites: user.favourites });
+        res.status(200).json({
+            message: "Product added to favourites",
+            isLiked: true,
+            productId,
+        });
     } catch (error) {
         res.status(500).json({ message: "Server error", error: error.message });
     }

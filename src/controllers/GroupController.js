@@ -7,6 +7,7 @@ const { sendPushNotification } = require('../utils/Firebase.js');
 const { getIO } = require("../sockets/Chat.js");
 const { sendSystemMessage } = require("./MessageController.js");
 const Report = require("../models/ReportSchema.js");
+const { withProductThumb } = require("../utils/imageUrls.js");
 
 
 
@@ -48,112 +49,97 @@ exports.groupMember = async (req, res) => {
 };
 
 exports.getGroupsForUser = async (req, res) => {
+  const startedAt = Date.now();
   try {
     const userId = req.User._id;
-    let { keyword, page = 1, limit = 20 } = req.body;
+    let { keyword, page = 1, limit = 20, since } = req.body;
 
-    // Ensure `page` and `limit` are numbers
-    page = parseInt(page, 10);
-    limit = parseInt(limit, 10);
+    page = parseInt(page, 10) || 1;
+    limit = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 50);
     const skip = (page - 1) * limit;
 
-    // Validate userId
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ message: 'Invalid user ID.' });
     }
 
-    // Convert userId to ObjectId
     const userIdObjectId = new mongoose.Types.ObjectId(userId);
+    const sinceDate = since ? new Date(since) : null;
+    const hasValidSince = sinceDate && !isNaN(sinceDate.getTime());
 
-    // Aggregation pipeline to fetch groups with the last message
     const aggregationPipeline = [
-      // Match groups where the user is a member
       { $match: { members: { $in: [userIdObjectId] } } },
-
-      // Lookup to fetch product details
       {
         $lookup: {
           from: 'posts',
           localField: 'productId',
           foreignField: '_id',
           as: 'productDetails',
+          pipeline: [
+            {
+              $project: {
+                itemName: 1,
+                productImage: 1,
+                clubStatus: 1,
+                expiryAt: 1,
+                deletedAt: 1,
+              },
+            },
+          ],
         },
       },
       { $unwind: '$productDetails' },
-
-      // Lookup to fetch the last message for each group
       {
         $lookup: {
           from: 'messages',
           let: { groupId: '$_id' },
           pipeline: [
-            { $match: { $expr: { $eq: ['$groupId', '$$groupId'] } } }, // Match messages by groupId
-            { $sort: { createdAt: -1 } }, // Sort by createdAt in descending order
-            { $limit: 1 }, // Limit to the last message
-            {
-              $lookup: {
-                from: 'users',
-                localField: 'senderId',
-                foreignField: '_id',
-                as: 'senderDetails',
-                pipeline: [
-                  {
-                    $project: {
-                      _id: 1, // Include _id
-                      firstName: 1, // Include firstName
-                      lastName: 1, // Include lastName
-                      avatar: 1, // Include avatar
-                    },
-                  },
-                ],
-              },
-            },
-            {
-              $addFields: {
-                senderDetails: { $arrayElemAt: ['$senderDetails', 0] }, // Convert array to object
-              },
-            },
+            { $match: { $expr: { $eq: ['$groupId', '$$groupId'] } } },
+            { $sort: { createdAt: -1 } },
+            { $limit: 1 },
             {
               $project: {
                 content: 1,
-                type: 1,
                 createdAt: 1,
-                senderId: 1,
                 readBy: 1,
-                senderDetails: 1, // Include senderDetails as an object
               },
             },
           ],
           as: 'lastMessage',
         },
       },
-      { $unwind: { path: '$lastMessage', preserveNullAndEmptyArrays: true } }, // Unwind lastMessage
-
-      // Add memberCount field (length of the members array)
+      { $unwind: { path: '$lastMessage', preserveNullAndEmptyArrays: true } },
       {
         $addFields: {
-          memberCount: { $size: '$members' }, // Calculate the length of the members array
+          memberCount: { $size: '$members' },
+          sortAt: { $ifNull: ['$lastMessage.createdAt', '$updatedAt'] },
         },
       },
+    ];
 
-      // Apply search filtering if keyword is provided
-      ...(keyword
-        ? [
-          {
-            $match: {
-              'productDetails.itemName': {
-                $regex: keyword,
-                $options: 'i',
-              },
-            },
+    if (keyword) {
+      aggregationPipeline.push({
+        $match: {
+          'productDetails.itemName': {
+            $regex: keyword,
+            $options: 'i',
           },
-        ]
-        : []),
+        },
+      });
+    }
 
-      // Sort groups by the last message's createdAt timestamp (descending order)
-      { $sort: { 'lastMessage.createdAt': -1 } },
+    if (hasValidSince) {
+      aggregationPipeline.push({
+        $match: {
+          $or: [
+            { 'lastMessage.createdAt': { $gte: sinceDate } },
+            { updatedAt: { $gte: sinceDate } },
+          ],
+        },
+      });
+    }
 
-      // Project the required fields
+    aggregationPipeline.push(
+      { $sort: { sortAt: -1 } },
       {
         $project: {
           _id: 1,
@@ -161,27 +147,57 @@ exports.getGroupsForUser = async (req, res) => {
           productName: '$productDetails.itemName',
           clubStatus: '$productDetails.clubStatus',
           expiryAt: '$productDetails.expiryAt',
-          deletedAt: '$productDetails.deletedAt',
-          lastMessage: 1,
+          lastMessage: {
+            text: '$lastMessage.content',
+            createdAt: '$lastMessage.createdAt',
+            readBy: '$lastMessage.readBy',
+          },
           memberCount: 1,
         },
       },
+      {
+        $facet: {
+          metadata: [{ $count: 'total' }],
+          data: [{ $skip: skip }, { $limit: limit }],
+        },
+      },
+    );
 
-      // Pagination
-      { $skip: skip },
-      { $limit: limit },
-    ];
+    const [facetResult] = await Group.aggregate(aggregationPipeline);
+    const totalGroups = facetResult?.metadata?.[0]?.total ?? 0;
+    const groups = (facetResult?.data ?? []).map((group) => {
+      const withThumb = withProductThumb({
+        ...group,
+        productImage: group.productImage,
+      });
+      return {
+        _id: withThumb._id,
+        productName: withThumb.productName,
+        productImage: withThumb.productImage,
+        productImageThumb: withThumb.productImageThumb,
+        clubStatus: withThumb.clubStatus,
+        memberCount: withThumb.memberCount,
+        expiryAt: withThumb.expiryAt,
+        lastMessage: withThumb.lastMessage?.createdAt
+          ? {
+              ...withThumb.lastMessage,
+              content: withThumb.lastMessage.text,
+            }
+          : null,
+      };
+    });
 
-    // Execute the aggregation pipeline
-    const groups = await Group.aggregate(aggregationPipeline);
-
-    // Get total count for pagination metadata
-    const totalGroups = await Group.countDocuments({ members: { $in: [userIdObjectId] } });
+    const durationMs = Date.now() - startedAt;
+    if (durationMs >= 500) {
+      console.warn(`[slow-query] POST myGroups ${durationMs}ms page=${page}`);
+    }
 
     return res.status(200).json({
       groups,
+      totalItems: totalGroups,
       totalPages: Math.ceil(totalGroups / limit),
       currentPage: page,
+      fetchedAt: new Date().toISOString(),
     });
   } catch (error) {
     console.error('Error fetching groups for user:', error);
