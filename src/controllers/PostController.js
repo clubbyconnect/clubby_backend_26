@@ -25,6 +25,7 @@ const {
   isPostOwner,
   normalizePostOwner,
 } = require("../utils/postOwnership.js");
+const { isValidObjectId } = require("../utils/validators.js");
 
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -600,10 +601,24 @@ const PostController = {
       }
 
       if (category) {
+        if (!isValidObjectId(category)) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid category id",
+            received: { category },
+          });
+        }
         matchStage.category = new mongoose.Types.ObjectId(category);
       }
 
       if (subCategory) {
+        if (!isValidObjectId(subCategory)) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid subCategory id",
+            received: { subCategory },
+          });
+        }
         matchStage.subCategory = new mongoose.Types.ObjectId(subCategory);
       }
 

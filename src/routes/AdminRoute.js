@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const {verifyAdminJWT} = require("../middleware/authAdmin.js");
+const { requireValidObjectId } = require("../middleware/validateObjectId.js");
 
 
 const upload = require("../middleware/multer.js")
@@ -33,21 +34,21 @@ router.put("/restore-admin/:id", verifyAdminJWT(2), AdminController.restoreAdmin
 router.post("/categories/create", upload.single('image'), verifyAdminJWT(1), CategoryController.createCategory);
 router.post("/categories/create-with-subcategories", verifyAdminJWT(), CategoryController.createCategoryWithSubcategories);
 router.get("/categories", verifyAdminJWT(), CategoryController.getAllCategories);
-router.get("/categories/:id", verifyAdminJWT(), CategoryController.getCategoryById);
-router.put("/categories/:id", verifyAdminJWT(1), upload.single('image'), CategoryController.updateCategory);
+router.get("/categories/:id", verifyAdminJWT(), requireValidObjectId("id"), CategoryController.getCategoryById);
+router.put("/categories/:id", verifyAdminJWT(1), requireValidObjectId("id"), upload.single('image'), CategoryController.updateCategory);
 router.delete("/categories/deleteAll", verifyAdminJWT(), CategoryController.deleteAllCategories);
-router.delete("/categories/:id", verifyAdminJWT(1), CategoryController.softDeleteCategory);
-router.patch("/categories/:id/restore", verifyAdminJWT(1), CategoryController.restoreCategory);
+router.delete("/categories/:id", verifyAdminJWT(1), requireValidObjectId("id"), CategoryController.softDeleteCategory);
+router.patch("/categories/:id/restore", verifyAdminJWT(1), requireValidObjectId("id"), CategoryController.restoreCategory);
 
 
 // SubCategory
 router.post("/subcategories/create", verifyAdminJWT(1), upload.single('image'), SubcategoryController.createSubcategory);
 router.get("/subcategories", verifyAdminJWT(), SubcategoryController.getAllSubcategories);
-router.get("/subcategories/:id", verifyAdminJWT(), SubcategoryController.getSubcategoryById);
-router.put("/subcategories/:id", verifyAdminJWT(1), upload.single('image'), SubcategoryController.updateSubcategory);
+router.get("/subcategories/:id", verifyAdminJWT(), requireValidObjectId("id"), SubcategoryController.getSubcategoryById);
+router.put("/subcategories/:id", verifyAdminJWT(1), requireValidObjectId("id"), upload.single('image'), SubcategoryController.updateSubcategory);
 router.delete("/subcategories/deleteAll", verifyAdminJWT(2), SubcategoryController.deleteAllSubcategories);
-router.delete("/subcategories/:id", verifyAdminJWT(1), SubcategoryController.softDeleteSubcategory);
-router.patch("/subcategories/:id/restore", verifyAdminJWT(1), SubcategoryController.restoreSubcategory);
+router.delete("/subcategories/:id", verifyAdminJWT(1), requireValidObjectId("id"), SubcategoryController.softDeleteSubcategory);
+router.patch("/subcategories/:id/restore", verifyAdminJWT(1), requireValidObjectId("id"), SubcategoryController.restoreSubcategory);
 
 // POST ROUTES
 router.post("/search-post", verifyAdminJWT(), PostController.adminSearch);

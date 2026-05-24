@@ -1,6 +1,7 @@
 const SubcategoryModel = require("../models/Subcategory.js");
 const CategoryModel = require("../models/Category.js");
 const uploadOnCloudinary = require("../utils/Cloudinary");
+const { isValidObjectId } = require("../utils/validators.js");
 
 const SubcategoryController = {
 // Create a new subcategory
@@ -10,6 +11,13 @@ const SubcategoryController = {
 
       if (!name || !categoryId) {
         return res.status(400).json({ error: "Subcategory name and category ID are required." });
+      }
+
+      if (!isValidObjectId(categoryId)) {
+        return res.status(400).json({
+          error: "Invalid categoryId",
+          received: { categoryId },
+        });
       }
 
       // Check if parent category exists
@@ -91,6 +99,12 @@ const SubcategoryController = {
 
       // Validate category if changed
       if (categoryId && categoryId !== subcategory.category.toString()) {
+        if (!isValidObjectId(categoryId)) {
+          return res.status(400).json({
+            error: "Invalid categoryId",
+            received: { categoryId },
+          });
+        }
         const categoryExists = await CategoryModel.findById(categoryId);
         if (!categoryExists) {
           return res.status(404).json({ error: "Parent category not found." });

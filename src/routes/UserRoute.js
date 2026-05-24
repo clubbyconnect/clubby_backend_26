@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const upload = require("../middleware/multer.js")
 const { verifyJWT } = require("../middleware/auth.js")
+const { requireValidObjectId } = require("../middleware/validateObjectId.js")
 const {
   uploadAvatar,
   UpdateUserDetails,
@@ -114,7 +115,7 @@ router.post("/fetchsubcategory", verifyJWT, SubcategoryController.fetchsubcatego
 
 
 router.post("/isConnected", verifyJWT, isConnected)
-router.get("/categoryname/:categoryId", CategoryController.getCategoryName);
+router.get("/categoryname/:categoryId", requireValidObjectId("categoryId"), CategoryController.getCategoryName);
 
 //--------------------Group chat Routes-------------------------------------------------
 
