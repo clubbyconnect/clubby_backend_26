@@ -2,6 +2,7 @@ const { OAuth2Client } = require("google-auth-library");
 const verifyAppleIdToken = require("../utils/verifyAppleIdToken.js");
 const Facebook = require("facebook-node-sdk");
 const serverErrorHandler = require("../utils/ServerErrorHandler.js");
+const { parseEmail } = require("../utils/validators.js");
 const User = require("../models/User.js");
 const generateAccessAndRefreshTokens = require("../utils/RefreshToken.js")
 
@@ -15,6 +16,40 @@ const fb = new Facebook({
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+const findEmailConflict = async (emailLower) => {
+    const byLower = await User.findOne({ emailLower });
+    if (byLower) return byLower;
+
+    const escaped = emailLower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return User.findOne({
+        email: { $regex: new RegExp(`^${escaped}$`, "i") },
+    });
+};
+
+
+exports.checkEmail = async (req, res) => {
+    try {
+        const parsed = parseEmail(req.query.email);
+        if (!parsed.ok) {
+            return res.status(400).json({ message: parsed.message });
+        }
+
+        const existingUser = await findEmailConflict(parsed.emailLower);
+        if (existingUser) {
+            return res.status(200).json({
+                available: false,
+                message: "This email already has an account",
+            });
+        }
+
+        return res.status(200).json({
+            available: true,
+            message: "Email is available",
+        });
+    } catch (error) {
+        serverErrorHandler(error, res);
+    }
+};
 
 exports.signUp = async (req, res) => {
     try {
@@ -31,23 +66,26 @@ exports.signUp = async (req, res) => {
             return res.status(400).json({ error: "Passwords do not match" });
         }
 
-        // Check if user already exists
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            const googleAuthError =
-                "You are already registered with Google Email-id, please sign in with Google";
-            const userExistsError = "User with this email already exists";
+        const parsed = parseEmail(email);
+        if (!parsed.ok) {
+            return res.status(400).json({ message: parsed.message });
+        }
 
+        const existingUser = await findEmailConflict(parsed.emailLower);
+        if (existingUser) {
             return res.status(409).json({
-                error:
-                    existingUser.googleAuthId !== null
-                        ? googleAuthError
-                        : userExistsError,
+                message: "This email already has an account",
             });
         }
 
         // Create new user with deviceType and fcmToken
-        const newUser = await User.create({ email, password, deviceType, fcmToken });
+        const newUser = await User.create({
+            email: parsed.trimmed,
+            emailLower: parsed.emailLower,
+            password,
+            deviceType,
+            fcmToken,
+        });
         const user = await User.findById(newUser._id).select("email deviceType fcmToken");
 
         if (!user) {
@@ -64,6 +102,9 @@ exports.signUp = async (req, res) => {
             data: { accessToken: accessToken, userInfo: user },
         });
     } catch (error) {
+        if (error.code === 11000 && error.keyPattern?.emailLower) {
+            return res.status(409).json({ message: "This email already has an account" });
+        }
         serverErrorHandler(error, res);
     }
 };

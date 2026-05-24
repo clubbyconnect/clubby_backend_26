@@ -6,9 +6,11 @@ const { requireValidObjectId } = require("../middleware/validateObjectId.js")
 const {
   uploadAvatar,
   UpdateUserDetails,
+  checkUsername,
 } = require("../controllers/UserInfoController.js")
 const {
   signUp,
+  checkEmail,
   googleAuth,
   appleAuth,
   facebookAuth,
@@ -72,6 +74,7 @@ const CategoryController = require('../controllers/CategoryController.js');
 const SubcategoryController = require("../controllers/SubCategoryController.js")
 
 router.post("/image-upload", verifyJWT, upload.single("image"), FileController.image);
+router.get("/checkEmail", checkEmail);
 router.post("/signUp", signUp);
 router.post("/googleAuth", googleAuth);
 router.post("/appleAuth", appleAuth);
@@ -107,6 +110,7 @@ router.post("/club-request/action", verifyJWT, ClubRequestController.handleClubR
 
 // GROUP ROUTES
 router.get("/group/member/:postId", verifyJWT, groupMember);
+router.get("/checkUsername", verifyJWT, checkUsername);
 router.post("/UpdateUserDetails", verifyJWT, upload.single('avatar'), UpdateUserDetails);
 
 

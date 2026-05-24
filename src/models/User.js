@@ -28,6 +28,10 @@ const userSchema = new mongoose.Schema(
       match: [/^[a-zA-Z0-9._]+$/, "Username can only contain letters, numbers, and underscores"],
       default: null,
     },
+    userNameLower: {
+      type: String,
+      default: null,
+    },
     birthdate: {
       type: Date,
       validate: {
@@ -64,12 +68,16 @@ const userSchema = new mongoose.Schema(
     email: {
       type: String,
       required: [true, "Email is required"],
-      unique: true,
       trim: true,
       match: [
         /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
         "Please enter a valid email address",
       ],
+    },
+    emailLower: {
+      type: String,
+      trim: true,
+      lowercase: true,
     },
     emailVerified: {
       type: Boolean,
@@ -214,6 +222,32 @@ const userSchema = new mongoose.Schema(
     deletedAt: { type: Date, default: null }
   }, { timestamps: true, }
 );
+
+userSchema.index({ userNameLower: 1 }, { unique: true, sparse: true });
+userSchema.index(
+  { emailLower: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { emailLower: { $type: "string" } },
+  }
+);
+
+userSchema.pre("save", function (next) {
+  if (this.isModified("userName")) {
+    if (this.userName) {
+      this.userNameLower = this.userName.trim().toLowerCase();
+    } else {
+      this.userNameLower = null;
+    }
+  }
+  if (this.isModified("email")) {
+    if (this.email) {
+      this.email = this.email.trim().toLowerCase();
+      this.emailLower = this.email;
+    }
+  }
+  next();
+});
 
 // Hashing password
 userSchema.pre("save", async function (next) {

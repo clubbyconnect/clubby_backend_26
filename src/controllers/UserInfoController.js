@@ -1,10 +1,58 @@
 const uploadOnCloudinary = require("../utils/Cloudinary.js");
 const serverErrorHandler = require("../utils/ServerErrorHandler.js");
+const { parseUsername } = require("../utils/validators.js");
 const User = require("../models/User.js");
+
+const findUsernameConflict = async (userNameLower, excludeUserId = null) => {
+  const query = { userNameLower };
+  if (excludeUserId) {
+    query._id = { $ne: excludeUserId };
+  }
+
+  const byLower = await User.findOne(query);
+  if (byLower) return byLower;
+
+  const escaped = userNameLower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regexQuery = {
+    userName: { $regex: new RegExp(`^${escaped}$`, "i") },
+  };
+  if (excludeUserId) {
+    regexQuery._id = { $ne: excludeUserId };
+  }
+  return User.findOne(regexQuery);
+};
 
 const excludeField =
   "-password -refreshToken -UserRating -homelocationChangeCount -lastHomelocationChange -emailChangeCount -lastEmailChange -phoneNumberChangeCount -lastPhoneNumberChange -googleAuthId -blockedUsers -reportCount";
 
+
+exports.checkUsername = async (req, res) => {
+  try {
+    const parsed = parseUsername(req.query.userName);
+    if (!parsed.ok) {
+      return res.status(400).json({ message: parsed.message });
+    }
+
+    const existingUser = await findUsernameConflict(
+      parsed.userNameLower,
+      req.User?._id
+    );
+
+    if (existingUser) {
+      return res.status(200).json({
+        available: false,
+        message: "Username is already taken",
+      });
+    }
+
+    return res.status(200).json({
+      available: true,
+      message: "Username is available",
+    });
+  } catch (error) {
+    serverErrorHandler(error, res);
+  }
+};
 
 exports.uploadAvatar = async (req, res) => {
     try {
@@ -60,16 +108,22 @@ exports.UpdateUserDetails = async (req, res) => {
         }
 
         if (userName) {
-            const trimmedUserName = userName.trim();
-            const isUserNameExist = await User.findOne({ userName: trimmedUserName });
-
-            if (
-                isUserNameExist &&
-                isUserNameExist._id.toString() !== userId.toString()
-            ) {
-                return res.status(409).json({ error: "userName Already exist" });
+            const parsed = parseUsername(userName);
+            if (!parsed.ok) {
+                return res.status(400).json({ message: parsed.message });
             }
-            updateDetails.userName = trimmedUserName;
+
+            const isUserNameExist = await findUsernameConflict(
+                parsed.userNameLower,
+                userId
+            );
+
+            if (isUserNameExist) {
+                return res.status(409).json({ message: "Username is already taken" });
+            }
+
+            updateDetails.userName = parsed.trimmed;
+            updateDetails.userNameLower = parsed.userNameLower;
         }
 
         if (firstName) updateDetails.firstName = firstName.trim();
@@ -119,6 +173,9 @@ exports.UpdateUserDetails = async (req, res) => {
             data: updateUser,
         });
     } catch (error) {
+        if (error.code === 11000 && error.keyPattern?.userNameLower) {
+            return res.status(409).json({ message: "Username is already taken" });
+        }
         serverErrorHandler(error, res);
     }
 };

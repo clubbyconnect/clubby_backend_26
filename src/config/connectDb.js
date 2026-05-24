@@ -32,12 +32,91 @@ const connectDB = async () => {
       const Post = require("../models/Post.js");
       const Message = require("../models/Message.js");
       const Group = require("../models/Group.js");
+      const User = require("../models/User.js");
+
+      await User.updateMany(
+        {
+          userName: { $nin: [null, ""] },
+          $or: [{ userNameLower: null }, { userNameLower: { $exists: false } }],
+        },
+        [
+          {
+            $set: {
+              userNameLower: { $toLower: { $trim: { input: "$userName" } } },
+            },
+          },
+        ]
+      );
+
+      const duplicateEmailGroups = await User.aggregate([
+        { $match: { email: { $nin: [null, ""] } } },
+        {
+          $group: {
+            _id: { $toLower: { $trim: { input: "$email" } } },
+            count: { $sum: 1 },
+            docs: { $push: { id: "$_id", createdAt: "$createdAt" } },
+          },
+        },
+        { $match: { count: { $gt: 1 } } },
+      ]);
+
+      const duplicateLoserIds = [];
+      for (const group of duplicateEmailGroups) {
+        const sorted = group.docs.sort(
+          (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+        );
+        duplicateLoserIds.push(...sorted.slice(1).map((doc) => doc.id));
+        await User.updateOne(
+          { _id: sorted[0].id },
+          { $set: { emailLower: group._id } }
+        );
+      }
+
+      if (duplicateLoserIds.length) {
+        await User.updateMany(
+          { _id: { $in: duplicateLoserIds } },
+          { $unset: { emailLower: "" } }
+        );
+      }
+
+      if (duplicateEmailGroups.length > 0) {
+        console.warn(
+          `Resolved ${duplicateEmailGroups.length} duplicate email group(s) for unique index (kept oldest account per email).`
+        );
+      }
+
+      try {
+        await User.updateMany(
+          {
+            email: { $nin: [null, ""] },
+            _id: { $nin: duplicateLoserIds },
+            $or: [{ emailLower: null }, { emailLower: { $exists: false } }],
+          },
+          [
+            {
+              $set: {
+                emailLower: { $toLower: { $trim: { input: "$email" } } },
+              },
+            },
+          ]
+        );
+      } catch (backfillError) {
+        console.warn("emailLower backfill warning:", backfillError.message);
+      }
+
       await Promise.all([
         Post.syncIndexes(),
         Message.syncIndexes(),
         Group.syncIndexes(),
       ]);
-      console.log("MongoDB indexes synced (Post, Message, Group)");
+
+      try {
+        await User.syncIndexes();
+      } catch (indexError) {
+        console.warn("User index sync warning:", indexError.message);
+      }
+
+      console.log("MongoDB indexes synced (Post, Message, Group, User)");
     }
 
     return cached.conn;
