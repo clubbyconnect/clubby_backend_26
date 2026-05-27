@@ -1,4 +1,5 @@
 const uploadOnCloudinary = require("../utils/Cloudinary.js");
+const uploadBufferOnCloudinary = require("../utils/Cloudinary.js").uploadBufferOnCloudinary;
 const getCloudinaryConfigError = require("../utils/Cloudinary.js").getCloudinaryConfigError;
 
 const FileController = {
@@ -13,8 +14,12 @@ const FileController = {
         return res.status(503).json({ success: false, error: configError });
       }
 
-      // Upload image to Cloudinary
-      const uploadedImage = await uploadOnCloudinary(req.file.path);
+      const uploadedImage = req.file.buffer
+        ? await uploadBufferOnCloudinary(
+            req.file.buffer,
+            req.file.mimetype || "image/jpeg",
+          )
+        : await uploadOnCloudinary(req.file.path);
 
       if (uploadedImage?.error) {
         return res.status(500).json({

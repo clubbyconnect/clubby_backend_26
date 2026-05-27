@@ -8,6 +8,14 @@ const { getIO } = require("../sockets/Chat.js");
 const { sendSystemMessage } = require("./MessageController.js");
 const Report = require("../models/ReportSchema.js");
 const { withProductThumb } = require("../utils/imageUrls.js");
+const {
+  getUserMembership,
+  getMembershipAudit,
+  recordUserLeft,
+  markUserRejoined,
+  LEFT_GROUP_PREVIEW,
+  LEFT_GROUP_LABEL,
+} = require("../utils/groupMembership.js");
 
 
 
@@ -67,7 +75,14 @@ exports.getGroupsForUser = async (req, res) => {
     const hasValidSince = sinceDate && !isNaN(sinceDate.getTime());
 
     const aggregationPipeline = [
-      { $match: { members: { $in: [userIdObjectId] } } },
+      {
+        $match: {
+          $or: [
+            { members: { $in: [userIdObjectId] } },
+            { "leftMembers.user": userIdObjectId },
+          ],
+        },
+      },
       {
         $lookup: {
           from: 'posts',
@@ -90,10 +105,74 @@ exports.getGroupsForUser = async (req, res) => {
       { $unwind: '$productDetails' },
       {
         $lookup: {
+          from: 'clubrequests',
+          let: { postId: '$productId' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$postId', '$$postId'] },
+                    { $eq: ['$requester', userIdObjectId] },
+                  ],
+                },
+              },
+            },
+            { $project: { status: 1 } },
+            { $limit: 1 },
+          ],
+          as: 'viewerClubRequest',
+        },
+      },
+      {
+        $addFields: {
+          isActiveMember: { $in: [userIdObjectId, '$members'] },
+          viewerRequestStatus: {
+            $arrayElemAt: ['$viewerClubRequest.status', 0],
+          },
+          userLeftAt: {
+            $let: {
+              vars: {
+                leftEntry: {
+                  $arrayElemAt: [
+                    {
+                      $filter: {
+                        input: { $ifNull: ['$leftMembers', []] },
+                        as: 'lm',
+                        cond: { $eq: ['$$lm.user', userIdObjectId] },
+                      },
+                    },
+                    0,
+                  ],
+                },
+              },
+              in: '$$leftEntry.leftAt',
+            },
+          },
+        },
+      },
+      {
+        $lookup: {
           from: 'messages',
-          let: { groupId: '$_id' },
+          let: { groupId: '$_id', userLeftAt: '$userLeftAt', isActiveMember: '$isActiveMember' },
           pipeline: [
             { $match: { $expr: { $eq: ['$groupId', '$$groupId'] } } },
+            {
+              $match: {
+                $expr: {
+                  $cond: {
+                    if: '$$isActiveMember',
+                    then: true,
+                    else: {
+                      $and: [
+                        { $ne: ['$$userLeftAt', null] },
+                        { $lte: ['$createdAt', '$$userLeftAt'] },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
             { $sort: { createdAt: -1 } },
             { $limit: 1 },
             {
@@ -101,6 +180,7 @@ exports.getGroupsForUser = async (req, res) => {
                 content: 1,
                 createdAt: 1,
                 readBy: 1,
+                type: 1,
               },
             },
           ],
@@ -143,16 +223,24 @@ exports.getGroupsForUser = async (req, res) => {
       {
         $project: {
           _id: 1,
+          productId: 1,
           productImage: '$productDetails.productImage',
           productName: '$productDetails.itemName',
+          requestStatus: '$viewerRequestStatus',
           clubStatus: '$productDetails.clubStatus',
           expiryAt: '$productDetails.expiryAt',
+          deletedAt: '$productDetails.deletedAt',
           lastMessage: {
             text: '$lastMessage.content',
             createdAt: '$lastMessage.createdAt',
             readBy: '$lastMessage.readBy',
+            type: '$lastMessage.type',
           },
           memberCount: 1,
+          membershipStatus: {
+            $cond: ['$isActiveMember', 'active', 'left'],
+          },
+          leftAt: '$userLeftAt',
         },
       },
       {
@@ -172,18 +260,36 @@ exports.getGroupsForUser = async (req, res) => {
       });
       return {
         _id: withThumb._id,
+        productId: withThumb.productId
+          ? String(withThumb.productId)
+          : null,
+        requestStatus: withThumb.requestStatus ?? null,
         productName: withThumb.productName,
         productImage: withThumb.productImage,
         productImageThumb: withThumb.productImageThumb,
         clubStatus: withThumb.clubStatus,
         memberCount: withThumb.memberCount,
         expiryAt: withThumb.expiryAt,
-        lastMessage: withThumb.lastMessage?.createdAt
-          ? {
-              ...withThumb.lastMessage,
-              content: withThumb.lastMessage.text,
-            }
-          : null,
+        deletedAt: withThumb.deletedAt,
+        membershipStatus: withThumb.membershipStatus || 'active',
+        leftAt: withThumb.leftAt || null,
+        leftGroupLabel:
+          withThumb.membershipStatus === 'left' ? LEFT_GROUP_LABEL : null,
+        lastMessage:
+          withThumb.membershipStatus === 'left'
+            ? {
+                text: LEFT_GROUP_PREVIEW,
+                content: LEFT_GROUP_PREVIEW,
+                type: 'left',
+                createdAt: withThumb.leftAt || withThumb.lastMessage?.createdAt || null,
+                readBy: [],
+              }
+            : withThumb.lastMessage?.createdAt
+              ? {
+                  ...withThumb.lastMessage,
+                  content: withThumb.lastMessage.text,
+                }
+              : null,
       };
     });
 
@@ -319,14 +425,18 @@ exports.createOrJoinGroup = async (req, res) => {
       }
     }
 
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+
     // Check if the user is already a member of the group
-    const isUserInGroup = group.members.some(member => member.equals(userId));
+    const isUserInGroup = group.members.some((member) =>
+      new mongoose.Types.ObjectId(member?._id ?? member).equals(userObjectId),
+    );
     if (isUserInGroup) {
       return res.status(400).json({ message: "User already exists in the group." });
     }
 
-    // Add the user to the group
-    group.members.push(userId);
+    markUserRejoined(group, userObjectId);
+    group.members.push(userObjectId);
     await group.save();
 
     try {
@@ -366,28 +476,44 @@ exports.createOrJoinGroup = async (req, res) => {
 };
 
 exports.leaveGroup = async (req, res) => {
-  const { groupId, userId, newAdminId } = req.body;
-  console.log(groupId, userId, newAdminId, "checkedddddddddd");
+  const { groupId, userId: bodyUserId, newAdminId } = req.body;
+  const userId = req.User?._id?.toString() || bodyUserId;
 
   if (!groupId || !userId) {
     return res.status(400).json({ message: 'groupId and userId are required.' });
   }
 
+  if (!mongoose.Types.ObjectId.isValid(groupId)) {
+    return res.status(400).json({ message: 'Invalid groupId.' });
+  }
+
   try {
     const group = await Group.findById(groupId);
-    console.log('groupId, userId, newAdminId, group.adminId', groupId, userId, newAdminId, group?.adminId);
 
     if (!group) {
       return res.status(404).json({ message: "Group not found." });
     }
 
-    // Check if the group is inactive or wrapped
-    if (!group.isActive || group.clubStatus === 'Wrap') {
+    const post = await Post.findById(group.productId).select("clubStatus").lean();
+    const postClubStatus = post?.clubStatus;
+
+    if (!group.isActive || postClubStatus === "Wrap" || postClubStatus === "Inactive") {
       return res.status(403).json({ message: "Cannot perform action as the group is inactive or wrapped." });
     }
 
-    const productId = group.productId;
-    const isMember = group.members.includes(userId);
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+    const membership = getUserMembership(group, userObjectId);
+
+    if (membership.status === "left") {
+      return res.status(200).json({
+        message: "User has already left the group",
+        membershipStatus: "left",
+        leftAt: membership.leftAt,
+        group,
+      });
+    }
+
+    const isMember = membership.status === "active";
 
     if (!isMember) {
       return res.status(403).json({ message: "You are not a member of this group." });
@@ -399,11 +525,7 @@ exports.leaveGroup = async (req, res) => {
     }
 
     const userFirstName = user.firstName || "User";
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-    const productObjectId = new mongoose.Types.ObjectId(productId);
-
-    console.log(userObjectId, "LLLLLLLLLLLLLLLLLLLLLLLLLLLsssssssssss");
-    const newAdminObjectId = new mongoose.Types.ObjectId(newAdminId);
+    const productObjectId = new mongoose.Types.ObjectId(group.productId);
 
     if (group.adminId.equals(userObjectId)) {
       if (!group.isActive) {
@@ -411,15 +533,19 @@ exports.leaveGroup = async (req, res) => {
       }
 
       if (newAdminId) {
+        if (!mongoose.Types.ObjectId.isValid(newAdminId)) {
+          return res.status(400).json({ message: "Invalid newAdminId." });
+        }
+
         const newAdmin = await User.findById(newAdminId);
         if (!newAdmin) {
           return res.status(404).json({ message: "New Admin not found." });
         }
 
+        const newAdminObjectId = new mongoose.Types.ObjectId(newAdminId);
         const newAdminFirstName = newAdmin.firstName || "User";
-        console.log('Making Admin working');
         group.adminId = newAdminObjectId;
-        group.members = group.members.filter(member => !member.equals(userObjectId));
+        recordUserLeft(group, userObjectId);
 
         const postToUpdate = await Post.findOne({ _id: productObjectId });
         if (postToUpdate) {
@@ -452,12 +578,16 @@ exports.leaveGroup = async (req, res) => {
       }
     } else {
       console.log("here 2");
-      // Normal user leaving the group without voting
-      group.members = group.members.filter(member => !member.equals(userObjectId));
+      // Normal user leaving — keep chat visible as read-only in the app
+      recordUserLeft(group, userObjectId);
       await group.save();
       await sendSystemMessage(group._id, `${userFirstName} has left the group.`);
 
-      return res.status(200).json({ message: "User has left the group", group });
+      return res.status(200).json({
+        message: "User has left the group",
+        membershipStatus: "left",
+        group,
+      });
     }
   } catch (error) {
     console.error("Error in leave group:", error);
@@ -496,15 +626,37 @@ exports.getGroupMembersAndAdmin = async (req, res) => {
   try {
     // Find the group by _id (groupId) and populate adminId and members fields
     const group = await Group.findById(groupId)
-      .populate("adminId", "firstName avatar") // Populate adminId with admin's firstName and avatar
-      .populate("members", "firstName avatar") // Populate members with their firstName and avatar
-      .populate("productId", "clubStatus"); // Populate postId with clubStatus
+      .populate("adminId", "firstName lastName userName avatar gender UserRating")
+      .populate("members", "firstName lastName userName avatar gender UserRating")
+      .populate("productId", "clubStatus expiryAt deletedAt");
 
     if (!group) {
       return res.status(404).json({ message: "Group not found." });
     }
 
+    const userId = req.User?._id;
+    const membership = userId
+      ? getUserMembership(group, userId)
+      : { status: "none", leftAt: null };
+
+    if (membership.status === "none") {
+      return res.status(403).json({ message: "You do not have access to this group." });
+    }
+
     const status = group.productId ? group.productId.clubStatus : null;
+    const postPolicyText = String(
+      group.productId?.returnPolicyText ||
+      group.productId?.returnExchangePolicy ||
+      group.productId?.additionalInformation ||
+      "",
+    ).toLowerCase();
+    const requiresBillForWrap =
+      typeof group.productId?.requiresBillForWrap === "boolean"
+        ? group.productId.requiresBillForWrap
+        : /return|exchange|replace|refund/.test(postPolicyText) &&
+          /bill|receipt|invoice|proof of purchase|purchase proof/.test(
+            postPolicyText,
+          );
     const adminDoc = group.adminId;
     const adminId =
       adminDoc?._id ?? adminDoc ?? group.adminId;
@@ -522,11 +674,39 @@ exports.getGroupMembersAndAdmin = async (req, res) => {
           adminId && member._id.equals(adminId) ? "Admin" : "Member",
       }));
 
+    const postDoc = group.productId;
+    const wrapVotes = group.wrapVotes || [];
+    const viewerId = req.User?._id;
+    const votedUserIds = wrapVotes.map((v) => String(v.userId));
+    const viewerHasVoted = viewerId
+      ? wrapVotes.some((v) =>
+          new mongoose.Types.ObjectId(v.userId).equals(viewerId),
+        )
+      : false;
+
     return res.status(200).json({
       message: "Group details fetched successfully",
       admin,
+      adminId,
       members,
-      status, // Add status field from Post's clubStatus
+      status,
+      clubStatus: status,
+      isActive: group.isActive,
+      expiryAt: postDoc?.expiryAt ?? null,
+      deletedAt: postDoc?.deletedAt ?? null,
+      memberCount: members.length,
+      membershipStatus: membership.status,
+      leftAt: membership.leftAt,
+      readOnly: membership.status === "left",
+      dealBillUrl: group.dealBillUrl || null,
+      dealBillUploadedAt: group.dealBillUploadedAt || null,
+      wrapVoteCount: wrapVotes.length,
+      wrapVoteTotal: members.length,
+      wrapVotesComplete:
+        members.length > 0 && wrapVotes.length >= members.length,
+      viewerHasVoted,
+      votedUserIds,
+      requiresBillForWrap,
     });
   } catch (error) {
     console.error("Error fetching group members and admin:", error);
@@ -535,31 +715,40 @@ exports.getGroupMembersAndAdmin = async (req, res) => {
 };
 
 exports.getGroupDetails = async (req, res) => {
-  const { groupId } = req.params; // Get groupId from URL params
-  console.log("groupId hits ", groupId);
+  const { groupId } = req.params;
+  const userId = req.User?._id;
 
   try {
-    // Find the group by _id (groupId) and populate productId to fetch product details
     const group = await Group.findById(groupId).populate("productId");
 
     if (!group) {
       return res.status(404).json({ message: "Group not found." });
     }
-    console.log('Group is ', group)
-    // Fetch the Post associated with the same productId to get productImage
-    const posts = await Post.findOne({ _id: group.productId });
 
-    console.log('group.productId is ', group.productId)
+    const membership = userId
+      ? getUserMembership(group, userId)
+      : { status: "none", leftAt: null };
+
+    if (membership.status === "none") {
+      return res.status(403).json({ message: "You do not have access to this group." });
+    }
+
+    const posts = await Post.findOne({ _id: group.productId });
 
     return res.status(200).json({
       message: "Group details fetched successfully",
       groupId: group._id,
-      productId: group.productId._id || null,
-      groupName: posts.itemName,
+      productId: group.productId?._id || group.productId || null,
+      groupName: posts?.itemName,
       productImage: posts?.productImage || null,
       deletedAt: posts?.deletedAt || null,
       expiryAt: posts?.expiryAt || null,
-      clubStatus: posts?.clubStatus || null
+      clubStatus: posts?.clubStatus || null,
+      isActive: group.isActive,
+      membershipStatus: membership.status,
+      leftAt: membership.leftAt,
+      readOnly: membership.status === "left",
+      membershipAudit: userId ? getMembershipAudit(group, userId) : null,
     });
   } catch (error) {
     console.error("Error fetching group details:", error);
@@ -579,11 +768,22 @@ exports.getReports = async (req, res) => {
       },
     }, {$unwind: "$user"}, {
       $lookup: {
-        from: "posts", localField: "groupId", foreignField: "groupId", as: "post",
+        from: "posts", localField: "postId", foreignField: "_id", as: "post",
       },
     }, {$unwind: {path: "$post", preserveNullAndEmptyArrays: true}}, {
       $project: {
-        _id: 1, title: 1, details: 1, reportedAt: 1, "user._id": 1, "user.firstName": 1, "user.lastName": 1, "user.avatar": 1, itemName: "$post.itemName", postId: "$post.postId",
+        _id: 1,
+        groupId: 1,
+        postId: 1,
+        title: 1,
+        details: 1,
+        reportedAt: 1,
+        "user._id": 1,
+        "user.firstName": 1,
+        "user.lastName": 1,
+        "user.avatar": 1,
+        itemName: "$post.itemName",
+        productImage: "$post.productImage",
       },
     }, {$sort: {reportedAt: -1}}, {$skip: skip}, {$limit: parseInt(limit)},]);
 

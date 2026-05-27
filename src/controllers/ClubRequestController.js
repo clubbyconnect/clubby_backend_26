@@ -11,18 +11,18 @@ const { addNotification } = require("./NotificationController.js");
 const Notification = require("../models/Notification.js");
 const { emitToRoom } = require("../sockets/Chat.js");
 const { isPostOwner, isSameId } = require("../utils/postOwnership.js");
+const {
+  getUserLeftInfo,
+  isGroupMember,
+  REJOIN_WARNING_MESSAGE,
+  EXHAUSTED_REJOIN_MESSAGE,
+} = require("../utils/clubRejoin.js");
+const { markUserRejoined, getMembershipAudit } = require("../utils/groupMembership.js");
 
 const toPostObjectId = (postId) =>
   mongoose.Types.ObjectId.isValid(postId)
     ? new mongoose.Types.ObjectId(postId)
     : postId;
-
-const isGroupMember = (group, userId) =>
-  Boolean(
-    group?.members?.some((member) =>
-      isSameId(member?._id ?? member, userId),
-    ),
-  );
 
 const ClubRequestController = {
   list: async (req, res) => {
@@ -53,7 +53,7 @@ const ClubRequestController = {
         .sort({ createdAt: -1 });
 
       const group = await Group.findOne({ productId: postObjectId })
-        .select("members isActive")
+        .select("members leftMembers isActive")
         .lean();
       const memberCount = group?.members?.length ?? 0;
       const clubSize = postData.clubMembers ?? 0;
@@ -110,6 +110,9 @@ const ClubRequestController = {
           createdAt: request.createdAt,
           status: request.status,
           updatedAt: request.updatedAt,
+          membershipAudit: group
+            ? getMembershipAudit(group, request.requester?._id ?? request.requester)
+            : null,
         })),
       });
     } catch (error) {
@@ -141,35 +144,62 @@ const ClubRequestController = {
       }
 
       const postObjectId = new mongoose.Types.ObjectId(postId);
+      const group = await Group.findOne({ productId: postId });
+      const leftInfo = group ? getUserLeftInfo(group, requesterId) : null;
+
+      if (leftInfo?.feedHidden) {
+        return res.status(403).json({
+          error: EXHAUSTED_REJOIN_MESSAGE,
+          code: "REJOIN_EXHAUSTED",
+        });
+      }
+
       const existingRequest = await ClubRequest.findOne({
         requester: requesterId,
         postId: postObjectId,
       });
-      if (existingRequest) {
-        if (existingRequest.status === "accepted") {
-          return res.status(400).json({ error: "You have already joined this club." });
-        }
-        if (existingRequest.status === "declined") {
-          return res.status(400).json({ error: "Your join request was declined." });
-        }
-        return res.status(400).json({ error: "You have already sent a join request." });
-      }
 
-
-      // Fetch the associated group
-      const group = await Group.findOne({ productId: postId });
       if (group) {
-        // Check if group has reached its max size
         if (group.members.length >= postData.clubMembers) {
           return res.status(400).json({ error: "The group is already full. You cannot send a club request." });
         }
-        // Check if requester is already in the group
         if (isGroupMember(group, requesterId)) {
           return res.status(400).json({ error: "You are already a member of this group." });
         }
       }
 
-      await new ClubRequest({ requester: requesterId, postId: postObjectId }).save();
+      let isRejoinRequest = false;
+
+      if (existingRequest) {
+        if (existingRequest.status === "accepted" && group && !isGroupMember(group, requesterId)) {
+          if (!leftInfo?.canRejoin) {
+            return res.status(403).json({
+              error: EXHAUSTED_REJOIN_MESSAGE,
+              code: "REJOIN_EXHAUSTED",
+            });
+          }
+          existingRequest.status = "pending";
+          existingRequest.updatedAt = Date.now();
+          await existingRequest.save();
+          isRejoinRequest = true;
+        } else if (existingRequest.status === "declined") {
+          existingRequest.status = "pending";
+          existingRequest.updatedAt = Date.now();
+          await existingRequest.save();
+          isRejoinRequest = true;
+        } else if (existingRequest.status === "pending") {
+          return res.status(400).json({ error: "You have already sent a join request." });
+        } else if (existingRequest.status === "accepted") {
+          return res.status(400).json({ error: "You have already joined this club." });
+        }
+      }
+
+      if (!existingRequest) {
+        await new ClubRequest({ requester: requesterId, postId: postObjectId }).save();
+        if (leftInfo?.isLeft && leftInfo?.canRejoin) {
+          isRejoinRequest = true;
+        }
+      }
       //postOwnerId
       const postInformation = await Post.findOne({ _id: postId })
         .select("itemName")
@@ -227,8 +257,12 @@ const ClubRequestController = {
       }
 
       return res.status(200).json({
-        message: "Club request sent successfully.",
+        message: isRejoinRequest
+          ? "Rejoin request sent. Waiting for the post owner."
+          : "Club request sent successfully.",
         requestStatus: "pending",
+        rejoinMessage: isRejoinRequest ? REJOIN_WARNING_MESSAGE : null,
+        isRejoin: isRejoinRequest,
       });
     } catch (error) {
       console.log('Error is ', error)
@@ -392,6 +426,7 @@ const ClubRequestController = {
           return res.status(400).json({ error: "Requester is already a member of the group." });
         }
 
+        markUserRejoined(group, requesterObjectId);
         group.members.push(requesterObjectId);
         await group.save();
         await sendSystemMessage(group._id, `${requester.firstName || "User"} has been added to the group.`);

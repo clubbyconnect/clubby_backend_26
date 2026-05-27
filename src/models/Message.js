@@ -23,7 +23,7 @@ const MessageSchema = new Schema({
   },
   type: {
     type: String,
-    enum: ['text', 'image', 'video', 'audio', 'system', 'voiceCall', 'videoCall'], // Removed duplicate 'system'
+    enum: ['text', 'image', 'video', 'audio', 'file', 'system', 'voiceCall', 'videoCall'],
     default: 'text',
     index: true // Index for fast retrieval of messages by type
   },

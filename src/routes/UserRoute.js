@@ -39,6 +39,8 @@ const {
   getFirst4MediaMessages,
   getAllMediaMessages,
   wrapDeal,
+  uploadDealBill,
+  voteWrapDeal,
   createReport,
   removeUserFromGroup,
   getAllReports,
@@ -143,8 +145,8 @@ router.post(
 );
 router.post("/markMessageAsRead", verifyJWT, markMessageAsRead);
 router.get("/getMessages/:groupId", verifyJWT, getMessagesForGroup);
-router.get("/getAdminUser/:groupId", getGroupMembersAndAdmin);
-router.get("/getGroupDetails/:groupId", getGroupDetails)
+router.get("/getAdminUser/:groupId", verifyJWT, getGroupMembersAndAdmin);
+router.get("/getGroupDetails/:groupId", verifyJWT, getGroupDetails);
 router.post("/sendSystemMessage", sendSystemMessageHandler);
 
 
@@ -160,6 +162,8 @@ router.post("/removeUserFromGroup", verifyJWT, removeUserFromGroup);
 router.get("/getSortmedia/:groupId", verifyJWT, getFirst4MediaMessages);
 router.get("/getAllMediaMessages/:groupId", verifyJWT, getAllMediaMessages);
 router.post("/wrapDeal", verifyJWT, wrapDeal);
+router.post("/uploadDealBill", verifyJWT, uploadDealBill);
+router.post("/voteWrapDeal", verifyJWT, voteWrapDeal);
 router.post("/createReport", verifyJWT, createReport);
 router.get("/getAllReports", verifyJWT, getAllReports);
 

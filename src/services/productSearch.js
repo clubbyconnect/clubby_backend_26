@@ -1,6 +1,8 @@
 const PostModel = require("../models/Post.js");
 const User = require("../models/User.js");
+const Group = require("../models/Group.js");
 const mongoose = require("mongoose");
+const { getFeedExcludedPostIds } = require("../utils/clubRejoin.js");
 const crypto = require("crypto");
 const { isValidObjectId } = require("../utils/validators.js");
 const { withProductThumb } = require("../utils/imageUrls.js");
@@ -36,6 +38,12 @@ async function executeProductSearch(userId, query, options = {}) {
   );
 
   let matchStage = { deletedAt: null, expiryAt: { $gte: new Date() } };
+
+  const excludedPostIds = await getFeedExcludedPostIds(userId, Group);
+  if (excludedPostIds.length > 0) {
+    matchStage._id = { $nin: excludedPostIds };
+  }
+
   const aggregatePipeline = [];
 
   if ((rangeLat && rangeLon && rangeRadius) || (lon && lat)) {

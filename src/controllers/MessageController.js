@@ -6,6 +6,7 @@ const { getIO } = require("../sockets/Chat.js");
 
 const admin = require("../utils/Firebase.js")
 const { addNotification } = require("./NotificationController.js");
+const { getUserMembership, getMembershipAudit } = require("../utils/groupMembership.js");
 
 
 exports.sendMessage = async (req, res) => {
@@ -49,12 +50,16 @@ exports.sendMessage = async (req, res) => {
 
         console.log('group is ', group.isActive);
 
-        // Check if the user is a member of the group
-        const isMember = group.members.some((member) =>
-            String(member?._id ?? member) === String(userId),
-        );
-        if (!isMember) {
-            return res.status(403).json({ error: "You are not a member of this group." });
+        const membership = getUserMembership(group, userId);
+        if (membership.status !== "active") {
+            return res.status(403).json({
+                error:
+                    membership.status === "left"
+                        ? "You're no longer part of this group. New messages are hidden."
+                        : "You are not a member of this group.",
+                membershipStatus: membership.status,
+                readOnly: membership.status === "left",
+            });
         }
 
         // Check if the group is active
@@ -232,15 +237,36 @@ exports.markMessageAsRead = async (req, res) => {
 
 exports.getMessagesForGroup = async (req, res) => {
     const { groupId } = req.params;
+    const userId = req.User._id;
 
     try {
-        // Retrieve all messages for the given groupId
-        const messages = await Message.find({ groupId })
-            .populate('senderId', 'firstName avatar') // Populate senderId to get username
-            .sort({ createdAt: 1 }) // Sort messages by creation date in ascending order (oldest first)
+        const group = await Group.findById(groupId);
+        if (!group) {
+            return res.status(404).json({ message: "Group not found." });
+        }
 
-        // Return messages in the response
-        return res.status(200).json(messages);
+        const membership = getUserMembership(group, userId);
+        if (membership.status === "none") {
+            return res.status(403).json({ message: "You do not have access to this group." });
+        }
+
+        const query = { groupId };
+        if (membership.status === "left" && membership.leftAt) {
+            query.createdAt = { $lte: membership.leftAt };
+        }
+
+        const messages = await Message.find(query)
+            .populate('senderId', 'firstName lastName userName avatar UserRating')
+            .sort({ createdAt: 1 });
+
+        return res.status(200).json({
+            messages,
+            groupId: group._id,
+            membershipStatus: membership.status,
+            leftAt: membership.leftAt,
+            readOnly: membership.status === "left",
+            membershipAudit: getMembershipAudit(group, userId),
+        });
     } catch (error) {
         console.error("Error fetching messages:", error);
         return res.status(500).json({ message: "Internal server error." });

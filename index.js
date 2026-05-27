@@ -32,16 +32,12 @@ if (!process.env.VERCEL && require.main === module) {
   const http = require("http");
   const server = http.createServer(app);
 
-  const PORT = Number(process.env.PORT) || 8000;
-  const HOST = "0.0.0.0";
-
   connectDB()
     .then(() => {
-      setupSocket(server);
-      server.listen(PORT, HOST, () => {
-        console.log(`HTTP + Socket.IO on http://${HOST}:${PORT}`);
-        console.log(`API base: http://localhost:${PORT}/api/`);
+      server.listen(process.env.PORT || 8000, () => {
+        console.log(`Server is listening on port ${process.env.PORT}`);
       });
+      setupSocket(server);
     })
     .catch((error) => {
       console.log("Unable to start server", error);

@@ -1,9 +1,11 @@
+const mongoose = require("mongoose");
 const User = require("../models/User.js");
 const Post = require("../models/Post.js");
 const Report = require('../models/ReportSchema.js');
 const Group = require('../models/Group.js');
 const Message = require('../models/Message.js');
 const { sendSystemMessage } = require("./MessageController.js");
+const { getUserMembership, recordUserLeft } = require("../utils/groupMembership.js");
 
 
 exports.removeUserFromGroup = async (req, res) => {
@@ -25,14 +27,15 @@ exports.removeUserFromGroup = async (req, res) => {
             return res.status(403).json({ message: "You are not authorized to remove users from this group." });
         }
 
-        // Check if the user is a member of the group
-        const isMember = group.members.includes(removeUserId);
+        const removeUserObjectId = new mongoose.Types.ObjectId(removeUserId);
+        const isMember = group.members.some((member) =>
+            new mongoose.Types.ObjectId(member?._id ?? member).equals(removeUserObjectId),
+        );
         if (!isMember) {
             return res.status(403).json({ message: "User is not a member of this group." });
         }
 
-        // Remove the user from the group's members array
-        group.members = group.members.filter(member => !member.equals(removeUserId));
+        recordUserLeft(group, removeUserObjectId);
         await group.save();
 
         // Send system message to notify the group about the removal
@@ -55,18 +58,38 @@ exports.removeUserFromGroup = async (req, res) => {
 
 exports.getFirst4MediaMessages = async (req, res) => {
     const { groupId } = req.params;
+    const userId = req.User._id;
 
     try {
-        // Retrieve the latest 4 media messages (image or video) for the given groupId
-        const messages = await Message.find({
-            groupId,
-            type: { $in: ['image', 'video'] }
-        })
-            .sort({ createdAt: -1 }) // Sort by latest messages first
-            .limit(4)  // Limit to 4 messages
-            .populate('senderId', 'firstName avatar'); // Populate senderId to get username
+        const group = await Group.findById(groupId);
+        if (!group) {
+            return res.status(404).json({ message: "Group not found." });
+        }
 
-        return res.status(200).json(messages);
+        const membership = getUserMembership(group, userId);
+        if (membership.status === "none") {
+            return res.status(403).json({ message: "You do not have access to this group." });
+        }
+
+        const query = {
+            groupId,
+            type: { $in: ['image', 'video', 'audio', 'file'] },
+        };
+        if (membership.status === "left" && membership.leftAt) {
+            query.createdAt = { $lte: membership.leftAt };
+        }
+
+        const messages = await Message.find(query)
+            .sort({ createdAt: -1 })
+            .limit(4)
+            .populate('senderId', 'firstName lastName userName avatar UserRating');
+
+        return res.status(200).json({
+            messages,
+            membershipStatus: membership.status,
+            leftAt: membership.leftAt,
+            readOnly: membership.status === "left",
+        });
     } catch (error) {
         console.error("Error fetching latest 4 media messages:", error);
         return res.status(500).json({ message: "Internal server error." });
@@ -75,89 +98,288 @@ exports.getFirst4MediaMessages = async (req, res) => {
 
 exports.getAllMediaMessages = async (req, res) => {
     const { groupId } = req.params;
+    const userId = req.User._id;
 
     try {
-        // Retrieve all media messages (image or video) for the given groupId
-        const messages = await Message.find({
-            groupId,
-            type: { $in: ['image', 'video'] }
-        })
-            .populate('senderId', 'firstName avatar') // Populate senderId to get username
-            .sort({ createdAt: -1 }); // Sort messages by latest first
+        const group = await Group.findById(groupId);
+        if (!group) {
+            return res.status(404).json({ message: "Group not found." });
+        }
 
-        return res.status(200).json({ media: messages });
+        const membership = getUserMembership(group, userId);
+        if (membership.status === "none") {
+            return res.status(403).json({ message: "You do not have access to this group." });
+        }
+
+        const query = {
+            groupId,
+            type: { $in: ['image', 'video', 'audio', 'file'] },
+        };
+        if (membership.status === "left" && membership.leftAt) {
+            query.createdAt = { $lte: membership.leftAt };
+        }
+
+        const messages = await Message.find(query)
+            .populate('senderId', 'firstName lastName userName avatar UserRating')
+            .sort({ createdAt: -1 });
+
+        return res.status(200).json({
+            media: messages,
+            membershipStatus: membership.status,
+            leftAt: membership.leftAt,
+            readOnly: membership.status === "left",
+        });
     } catch (error) {
         console.error("Error fetching all media messages:", error);
         return res.status(500).json({ message: "Internal server error." });
     }
 };
 
-exports.wrapDeal = async (req, res) => {
-    const { groupId, reviews } = req.body;
-    console.log("groupId, reviews ", groupId, reviews);
+async function applyWrapReviews(reviews) {
+    if (!Array.isArray(reviews)) {
+        return;
+    }
+    for (const review of reviews) {
+        const user = await User.findById(review.userId);
+        if (!user) continue;
+        const currentRating = user.UserRating || 0;
+        const newRating =
+            currentRating === 0 ? review.rating : review.rating / 2;
+        await User.findByIdAndUpdate(review.userId, {
+            $inc: { UserRating: newRating },
+        });
+    }
+}
+
+async function finalizeWrapDeal(group, reviews) {
+    const product = await Post.findById(group.productId);
+    if (!product) {
+        return { ok: false, status: 404, message: "Post not found." };
+    }
+    if (product.clubStatus === "Wrap" || product.clubStatus === "Inactive") {
+        return {
+            ok: false,
+            status: 403,
+            message: "No action performed as the group is Inactive or already Wrapped.",
+        };
+    }
+    await Post.findByIdAndUpdate(group.productId, { clubStatus: "Wrap" });
+    await applyWrapReviews(reviews);
+    await sendSystemMessage(group._id, "Deal has been wrapped.");
+    return { ok: true, message: "Group and Post wrapped successfully, ratings updated." };
+}
+
+function inferRequiresBillForWrap(post) {
+    if (!post) return false;
+    if (typeof post.requiresBillForWrap === "boolean") {
+        return post.requiresBillForWrap;
+    }
+    const policyText = String(
+        post.returnPolicyText ||
+        post.returnExchangePolicy ||
+        post.additionalInformation ||
+        "",
+    ).toLowerCase();
+    if (!policyText) return false;
+    const hasReturnPolicy = /return|exchange|replace|refund/.test(policyText);
+    const requiresReceipt = /bill|receipt|invoice|proof of purchase|purchase proof/.test(
+        policyText,
+    );
+    return hasReturnPolicy && requiresReceipt;
+}
+
+function buildWrapVotePayload(group, viewerId, requiresBillForWrap) {
+    const memberCount = (group.members || []).length;
+    const wrapVotes = group.wrapVotes || [];
+    const voteCount = wrapVotes.length;
+    const viewerHasVoted = wrapVotes.some((v) =>
+        new mongoose.Types.ObjectId(v.userId).equals(viewerId),
+    );
+    const votedUserIds = wrapVotes.map((v) => String(v.userId));
+    return {
+        dealBillUrl: group.dealBillUrl || null,
+        dealBillUploadedAt: group.dealBillUploadedAt || null,
+        wrapVoteCount: voteCount,
+        wrapVoteTotal: memberCount,
+        wrapVotesComplete: memberCount > 0 && voteCount >= memberCount,
+        viewerHasVoted,
+        votedUserIds,
+        requiresBillForWrap: Boolean(requiresBillForWrap),
+    };
+}
+
+exports.uploadDealBill = async (req, res) => {
+    const { groupId, billUrl } = req.body;
+
+    if (!groupId || !billUrl || typeof billUrl !== "string" || !billUrl.trim()) {
+        return res.status(400).json({ message: "groupId and billUrl are required." });
+    }
 
     try {
-        // Find the group to get the associated Post (product)
         const group = await Group.findById(groupId);
-
         if (!group) {
             return res.status(404).json({ message: "Group not found." });
         }
 
-        // Fetch the associated Post (product)
-        const product = await Post.findById(group.productId);
+        const membership = getUserMembership(group, req.User._id);
+        if (membership.status === "left") {
+            return res.status(403).json({
+                message: "You're no longer part of this group.",
+                membershipStatus: "left",
+                readOnly: true,
+            });
+        }
+        if (membership.status === "none") {
+            return res.status(403).json({ message: "You do not have access to this group." });
+        }
 
+        const product = await Post.findById(group.productId);
         if (!product) {
             return res.status(404).json({ message: "Post not found." });
         }
-
-        // Check if the Post is already "Wrap" or "Inactive"
         if (product.clubStatus === "Wrap" || product.clubStatus === "Inactive") {
             return res.status(403).json({
-                message: "No action performed as the group is Inactive or already Wrapped.",
+                message: "Cannot upload a bill — the deal is already wrapped or inactive.",
             });
         }
-        console.log('product is ', product)
 
-        // Update the Post (product) status to "Wrap"
-        await Post.findByIdAndUpdate(group.productId, { clubStatus: "Wrap" });
+        group.dealBillUrl = billUrl.trim();
+        group.dealBillUploadedAt = new Date();
+        group.dealBillUploadedBy = req.User._id;
+        group.wrapVotes = [];
+        await group.save();
 
-        // Process reviews if they exist
-        if (reviews) {
-            for (const review of reviews) {
-                const user = await User.findById(review.userId);
-                if (!user) continue;
+        await sendSystemMessage(
+            groupId,
+            "All members can see the bill. Ask everyone to vote and close the deal.",
+        );
 
-                // Adjust the new rating based on current rating
-                const currentRating = user.UserRating || 0;
-                const newRating =
-                    currentRating === 0 ? review.rating : review.rating / 2;
-                console.log(
-                    "Current rating:",
-                    currentRating,
-                    "New rating:",
-                    newRating,
-                    "Review rating:",
-                    review.rating
-                );
+        return res.status(200).json({
+            message: "Bill uploaded successfully.",
+            ...buildWrapVotePayload(
+                group,
+                req.User._id,
+                inferRequiresBillForWrap(product),
+            ),
+        });
+    } catch (error) {
+        console.error("Error in uploadDealBill:", error);
+        return res.status(500).json({ message: "Failed to upload bill." });
+    }
+};
 
-                // Update user's rating
-                await User.findByIdAndUpdate(review.userId, {
-                    $inc: { UserRating: newRating },
-                });
-            }
+exports.voteWrapDeal = async (req, res) => {
+    const { groupId, reviews } = req.body;
+
+    if (!groupId) {
+        return res.status(400).json({ message: "groupId is required." });
+    }
+
+    try {
+        const group = await Group.findById(groupId);
+        if (!group) {
+            return res.status(404).json({ message: "Group not found." });
         }
 
-        await sendSystemMessage(groupId, `Deal has been wrapped.`);
-        res
-            .status(200)
-            .json({ message: "Group and Post wrapped successfully, ratings updated." });
-    } catch (error) {
-        console.error("Error in wrapDeal:", error);
-        res.status(500).json({
-            error: "An error occurred while updating the group and Post status.",
+        const membership = getUserMembership(group, req.User._id);
+        if (membership.status === "left") {
+            return res.status(403).json({
+                message: "You're no longer part of this group.",
+                membershipStatus: "left",
+                readOnly: true,
+            });
+        }
+        if (membership.status === "none") {
+            return res.status(403).json({ message: "You do not have access to this group." });
+        }
+
+        const product = await Post.findById(group.productId);
+        if (!product) {
+            return res.status(404).json({ message: "Post not found." });
+        }
+        const requiresBillForWrap = inferRequiresBillForWrap(product);
+        if (product.clubStatus === "Wrap" || product.clubStatus === "Inactive") {
+            return res.status(403).json({
+                message: "This deal is already wrapped or inactive.",
+            });
+        }
+
+        if (requiresBillForWrap && !group.dealBillUrl) {
+            return res.status(400).json({
+                message: "The admin must upload the bill before members can vote to wrap.",
+                billRequired: true,
+                requiresBillForWrap: true,
+            });
+        }
+
+        const viewerId = req.User._id;
+        const alreadyVoted = (group.wrapVotes || []).some((v) =>
+            new mongoose.Types.ObjectId(v.userId).equals(viewerId),
+        );
+
+        const isAdmin = group.adminId.equals(viewerId);
+        if (isAdmin && Array.isArray(reviews) && reviews.length > 0) {
+            group.pendingWrapReviews = reviews;
+        }
+
+        if (!alreadyVoted) {
+            group.wrapVotes = group.wrapVotes || [];
+            group.wrapVotes.push({ userId: viewerId, votedAt: new Date() });
+            await group.save();
+        } else if (isAdmin && Array.isArray(reviews)) {
+            await group.save();
+        }
+
+        const memberCount = (group.members || []).length;
+        const voteCount = (group.wrapVotes || []).length;
+        let wrapped = false;
+        let wrapMessage = "Your vote has been recorded.";
+
+        if (voteCount >= memberCount && memberCount > 0) {
+            const reviewPayload =
+                group.pendingWrapReviews?.length > 0
+                    ? group.pendingWrapReviews
+                    : isAdmin && Array.isArray(reviews)
+                      ? reviews
+                      : null;
+            const result = await finalizeWrapDeal(group, reviewPayload);
+            if (result.ok) {
+                wrapped = true;
+                wrapMessage = result.message;
+            } else {
+                return res.status(result.status || 500).json({ message: result.message });
+            }
+        } else {
+            wrapMessage = `Vote recorded (${voteCount}/${memberCount}). Waiting for all members to vote.`;
+        }
+
+        const refreshed = await Group.findById(groupId);
+        return res.status(200).json({
+            message: wrapMessage,
+            wrapped,
+            ...buildWrapVotePayload(
+                refreshed || group,
+                viewerId,
+                requiresBillForWrap,
+            ),
         });
+    } catch (error) {
+        console.error("Error in voteWrapDeal:", error);
+        return res.status(500).json({ message: "Failed to record wrap vote." });
     }
+};
+
+/** @deprecated Prefer voteWrapDeal — kept for older app builds */
+exports.wrapDeal = async (req, res) => {
+    const { groupId } = req.body;
+    if (!groupId) {
+        return res.status(400).json({ message: "groupId is required." });
+    }
+    return res.status(400).json({
+        message:
+            "Wrap requires every member to vote after the admin uploads the bill. Use voteWrapDeal instead.",
+        useVoteWrapDeal: true,
+    });
 };
 
 exports.sortReports = async (req, res) => {
@@ -181,12 +403,12 @@ exports.sortReports = async (req, res) => {
 
 exports.getAllReports = async (req, res) => {
     try {
-        // Retrieve all reports
         const reports = await Report.find()
-            .populate('groupId', 'productName')  
-            .populate('userId', 'firstName avatar');  
+            .populate('groupId', 'productName productId')
+            .populate('postId', 'itemName productImage')
+            .populate('userId', 'firstName lastName avatar')
+            .sort({ reportedAt: -1 });
 
-        // Return reports in the response
         return res.status(200).json(reports);
     } catch (error) {
         console.error("Error fetching all reports:", error);
@@ -195,18 +417,53 @@ exports.getAllReports = async (req, res) => {
 };
 
 exports.createReport = async (req, res) => {
-    const { groupId, userId, title, details } = req.body;
-    console.log('groupId, userId, title, details ', groupId, userId, title, details)
+    const { groupId, userId: bodyUserId, title, details, postId: bodyPostId } = req.body;
+    const reporterId = req.User._id;
     try {
-        if (!groupId || !userId || !title || !details) {
-            return res.status(400).json({ message: "All fields are required." });
+        if (!groupId || !title || !details) {
+            return res.status(400).json({
+                message: "groupId, title, and details are required.",
+            });
+        }
+
+        if (bodyUserId && String(bodyUserId) !== String(reporterId)) {
+            return res.status(403).json({ message: "userId must match the authenticated user." });
+        }
+
+        const group = await Group.findById(groupId);
+        if (!group) {
+            return res.status(404).json({ message: "Group not found." });
+        }
+
+        const postId = bodyPostId || group.productId;
+        if (!postId) {
+            return res.status(400).json({ message: "postId is required for this report." });
+        }
+        if (!group.productId) {
+            return res.status(400).json({ message: "Group is not linked to a post." });
+        }
+        if (String(postId) !== String(group.productId)) {
+            return res.status(400).json({ message: "postId does not match this group." });
+        }
+
+        const membership = getUserMembership(group, req.User._id);
+        if (membership.status === "left") {
+            return res.status(403).json({
+                message: "You're no longer part of this group.",
+                membershipStatus: "left",
+                readOnly: true,
+            });
+        }
+        if (membership.status === "none") {
+            return res.status(403).json({ message: "You do not have access to this group." });
         }
 
         const newReport = new Report({
             groupId,
-            userId,
-            title,
-            details,
+            postId,
+            userId: reporterId,
+            title: String(title).trim(),
+            details: String(details).trim(),
         });
 
         await newReport.save();

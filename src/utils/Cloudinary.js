@@ -67,6 +67,34 @@ const uploadOnCloudinary = async (localFilePath) => {
     }
 };
 
+/** Vercel/serverless: upload from multer memory buffer (no disk path). */
+const uploadBufferOnCloudinary = (buffer, mimetype = "image/jpeg") => {
+    const configError = getCloudinaryConfigError();
+    if (configError) {
+        return Promise.resolve({ error: configError });
+    }
+    if (!buffer || !buffer.length) {
+        return Promise.resolve({ error: "Empty image buffer" });
+    }
+
+    return new Promise((resolve) => {
+        const stream = cloudinary.uploader.upload_stream(
+            { resource_type: "auto", secure: true },
+            (error, result) => {
+                if (error) {
+                    const friendly = formatCloudinaryConfigError(error);
+                    console.error("Cloudinary buffer upload failed:", friendly);
+                    resolve({ error: friendly });
+                    return;
+                }
+                resolve(result);
+            },
+        );
+        stream.end(buffer);
+    });
+};
+
 module.exports = uploadOnCloudinary;
+module.exports.uploadBufferOnCloudinary = uploadBufferOnCloudinary;
 module.exports.getCloudinaryConfigError = getCloudinaryConfigError;
 

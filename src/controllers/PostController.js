@@ -395,7 +395,17 @@ const PostController = {
         requester: userId,
         postId: { $in: [postObjectId, postMongoId] },
       }).select("status");
-      productData.requestStatus = clubRequest ? clubRequest.status : null;
+
+      const { resolveVisitorRequestState } = require("../utils/clubRejoin.js");
+      const visitorState = resolveVisitorRequestState(group, userId, clubRequest, {
+        isPostOwner: productData.isPostOwner,
+      });
+      productData.requestStatus = visitorState.requestStatus;
+      productData.membershipStatus = visitorState.membershipStatus;
+      productData.leaveCount = visitorState.leaveCount;
+      productData.canRejoin = visitorState.canRejoin;
+      productData.feedHidden = visitorState.feedHidden;
+      productData.rejoinMessage = visitorState.rejoinMessage;
 
       if (productData.isPostOwner) {
         productData.pendingRequestCount = await ClubRequest.countDocuments({
@@ -506,8 +516,8 @@ const PostController = {
       if (pendingRequest) {
         await ClubRequest.deleteOne({_id: pendingRequest._id});
       }
-      // remove current owner from group
-      group.members = group.members.filter(memberId => memberId.toString() !== userId.toString());
+      const { recordUserLeft } = require("../utils/groupMembership.js");
+      recordUserLeft(group, new mongoose.Types.ObjectId(userId));
       await group.save();
 
       // Save changes

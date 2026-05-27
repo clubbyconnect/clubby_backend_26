@@ -30,20 +30,24 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, os.tmpdir());
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${path.extname(file.originalname)}`;
-    cb(null, uniqueSuffix);
-  }
-});
+/** Vercel serverless: memory storage is more reliable than disk for multipart uploads. */
+const storage = process.env.VERCEL
+  ? multer.memoryStorage()
+  : multer.diskStorage({
+      destination: function (req, file, cb) {
+        cb(null, os.tmpdir());
+      },
+      filename: function (req, file, cb) {
+        const ext = path.extname(file.originalname || '') || '.jpg';
+        const uniqueSuffix = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`;
+        cb(null, uniqueSuffix);
+      },
+    });
 
 const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
-  limits: { fileSize: 50 * 1024 * 1024 } // Increased limit to 50MB for img, videos and audio
+  limits: { fileSize: 10 * 1024 * 1024 },
 });
 
 module.exports = upload;
