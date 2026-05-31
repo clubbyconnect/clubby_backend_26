@@ -18,6 +18,7 @@ const {
   EXHAUSTED_REJOIN_MESSAGE,
 } = require("../utils/clubRejoin.js");
 const { markUserRejoined, getMembershipAudit } = require("../utils/groupMembership.js");
+const { getUnavailablePostReason } = require("../utils/postVisibility.js");
 
 const toPostObjectId = (postId) =>
   mongoose.Types.ObjectId.isValid(postId)
@@ -145,6 +146,13 @@ const ClubRequestController = {
 
       const postObjectId = new mongoose.Types.ObjectId(postId);
       const group = await Group.findOne({ productId: postId });
+      const unavailableReason = getUnavailablePostReason(postData, group);
+      if (unavailableReason) {
+        return res.status(403).json({
+          error: unavailableReason.message,
+          code: unavailableReason.code,
+        });
+      }
       const leftInfo = group ? getUserLeftInfo(group, requesterId) : null;
 
       if (leftInfo?.feedHidden) {
@@ -396,6 +404,30 @@ const ClubRequestController = {
         });
       }
 
+      let groupForAccepted = null;
+      if (status === "accepted") {
+        groupForAccepted = await Group.findOne({ productId: postId });
+        if (!groupForAccepted) {
+          return res.status(404).json({ error: "Group not found for this Post." });
+        }
+
+        const unavailableReason = getUnavailablePostReason(postData, groupForAccepted);
+        if (unavailableReason) {
+          return res.status(403).json({
+            error: unavailableReason.message,
+            code: unavailableReason.code,
+          });
+        }
+
+        if (groupForAccepted.members.length >= postData.clubMembers) {
+          return res.status(400).json({ error: "The group is full. Cannot add more members." });
+        }
+
+        if (isGroupMember(groupForAccepted, requesterObjectId)) {
+          return res.status(400).json({ error: "Requester is already a member of the group." });
+        }
+      }
+
       pendingRequest.status = status;
       pendingRequest.updatedAt = Date.now();
       await pendingRequest.save();
@@ -412,19 +444,7 @@ const ClubRequestController = {
 
       if (status === "accepted") {
         console.log("inside accepted")
-        const group = await Group.findOne({ productId: postId });
-        if (!group) {
-          return res.status(404).json({ error: "Group not found for this Post." });
-        }
-
-        // Check if group has reached its max size
-        if (group.members.length >= postData.clubMembers) {
-          return res.status(400).json({ error: "The group is full. Cannot add more members." });
-        }
-
-        if (isGroupMember(group, requesterObjectId)) {
-          return res.status(400).json({ error: "Requester is already a member of the group." });
-        }
+        const group = groupForAccepted;
 
         markUserRejoined(group, requesterObjectId);
         group.members.push(requesterObjectId);

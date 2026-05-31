@@ -30,6 +30,7 @@ const { withProductThumb } = require("../utils/imageUrls.js");
 const crypto = require("crypto");
 const { executeProductSearch } = require("../services/productSearch.js");
 const { fetchNormalizedCategories } = require("../utils/categoryList.js");
+const { canViewInactivePostDetails } = require("../utils/postVisibility.js");
 
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -387,6 +388,13 @@ const PostController = {
 
       const group = await Group.findOne({productId: product._id})
         .populate("members", "firstName lastName userName _id avatar");
+      if (!canViewInactivePostDetails(product, group, userId)) {
+        return res.status(403).json({
+          success: false,
+          error: "This post is inactive or wrapped and is only available to club members.",
+          code: "POST_DETAILS_RESTRICTED",
+        });
+      }
       productData.members = group ? group.members : [];
 
       const postMongoId = String(product._id);

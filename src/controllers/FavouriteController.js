@@ -7,6 +7,7 @@ const {
   buildActivityPostRow,
   activityPostEnrichmentStages,
 } = require("../utils/activityPost.js");
+const { buildPublicFeedPostMatch } = require("../utils/postVisibility.js");
 
 exports.addToFavourites = async (req, res) => {
   try {
@@ -99,7 +100,9 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
       (id) => new mongoose.Types.ObjectId(id),
     );
 
-    const statusMatch = buildClubStatusMatch(status);
+    const statusMatch = status
+      ? { deletedAt: null, ...buildClubStatusMatch(status) }
+      : buildPublicFeedPostMatch();
 
     const aggregatePipeline = [
       {
@@ -114,12 +117,14 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
       {
         $match: {
           _id: { $in: favouriteIds },
-          deletedAt: null,
           ...statusMatch,
         },
       },
       ...activityPostEnrichmentStages(userIdObjectId),
     ];
+    if (!status) {
+      aggregatePipeline.push({ $match: { "groupInfo.isActive": { $ne: false } } });
+    }
 
     const pageNum = Math.max(parseInt(page, 10) || 1, 1);
     const limitNum = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);

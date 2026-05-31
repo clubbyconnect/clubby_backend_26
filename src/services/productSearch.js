@@ -6,6 +6,10 @@ const { getFeedExcludedPostIds } = require("../utils/clubRejoin.js");
 const crypto = require("crypto");
 const { isValidObjectId } = require("../utils/validators.js");
 const { withProductThumb } = require("../utils/imageUrls.js");
+const {
+  buildExcludeOwnPostsMatch,
+  buildPublicFeedPostMatch,
+} = require("../utils/postVisibility.js");
 
 async function executeProductSearch(userId, query, options = {}) {
   const {
@@ -31,13 +35,20 @@ async function executeProductSearch(userId, query, options = {}) {
   const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
   const skip = (parsedPage - 1) * parsedLimit;
   const isDiscovery = !productName || String(productName).trim() === "";
+  const userObjectId =
+    userId instanceof mongoose.Types.ObjectId
+      ? userId
+      : new mongoose.Types.ObjectId(userId);
 
   const userDoc = await User.findById(userId).select("favourites").lean();
   const favouriteIds = (userDoc?.favourites || []).map((id) =>
     id instanceof mongoose.Types.ObjectId ? id : new mongoose.Types.ObjectId(id),
   );
 
-  let matchStage = { deletedAt: null, expiryAt: { $gte: new Date() } };
+  let matchStage = {
+    ...buildPublicFeedPostMatch(),
+    ...buildExcludeOwnPostsMatch(userObjectId),
+  };
 
   const excludedPostIds = await getFeedExcludedPostIds(userId, Group);
   if (excludedPostIds.length > 0) {
@@ -174,12 +185,13 @@ async function executeProductSearch(userId, query, options = {}) {
         let: { productId: "$_id" },
         pipeline: [
           { $match: { $expr: { $eq: ["$productId", "$$productId"] } } },
-          { $project: { members: 1 } },
+          { $project: { members: 1, isActive: 1 } },
         ],
         as: "groupInfo",
       },
     },
     { $unwind: { path: "$groupInfo", preserveNullAndEmptyArrays: true } },
+    { $match: { "groupInfo.isActive": { $ne: false } } },
   );
 
   aggregatePipeline.push({
@@ -224,7 +236,7 @@ async function executeProductSearch(userId, query, options = {}) {
     sortOptions.price = -1;
   } else if (sortBy === "price_low_to_high") {
     sortOptions.price = 1;
-  } else if (sortBy === "newest") {
+  } else if (sortBy === "newest" || (isDiscovery && !sortBy)) {
     sortOptions.createdAt = -1;
   } else if (sortBy === "distance") {
     sortOptions.distance = 1;
