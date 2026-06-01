@@ -104,6 +104,30 @@ const GroupSchema = new Schema({
       rating: { type: Number, default: 0 },
     },
   ],
+  /** Whether any member has indicated a bill is required */
+  isBillRequired: {
+    type: Boolean,
+    default: false,
+  },
+  /** Per-member answers to "is bill required?" */
+  billRequiredAnswers: [
+    {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+      },
+      answer: {
+        type: String,
+        enum: ['yes', 'no'],
+        required: true,
+      },
+      answeredAt: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+  ],
   messages: [{  // Add this field to store message IDs
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Message'

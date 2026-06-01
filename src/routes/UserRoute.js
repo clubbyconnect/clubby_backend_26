@@ -44,6 +44,7 @@ const {
   createReport,
   removeUserFromGroup,
   getAllReports,
+  setBillRequired,
 } = require("../controllers/GroupProfileController.js")
 const {
   createOrJoinGroup,
@@ -166,6 +167,7 @@ router.post("/uploadDealBill", verifyJWT, uploadDealBill);
 router.post("/voteWrapDeal", verifyJWT, voteWrapDeal);
 router.post("/createReport", verifyJWT, createReport);
 router.get("/getAllReports", verifyJWT, getAllReports);
+router.post("/setBillRequired", verifyJWT, setBillRequired);
 
 
 

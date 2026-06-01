@@ -475,3 +475,63 @@ exports.createReport = async (req, res) => {
         return res.status(500).json({ message: "Internal server error." });
     }
 };
+
+exports.setBillRequired = async (req, res) => {
+    const userId = req.User._id;
+    const { groupId, answer } = req.body;
+
+    if (!groupId || !answer) {
+        return res.status(400).json({ message: "groupId and answer are required." });
+    }
+
+    if (!["yes", "no"].includes(answer)) {
+        return res.status(400).json({ message: "answer must be 'yes' or 'no'." });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(groupId)) {
+        return res.status(400).json({ message: "Invalid groupId." });
+    }
+
+    try {
+        const group = await Group.findById(groupId);
+        if (!group) {
+            return res.status(404).json({ message: "Group not found." });
+        }
+
+        const userObjectId = new mongoose.Types.ObjectId(userId);
+        const membership = getUserMembership(group, userObjectId);
+        if (membership.status !== "active") {
+            return res.status(403).json({ message: "You are not an active member of this group." });
+        }
+
+        // Upsert the user's answer
+        const existingIndex = group.billRequiredAnswers.findIndex((a) =>
+            new mongoose.Types.ObjectId(a.userId).equals(userObjectId),
+        );
+
+        if (existingIndex >= 0) {
+            group.billRequiredAnswers[existingIndex].answer = answer;
+            group.billRequiredAnswers[existingIndex].answeredAt = new Date();
+        } else {
+            group.billRequiredAnswers.push({ userId: userObjectId, answer, answeredAt: new Date() });
+        }
+
+        // isBillRequired = true if any member answered 'yes'; false only if all answered 'no'
+        const hasAnyYes = group.billRequiredAnswers.some((a) => a.answer === "yes");
+        group.isBillRequired = hasAnyYes;
+
+        await group.save();
+
+        return res.status(200).json({
+            isBillRequired: group.isBillRequired,
+            billRequiredAnswers: group.billRequiredAnswers.map((a) => ({
+                userId: a.userId,
+                answer: a.answer,
+            })),
+            viewerBillRequiredAnswer: answer,
+        });
+    } catch (error) {
+        console.error("Error in setBillRequired:", error);
+        return res.status(500).json({ message: "Internal server error." });
+    }
+};

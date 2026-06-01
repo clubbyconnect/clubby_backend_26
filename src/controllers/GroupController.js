@@ -684,6 +684,16 @@ exports.getGroupMembersAndAdmin = async (req, res) => {
         )
       : false;
 
+    const billRequiredAnswers = (group.billRequiredAnswers || []).map((a) => ({
+      userId: a.userId,
+      answer: a.answer,
+    }));
+    const viewerBillRequiredAnswer = viewerId
+      ? (group.billRequiredAnswers || []).find((a) =>
+          new mongoose.Types.ObjectId(a.userId).equals(viewerId),
+        )?.answer ?? null
+      : null;
+
     return res.status(200).json({
       message: "Group details fetched successfully",
       admin,
@@ -707,6 +717,9 @@ exports.getGroupMembersAndAdmin = async (req, res) => {
       viewerHasVoted,
       votedUserIds,
       requiresBillForWrap,
+      isBillRequired: group.isBillRequired ?? false,
+      billRequiredAnswers,
+      viewerBillRequiredAnswer,
     });
   } catch (error) {
     console.error("Error fetching group members and admin:", error);
