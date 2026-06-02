@@ -65,4 +65,28 @@ const parseEmail = (email) => {
   return { ok: true, trimmed, emailLower: trimmed };
 };
 
-module.exports = { isValidObjectId, parseUsername, parseEmail };
+const PHONE_PATTERN = /^[6-9]\d{9}$/;
+
+const parsePhoneNumber = (phoneNumber) => {
+  if (phoneNumber == null || String(phoneNumber).trim() === "") {
+    return { ok: false, message: "phoneNumber is required" };
+  }
+
+  const digits = String(phoneNumber).replace(/\D/g, "");
+  if (!PHONE_PATTERN.test(digits)) {
+    return {
+      ok: false,
+      message: "Please enter a valid 10-digit Indian phone number",
+    };
+  }
+
+  return { ok: true, digits, value: Number(digits) };
+};
+
+module.exports = {
+  isValidObjectId,
+  parseUsername,
+  parseEmail,
+  parsePhoneNumber,
+  PHONE_PATTERN,
+};

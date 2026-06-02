@@ -104,6 +104,7 @@ router.get("/homeBootstrap", verifyJWT, PostController.homeBootstrap);
 
 // CLUB ROUTES
 router.get("/club/:productId", verifyJWT, ClubRequestController.list);
+router.get("/club-requests-for-post/:productId", verifyJWT, ClubRequestController.list);
 router.get("/club/join/:postId", verifyJWT, ClubRequestController.sendClubRequest);
 router.post("/club/cancel-join/:postId", verifyJWT, ClubRequestController.cancelClubRequest);
 router.delete("/club/join/:postId", verifyJWT, ClubRequestController.cancelClubRequest);

@@ -4,7 +4,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon ./index.js"
+    "dev": "nodemon ./index.js",
+    "migrate:profile-verification": "node scripts/migrate-profile-verification.js",
+    "migrate:profile-verification:apply": "node scripts/migrate-profile-verification.js --apply"
   },
   "author": "",
   "license": "ISC",

@@ -3,6 +3,8 @@ const axios = require("axios");
 const serverErrorHandler = require("../utils/ServerErrorHandler.js");
 const User = require("../models/User.js");
 const OTP = require("../models/Otp.js");
+const { parsePhoneNumber } = require("../utils/validators.js");
+const { toUserInfo } = require("../utils/userInfo.js");
 
 
 const generateUniqueOtp = async () => {
@@ -46,33 +48,43 @@ exports.sendOtp = async (req, res) => {
                 .json({ error: "Email or phone number is required" });
         }
 
-        const email = /\S+@\S+\.\S+/.test(contact);
-        const userQuery = email ? { email: contact } : { phoneNumber: contact };
+        const isEmailContact = /\S+@\S+\.\S+/.test(contact);
+        let userQuery;
+        let parsedPhone = null;
+
+        if (isEmailContact) {
+            userQuery = { email: contact };
+        } else {
+            parsedPhone = parsePhoneNumber(contact);
+            if (!parsedPhone.ok) {
+                return res.status(400).json({ error: parsedPhone.message });
+            }
+            userQuery = { phoneNumber: parsedPhone.value };
+        }
 
         const user = await User.findOne(userQuery);
 
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
-        const isEmail = user.email === contact;
+
         const otp = await generateUniqueOtp();
 
-        const otpPayload = isEmail
+        const otpPayload = isEmailContact
             ? { email: contact, otp }
-            : { phoneNumber: contact, otp };
+            : { phoneNumber: parsedPhone.digits, otp };
         await OTP.create(otpPayload);
 
-        if (isEmail) {
-            return res
-                .status(200)
-                .json({ success: true, message: "OTP Sent Successfully" });
-        } else {
-            const message = otp;
-            await sendSms(contact, message);
+        if (isEmailContact) {
             return res
                 .status(200)
                 .json({ success: true, message: "OTP Sent Successfully" });
         }
+
+        await sendSms(parsedPhone.digits, otp);
+        return res
+            .status(200)
+            .json({ success: true, message: "OTP Sent Successfully" });
     } catch (error) {
         serverErrorHandler(error, res);
     }
@@ -82,12 +94,20 @@ exports.sendOtpToVerifyMobileNumber = async (req, res) => {
     try {
         const { phoneNumber } = req.body;
 
-        const existingUser = await User.findOne({ phoneNumber });
-        if (existingUser) {
-            return res.status(200).json({ message: "Phone number already exist" });
+        const parsedPhone = parsePhoneNumber(phoneNumber);
+        if (!parsedPhone.ok) {
+            return res.status(400).json({ error: parsedPhone.message });
         }
 
-        const existingOtp = await OTP.findOne({ phoneNumber });
+        const existingUser = await User.findOne({
+            phoneNumber: parsedPhone.value,
+            _id: { $ne: req.User._id },
+        });
+        if (existingUser) {
+            return res.status(409).json({ message: "Phone number already in use" });
+        }
+
+        const existingOtp = await OTP.findOne({ phoneNumber: parsedPhone.digits });
 
         if (existingOtp) {
             return res
@@ -97,11 +117,10 @@ exports.sendOtpToVerifyMobileNumber = async (req, res) => {
 
         const otp = await generateUniqueOtp();
 
-        const otpPayload = { phoneNumber, otp };
+        const otpPayload = { phoneNumber: parsedPhone.digits, otp };
         await OTP.create(otpPayload);
 
-        const message = otp;
-        await sendSms(phoneNumber, message);
+        await sendSms(parsedPhone.digits, otp);
         return res.status(200).json({ message: "OTP Sent Successfully" });
     } catch (error) {
         serverErrorHandler(error, res);
@@ -118,25 +137,51 @@ exports.verifyOtpToVerfiyMobileNumber = async (req, res) => {
                 .json({ error: "phoneNumber and OTP are required" });
         }
 
-        const user = await OTP.findOne({ phoneNumber });
-
-        if (!user) {
-            return res.status(400).json({ error: "OTP expierd" });
+        const parsedPhone = parsePhoneNumber(phoneNumber);
+        if (!parsedPhone.ok) {
+            return res.status(400).json({ error: parsedPhone.message });
         }
 
-        const otpRecord = await OTP.findOne({ phoneNumber, otp });
+        const otpRecord = await OTP.findOne({
+            phoneNumber: parsedPhone.digits,
+            otp,
+        });
 
-        if (otpRecord) {
-            const userId = req.User._id;
-            let updateDetails = await User.findById(userId);
-            if (phoneNumber) updateDetails.phoneNumber = phoneNumber.trim();
-            updateDetails.phoneNumberVerified = true;
-            updateDetails = await updateDetails.save();
-
-            return res.status(200).json({ message: "OTP verified successfully" });
-        } else {
-            return res.status(400).json({ error: "Invalid OTP" });
+        if (!otpRecord) {
+            return res.status(400).json({ error: "Invalid or expired OTP" });
         }
+
+        const userId = req.User._id;
+
+        const phoneTaken = await User.findOne({
+            phoneNumber: parsedPhone.value,
+            _id: { $ne: userId },
+        });
+        if (phoneTaken) {
+            return res.status(409).json({ message: "Phone number already in use" });
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            {
+                $set: {
+                    phoneNumber: parsedPhone.value,
+                    phoneNumberVerified: true,
+                },
+            },
+            { new: true },
+        ).select("-password -refreshToken");
+
+        if (!updatedUser) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        await OTP.deleteOne({ _id: otpRecord._id });
+
+        return res.status(200).json({
+            message: "OTP verified successfully",
+            data: toUserInfo(updatedUser),
+        });
     } catch (error) {
         serverErrorHandler(error, res);
     }
@@ -150,25 +195,35 @@ exports.verifyOtp = async (req, res) => {
             return res.status(400).json({ error: "Contact and OTP are required" });
         }
 
-        const user = await OTP.findOne({
-            $or: [{ email: contact }, { phoneNumber: contact }],
-        });
+        const isEmailContact = /\S+@\S+\.\S+/.test(contact);
+        let otpRecord;
 
-        if (!user) {
-            return res.status(400).json({ error: "OTP expierd" });
-        }
-
-        const query =
-            user.email === contact
-                ? { email: contact, otp }
-                : { phoneNumber: contact, otp };
-        const otpRecord = await OTP.findOne(query);
-
-        if (otpRecord) {
-            return res.status(200).json({ message: "OTP verified successfully" });
+        if (isEmailContact) {
+            otpRecord = await OTP.findOne({ email: contact, otp });
         } else {
-            return res.status(400).json({ error: "Invalid OTP" });
+            const parsedPhone = parsePhoneNumber(contact);
+            if (!parsedPhone.ok) {
+                return res.status(400).json({ error: parsedPhone.message });
+            }
+            otpRecord = await OTP.findOne({
+                phoneNumber: parsedPhone.digits,
+                otp,
+            });
         }
+
+        if (!otpRecord) {
+            return res.status(400).json({ error: "Invalid or expired OTP" });
+        }
+
+        if (isEmailContact) {
+            await User.updateOne(
+                { email: { $regex: new RegExp(`^${String(contact).trim()}$`, "i") } },
+                { $set: { emailVerified: true } },
+            );
+        }
+
+        await OTP.deleteOne({ _id: otpRecord._id });
+        return res.status(200).json({ message: "OTP verified successfully" });
     } catch (error) {
         serverErrorHandler(error, res);
     }

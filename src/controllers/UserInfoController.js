@@ -1,6 +1,7 @@
 const uploadOnCloudinary = require("../utils/Cloudinary.js");
 const serverErrorHandler = require("../utils/ServerErrorHandler.js");
 const { parseUsername } = require("../utils/validators.js");
+const { toUserInfo } = require("../utils/userInfo.js");
 const User = require("../models/User.js");
 
 const findUsernameConflict = async (userNameLower, excludeUserId = null) => {
@@ -74,7 +75,7 @@ exports.uploadAvatar = async (req, res) => {
 
         return res
             .status(200)
-            .json({ message: "Avatar uploaded successfully", data: user });
+            .json({ message: "Avatar uploaded successfully", data: toUserInfo(user) });
     } catch (error) {
         return res
             .status(500)
@@ -130,8 +131,12 @@ exports.UpdateUserDetails = async (req, res) => {
         if (lastName) updateDetails.lastName = lastName.trim();
         if (gender) updateDetails.gender = gender.trim();
         if (email) updateDetails.email = email.trim();
-        if (phoneNumber != null && phoneNumber !== "") {
-            updateDetails.phoneNumber = String(phoneNumber).trim();
+        if (phoneNumber != null && String(phoneNumber).trim() !== "") {
+            return res.status(400).json({
+                message:
+                    "Phone number cannot be saved via UpdateUserDetails. Use sendOtpToVerifyMobileNumber, then verifyOtpToVerfiyMobileNumber.",
+                code: "PHONE_USE_OTP_FLOW",
+            });
         }
         let addressPayload = address;
         if (typeof addressPayload === "string") {
@@ -170,7 +175,7 @@ exports.UpdateUserDetails = async (req, res) => {
 
         return res.status(200).json({
             message: "User details updated successfully",
-            data: updateUser,
+            data: toUserInfo(updateUser),
         });
     } catch (error) {
         if (error.code === 11000 && error.keyPattern?.userNameLower) {

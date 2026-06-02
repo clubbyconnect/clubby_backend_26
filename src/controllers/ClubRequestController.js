@@ -10,7 +10,6 @@ const checkUserFCMAndDevice = require("../utils/FcmCheck.js")
 const { addNotification } = require("./NotificationController.js");
 const Notification = require("../models/Notification.js");
 const { emitToRoom } = require("../sockets/Chat.js");
-const { isPostOwner, isSameId } = require("../utils/postOwnership.js");
 const {
   getUserLeftInfo,
   isGroupMember,
@@ -18,7 +17,7 @@ const {
   EXHAUSTED_REJOIN_MESSAGE,
 } = require("../utils/clubRejoin.js");
 const { markUserRejoined, getMembershipAudit } = require("../utils/groupMembership.js");
-const { getUnavailablePostReason } = require("../utils/postVisibility.js");
+const { getUnavailablePostReason, canManageClubRequests } = require("../utils/postVisibility.js");
 
 const toPostObjectId = (postId) =>
   mongoose.Types.ObjectId.isValid(postId)
@@ -39,23 +38,24 @@ const ClubRequestController = {
         return res.status(404).json({ error: "Post not found" });
       }
 
-      if (!isPostOwner(postData, userId)) {
+      const postObjectId = toPostObjectId(productId);
+      const group = await Group.findOne({ productId: postObjectId })
+        .select("adminId members leftMembers isActive")
+        .lean();
+
+      if (!canManageClubRequests(postData, group, userId)) {
         return res.status(403).json({
           error: "You are not authorized to view requests for this post.",
           code: "NOT_POST_OWNER",
         });
       }
 
-      const postObjectId = toPostObjectId(productId);
       const clubRequests = await ClubRequest.find({
         postId: postObjectId,
       })
         .populate("requester", "firstName lastName email avatar gender")
         .sort({ createdAt: -1 });
 
-      const group = await Group.findOne({ productId: postObjectId })
-        .select("members leftMembers isActive")
-        .lean();
       const memberCount = group?.members?.length ?? 0;
       const clubSize = postData.clubMembers ?? 0;
       const spotsOpen = Math.max(0, clubSize - memberCount);
@@ -371,7 +371,12 @@ const ClubRequestController = {
         return res.status(404).json({ error: "Post Not Found" });
       }
 
-      if (!isPostOwner(postData, userId)) {
+      const postObjectId = toPostObjectId(postId);
+      const groupForAuth = await Group.findOne({ productId: postObjectId })
+        .select("adminId isActive members")
+        .lean();
+
+      if (!canManageClubRequests(postData, groupForAuth, userId)) {
         return res.status(403).json({
           error: "You are not authorized to accept or decline requests for this post.",
           code: "NOT_POST_OWNER",
@@ -385,7 +390,6 @@ const ClubRequestController = {
         return res.status(404).json({ error: "Requester Not Found" });
       }
 
-      const postObjectId = toPostObjectId(postId);
       const pendingRequest = await ClubRequest.findOne({
         requester: requesterObjectId,
         postId: postObjectId,

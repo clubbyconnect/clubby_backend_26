@@ -97,6 +97,8 @@ exports.getGroupsForUser = async (req, res) => {
                 clubStatus: 1,
                 expiryAt: 1,
                 deletedAt: 1,
+                postOwnerId: 1,
+                deactivatedByAdminId: 1,
               },
             },
           ],
@@ -189,9 +191,79 @@ exports.getGroupsForUser = async (req, res) => {
       },
       { $unwind: { path: '$lastMessage', preserveNullAndEmptyArrays: true } },
       {
+        $lookup: {
+          from: 'clubrequests',
+          let: { postId: '$productId' },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ['$postId', '$$postId'] },
+                status: 'pending',
+              },
+            },
+            { $count: 'count' },
+          ],
+          as: 'pendingRequests',
+        },
+      },
+      {
         $addFields: {
           memberCount: { $size: '$members' },
           sortAt: { $ifNull: ['$lastMessage.createdAt', '$updatedAt'] },
+          pendingRequestCount: {
+            $ifNull: [{ $arrayElemAt: ['$pendingRequests.count', 0] }, 0],
+          },
+          postOwnerId: '$productDetails.postOwnerId',
+          isPostOwner: {
+            $eq: [
+              { $toString: '$productDetails.postOwnerId' },
+              { $toString: userIdObjectId },
+            ],
+          },
+          viewerIsAdmin: {
+            $eq: [
+              { $toString: '$adminId' },
+              { $toString: userIdObjectId },
+            ],
+          },
+          acceptsRequests: {
+            $and: [
+              { $eq: ['$isActiveMember', true] },
+              { $eq: [{ $ifNull: ['$productDetails.deletedAt', null] }, null] },
+              {
+                $eq: [
+                  { $ifNull: ['$productDetails.deactivatedByAdminId', null] },
+                  null,
+                ],
+              },
+              {
+                $not: {
+                  $in: [
+                    '$productDetails.clubStatus',
+                    ['Inactive', 'Wrap', 'WrapDeal'],
+                  ],
+                },
+              },
+              { $ne: ['$isActive', false] },
+              {
+                $or: [
+                  { $eq: [{ $ifNull: ['$productDetails.expiryAt', null] }, null] },
+                  { $gte: ['$productDetails.expiryAt', new Date()] },
+                ],
+              },
+            ],
+          },
+        },
+      },
+      {
+        $addFields: {
+          canManageRequests: {
+            $and: [
+              '$acceptsRequests',
+              { $or: ['$isPostOwner', '$viewerIsAdmin'] },
+            ],
+          },
+          hasPendingRequests: { $gt: ['$pendingRequestCount', 0] },
         },
       },
     ];
@@ -224,12 +296,18 @@ exports.getGroupsForUser = async (req, res) => {
         $project: {
           _id: 1,
           productId: 1,
+          adminId: 1,
           productImage: '$productDetails.productImage',
           productName: '$productDetails.itemName',
           requestStatus: '$viewerRequestStatus',
           clubStatus: '$productDetails.clubStatus',
           expiryAt: '$productDetails.expiryAt',
           deletedAt: '$productDetails.deletedAt',
+          postOwnerId: 1,
+          isPostOwner: 1,
+          canManageRequests: 1,
+          pendingRequestCount: 1,
+          hasPendingRequests: 1,
           lastMessage: {
             text: '$lastMessage.content',
             createdAt: '$lastMessage.createdAt',
@@ -258,6 +336,10 @@ exports.getGroupsForUser = async (req, res) => {
         ...group,
         productImage: group.productImage,
       });
+      const isLeft = withThumb.membershipStatus === 'left';
+      const pendingRequestCount = isLeft
+        ? 0
+        : Number(withThumb.pendingRequestCount) || 0;
       return {
         _id: withThumb._id,
         productId: withThumb.productId
@@ -273,6 +355,12 @@ exports.getGroupsForUser = async (req, res) => {
         deletedAt: withThumb.deletedAt,
         membershipStatus: withThumb.membershipStatus || 'active',
         leftAt: withThumb.leftAt || null,
+        adminId: withThumb.adminId ? String(withThumb.adminId) : null,
+        postOwnerId: withThumb.postOwnerId ? String(withThumb.postOwnerId) : null,
+        isPostOwner: Boolean(withThumb.isPostOwner),
+        canManageRequests: isLeft ? false : Boolean(withThumb.canManageRequests),
+        pendingRequestCount,
+        hasPendingRequests: isLeft ? false : pendingRequestCount > 0,
         leftGroupLabel:
           withThumb.membershipStatus === 'left' ? LEFT_GROUP_LABEL : null,
         lastMessage:

@@ -2,7 +2,8 @@ const { OAuth2Client } = require("google-auth-library");
 const verifyAppleIdToken = require("../utils/verifyAppleIdToken.js");
 const Facebook = require("facebook-node-sdk");
 const serverErrorHandler = require("../utils/ServerErrorHandler.js");
-const { parseEmail } = require("../utils/validators.js");
+const { parseEmail, parsePhoneNumber } = require("../utils/validators.js");
+const { toUserInfo } = require("../utils/userInfo.js");
 const User = require("../models/User.js");
 const generateAccessAndRefreshTokens = require("../utils/RefreshToken.js")
 
@@ -25,6 +26,10 @@ const findEmailConflict = async (emailLower) => {
         email: { $regex: new RegExp(`^${escaped}$`, "i") },
     });
 };
+
+
+const findPhoneConflict = async (phoneValue) =>
+  User.findOne({ phoneNumber: phoneValue });
 
 
 exports.checkEmail = async (req, res) => {
@@ -53,40 +58,86 @@ exports.checkEmail = async (req, res) => {
 
 exports.signUp = async (req, res) => {
     try {
-        const { email, confirmPassword, password, deviceType, fcmToken } = req.body;
+        const {
+            email,
+            phoneNumber,
+            confirmPassword,
+            password,
+            deviceType,
+            fcmToken,
+        } = req.body;
 
-        // Validate required fields
         if (
-            [confirmPassword, email, password, deviceType, fcmToken].some((field) => field?.trim() === "")
+            [confirmPassword, password, deviceType, fcmToken].some(
+                (field) => field?.trim?.() === "" || field == null,
+            )
         ) {
             return res.status(400).json({ error: "All fields are required" });
+        }
+
+        if (!email && !phoneNumber) {
+            return res.status(400).json({
+                error: "Either email or phoneNumber is required",
+            });
+        }
+
+        if (email && phoneNumber) {
+            return res.status(400).json({
+                error: "Provide either email or phoneNumber, not both",
+            });
         }
 
         if (password !== confirmPassword) {
             return res.status(400).json({ error: "Passwords do not match" });
         }
 
-        const parsed = parseEmail(email);
-        if (!parsed.ok) {
-            return res.status(400).json({ message: parsed.message });
-        }
+        let newUser;
 
-        const existingUser = await findEmailConflict(parsed.emailLower);
-        if (existingUser) {
-            return res.status(409).json({
-                message: "This email already has an account",
+        if (email) {
+            const parsed = parseEmail(email);
+            if (!parsed.ok) {
+                return res.status(400).json({ message: parsed.message });
+            }
+
+            const existingUser = await findEmailConflict(parsed.emailLower);
+            if (existingUser) {
+                return res.status(409).json({
+                    message: "This email already has an account",
+                });
+            }
+
+            newUser = await User.create({
+                email: parsed.trimmed,
+                emailLower: parsed.emailLower,
+                password,
+                deviceType,
+                fcmToken,
+                signupMethod: "email",
+            });
+        } else {
+            const parsedPhone = parsePhoneNumber(phoneNumber);
+            if (!parsedPhone.ok) {
+                return res.status(400).json({ message: parsedPhone.message });
+            }
+
+            const existingPhone = await findPhoneConflict(parsedPhone.value);
+            if (existingPhone) {
+                return res.status(409).json({
+                    message: "This phone number already has an account",
+                });
+            }
+
+            newUser = await User.create({
+                phoneNumber: parsedPhone.value,
+                password,
+                deviceType,
+                fcmToken,
+                signupMethod: "phone",
+                phoneNumberVerified: false,
             });
         }
 
-        // Create new user with deviceType and fcmToken
-        const newUser = await User.create({
-            email: parsed.trimmed,
-            emailLower: parsed.emailLower,
-            password,
-            deviceType,
-            fcmToken,
-        });
-        const user = await User.findById(newUser._id).select("email deviceType fcmToken");
+        const user = await User.findById(newUser._id).select("-password -refreshToken");
 
         if (!user) {
             return res
@@ -94,16 +145,20 @@ exports.signUp = async (req, res) => {
                 .json({ error: "Something went wrong while registering the user" });
         }
 
-        // Generate tokens
-        const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
+        const { accessToken } = await generateAccessAndRefreshTokens(user._id);
 
         return res.status(200).json({
             message: "User registered successfully",
-            data: { accessToken: accessToken, userInfo: user },
+            data: { accessToken, userInfo: toUserInfo(user) },
         });
     } catch (error) {
-        if (error.code === 11000 && error.keyPattern?.emailLower) {
-            return res.status(409).json({ message: "This email already has an account" });
+        if (error.code === 11000) {
+            if (error.keyPattern?.emailLower) {
+                return res.status(409).json({ message: "This email already has an account" });
+            }
+            if (error.keyPattern?.phoneNumber) {
+                return res.status(409).json({ message: "This phone number already has an account" });
+            }
         }
         serverErrorHandler(error, res);
     }
@@ -112,15 +167,33 @@ exports.signUp = async (req, res) => {
 
 exports.signIn = async (req, res) => {
     try {
-        const { email, password, deviceType, fcmToken } = req.body;
+        const { email, phoneNumber, password, deviceType, fcmToken } = req.body;
 
-        // Validate required fields
-        if (!email || !password) {
-            return res.status(400).json({ error: "All fields are required" });
+        if (!password || (!email && !phoneNumber)) {
+            return res.status(400).json({
+                error: "Password and either email or phoneNumber are required",
+            });
         }
 
-        // Find user with case-insensitive email search
-        const user = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+        if (email && phoneNumber) {
+            return res.status(400).json({
+                error: "Provide either email or phoneNumber, not both",
+            });
+        }
+
+        let user;
+        if (email) {
+            user = await User.findOne({
+                email: { $regex: new RegExp(`^${String(email).trim()}$`, "i") },
+            });
+        } else {
+            const parsedPhone = parsePhoneNumber(phoneNumber);
+            if (!parsedPhone.ok) {
+                return res.status(400).json({ error: parsedPhone.message });
+            }
+            user = await User.findOne({ phoneNumber: parsedPhone.value });
+        }
+
         if (!user) {
             return res.status(404).json({ error: "User does not exist" });
         }
@@ -158,7 +231,7 @@ exports.signIn = async (req, res) => {
                 message: "User signed in successfully",
                 token: accessToken,
                 accessToken,
-                data: { accessToken, userInfo: loggedInUser },
+                data: { accessToken, userInfo: toUserInfo(loggedInUser) },
             });
     } catch (error) {
         serverErrorHandler(error, res);
@@ -212,11 +285,20 @@ exports.googleAuth = async (req, res) => {
                     });
                 }
                 user.googleAuthId = googleAuthId;
+                if (!user.emailVerified) user.emailVerified = true;
             }
         }
 
         if (!user) {
-            const newUser = await User.create({ email, googleAuthId, deviceType, fcmToken });
+            const newUser = await User.create({
+                email,
+                emailLower: email?.toLowerCase?.() ?? email,
+                googleAuthId,
+                deviceType,
+                fcmToken,
+                signupMethod: "email",
+                emailVerified: true,
+            });
             user = await User.findById(newUser._id).select("-password -refreshToken");
             isNewUser = true;
         } else {
@@ -245,7 +327,7 @@ exports.googleAuth = async (req, res) => {
                     : "User signed in successfully",
                 token: accessToken,
                 accessToken,
-                data: { accessToken, userInfo: loggedInUser },
+                data: { accessToken, userInfo: toUserInfo(loggedInUser, { includeAuthIds: true }) },
             });
     } catch (error) {
         serverErrorHandler(error, res);
@@ -306,10 +388,12 @@ exports.appleAuth = async (req, res) => {
 
             const createData = {
                 email,
+                emailLower: email?.toLowerCase?.() ?? email,
                 appleAuthId,
                 deviceType,
                 fcmToken,
-                emailVerified: payload.email_verified === true || payload.email_verified === "true",
+                signupMethod: "email",
+                emailVerified: true,
             };
 
             if (profile?.name?.firstName) createData.firstName = profile.name.firstName;
@@ -327,6 +411,7 @@ exports.appleAuth = async (req, res) => {
             user.deviceType = deviceType;
             user.fcmToken = fcmToken;
             if (!user.appleAuthId) user.appleAuthId = appleAuthId;
+            if (!user.emailVerified) user.emailVerified = true;
             await user.save({ validateBeforeSave: false });
         }
 
@@ -348,7 +433,7 @@ exports.appleAuth = async (req, res) => {
                     : "User signed in successfully",
                 token: accessToken,
                 accessToken,
-                data: { accessToken, userInfo: loggedInUser },
+                data: { accessToken, userInfo: toUserInfo(loggedInUser, { includeAuthIds: true }) },
             });
     } catch (error) {
         console.error("Apple auth error:", error);
@@ -506,9 +591,18 @@ exports.resetPassword = async (req, res) => {
 
         const isEmail = /\S+@\S+\.\S+/.test(contact);
 
-        const user = await User.findOne(
-            isEmail ? { email: contact } : { phoneNumber: contact }
-        );
+        let user;
+        if (isEmail) {
+            user = await User.findOne({
+                email: { $regex: new RegExp(`^${String(contact).trim()}$`, "i") },
+            });
+        } else {
+            const parsedPhone = parsePhoneNumber(contact);
+            if (!parsedPhone.ok) {
+                return res.status(400).json({ error: parsedPhone.message });
+            }
+            user = await User.findOne({ phoneNumber: parsedPhone.value });
+        }
 
         if (!user) {
             return res.status(404).json({ error: "User not found" });

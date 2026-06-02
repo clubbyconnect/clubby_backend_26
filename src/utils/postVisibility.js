@@ -1,5 +1,6 @@
 const { memberIdString } = require("./groupMembership.js");
 const { isPostOwner } = require("./postOwnership.js");
+const { isGroupAdmin } = require("./clubRejoin.js");
 
 const INACTIVE_OR_WRAPPED_STATUSES = ["Inactive", "Wrap", "WrapDeal"];
 
@@ -28,11 +29,6 @@ function buildExcludeOwnPostsMatch(userObjectId) {
 function isCurrentGroupMember(group, userId) {
   const uid = String(userId);
   return (group?.members || []).some((member) => memberIdString(member) === uid);
-}
-
-function isGroupAdmin(group, userId) {
-  if (!group?.adminId) return false;
-  return memberIdString(group.adminId) === String(userId);
 }
 
 function getUnavailablePostReason(post, group, now = new Date()) {
@@ -75,12 +71,31 @@ function canViewInactivePostDetails(post, group, userId) {
   );
 }
 
+/** Post owner or group admin — same rule as Messages Manage + My post. */
+function canManageClubRequests(post, group, userId) {
+  return isPostOwner(post, userId) || isGroupAdmin(group, userId);
+}
+
+function postAcceptsJoinRequests(post, group, now = new Date()) {
+  if (!post) return false;
+  if (post.deletedAt) return false;
+  if (post.deactivatedByAdminId) return false;
+  if (isInactiveOrWrappedStatus(post.clubStatus)) return false;
+  if (group?.isActive === false) return false;
+  if (post.expiryAt && new Date(post.expiryAt).getTime() < now.getTime()) {
+    return false;
+  }
+  return true;
+}
+
 module.exports = {
   INACTIVE_OR_WRAPPED_STATUSES,
   buildExcludeOwnPostsMatch,
   buildPublicFeedPostMatch,
+  canManageClubRequests,
   canViewInactivePostDetails,
   getUnavailablePostReason,
   isCurrentGroupMember,
   isInactiveOrWrappedStatus,
+  postAcceptsJoinRequests,
 };

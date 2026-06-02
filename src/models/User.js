@@ -67,12 +67,23 @@ const userSchema = new mongoose.Schema(
     },
     email: {
       type: String,
-      required: [true, "Email is required"],
+      required: function () {
+        return this.signupMethod !== "phone";
+      },
       trim: true,
-      match: [
-        /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
-        "Please enter a valid email address",
-      ],
+      default: null,
+      validate: {
+        validator: function (value) {
+          if (this.signupMethod === "phone" && (value == null || value === "")) {
+            return true;
+          }
+          if (value == null || value === "") {
+            return false;
+          }
+          return /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(value);
+        },
+        message: "Please enter a valid email address",
+      },
     },
     emailLower: {
       type: String,
@@ -106,6 +117,12 @@ const userSchema = new mongoose.Schema(
     phoneNumberVerified: {
       type: Boolean,
       default: false,
+    },
+    /** Primary contact used at signup: "email" | "phone" */
+    signupMethod: {
+      type: String,
+      enum: ["email", "phone"],
+      default: "email",
     },
     phoneNumberChangeCount: {
       type: Number,
@@ -224,6 +241,7 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.index({ userNameLower: 1 }, { unique: true, sparse: true });
+userSchema.index({ phoneNumber: 1 }, { unique: true, sparse: true });
 userSchema.index(
   { emailLower: 1 },
   {
@@ -240,11 +258,20 @@ userSchema.pre("save", function (next) {
       this.userNameLower = null;
     }
   }
-  if (this.isModified("email")) {
+  if (this.isModified("email") || this.isModified("signupMethod")) {
     if (this.email) {
       this.email = this.email.trim().toLowerCase();
       this.emailLower = this.email;
+    } else {
+      this.emailLower = null;
     }
+  }
+  next();
+});
+
+userSchema.pre("save", function (next) {
+  if (this.phoneNumber == null || this.phoneNumber === "") {
+    this.phoneNumberVerified = false;
   }
   next();
 });
