@@ -3,8 +3,30 @@ const axios = require("axios");
 const serverErrorHandler = require("../utils/ServerErrorHandler.js");
 const User = require("../models/User.js");
 const OTP = require("../models/Otp.js");
-const { parsePhoneNumber } = require("../utils/validators.js");
+const { parseEmail, parsePhoneNumber } = require("../utils/validators.js");
 const { toUserInfo } = require("../utils/userInfo.js");
+const generateAccessAndRefreshTokens = require("../utils/RefreshToken.js");
+const { assertLoginAllowed } = require("../utils/accountDeletion.js");
+
+const isUnifiedAuthFlow = (authFlow) =>
+    authFlow === "auth" || authFlow === "signin" || authFlow === "signup";
+
+const isDeactivatedByAdmin = (user) =>
+    Boolean(user?.deletedAt && user?.deactivatedByAdminId);
+
+const findUserByEmail = async (email) => {
+    const parsed = parseEmail(email);
+    if (!parsed.ok) {
+        return null;
+    }
+    const byLower = await User.findOne({ emailLower: parsed.emailLower });
+    if (byLower) {
+        return byLower;
+    }
+    return User.findOne({
+        email: { $regex: new RegExp(`^${parsed.trimmed}$`, "i") },
+    });
+};
 
 
 const generateUniqueOtp = async () => {
@@ -35,12 +57,17 @@ const sendSms = async (phoneNumber, message) => {
                 flash: "0",
             },
         });
-    } catch (error) { }
+        console.log("Fast2SMS API response:", response.data);
+    } catch (error) {
+        console.error("Error sending SMS via Fast2SMS:", error);
+        throw new Error("Failed to send SMS: " + error.message);
+    }
 };
 
 exports.sendOtp = async (req, res) => {
     try {
-        const { contact } = req.body;
+        const { contact, authFlow } = req.body;
+        const unifiedAuth = isUnifiedAuthFlow(authFlow);
 
         if (!contact || contact.trim() === "") {
             return res
@@ -49,42 +76,69 @@ exports.sendOtp = async (req, res) => {
         }
 
         const isEmailContact = /\S+@\S+\.\S+/.test(contact);
-        let userQuery;
         let parsedPhone = null;
+        let parsedEmail = null;
+        let otpLookup = {};
 
         if (isEmailContact) {
-            userQuery = { email: contact };
+            parsedEmail = parseEmail(contact);
+            if (!parsedEmail.ok) {
+                return res.status(400).json({ error: parsedEmail.message });
+            }
+            otpLookup = { email: parsedEmail.trimmed };
         } else {
             parsedPhone = parsePhoneNumber(contact);
             if (!parsedPhone.ok) {
                 return res.status(400).json({ error: parsedPhone.message });
             }
-            userQuery = { phoneNumber: parsedPhone.value };
+            otpLookup = { phoneNumber: parsedPhone.digits };
         }
 
-        const user = await User.findOne(userQuery);
+        const existingUser = isEmailContact
+            ? await findUserByEmail(contact)
+            : await User.findOne({ phoneNumber: parsedPhone.value });
 
-        if (!user) {
-            return res.status(404).json({ error: "User not found" });
+        if (!unifiedAuth) {
+            if (!existingUser) {
+                return res.status(404).json({ error: "User not found" });
+            }
+        } else if (isDeactivatedByAdmin(existingUser)) {
+            return res.status(403).json({
+                error: "Your account has been deactivated by an admin.",
+            });
+        }
+
+        const existingOtp = await OTP.findOne(otpLookup);
+        if (existingOtp) {
+            return res
+                .status(400)
+                .json({ error: "OTP already sent pls try after some time" });
         }
 
         const otp = await generateUniqueOtp();
+        const otpPayload = { ...otpLookup, otp };
 
-        const otpPayload = isEmailContact
-            ? { email: contact, otp }
-            : { phoneNumber: parsedPhone.digits, otp };
-        await OTP.create(otpPayload);
-
-        if (isEmailContact) {
-            return res
-                .status(200)
-                .json({ success: true, message: "OTP Sent Successfully" });
+        try {
+            await OTP.create(otpPayload);
+        } catch (mailError) {
+            if (isEmailContact) {
+                console.error("sendOtp email delivery failed:", mailError?.message || mailError);
+                return res.status(500).json({
+                    error:
+                        "Unable to send verification email. Configure MAIL_HOST, MAIL_USER, and MAIL_PASS in .env (use a Gmail App Password).",
+                });
+            }
+            throw mailError;
         }
 
-        await sendSms(parsedPhone.digits, otp);
-        return res
-            .status(200)
-            .json({ success: true, message: "OTP Sent Successfully" });
+        if (!isEmailContact) {
+            await sendSms(parsedPhone.digits, otp);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "OTP Sent Successfully",
+        });
     } catch (error) {
         serverErrorHandler(error, res);
     }
@@ -189,7 +243,9 @@ exports.verifyOtpToVerfiyMobileNumber = async (req, res) => {
 
 exports.verifyOtp = async (req, res) => {
     try {
-        const { contact, otp } = req.body;
+        const { contact, otp, authFlow, deviceType, fcmToken, termsAccepted } =
+            req.body;
+        const unifiedAuth = isUnifiedAuthFlow(authFlow);
 
         if (!contact || !otp) {
             return res.status(400).json({ error: "Contact and OTP are required" });
@@ -197,11 +253,20 @@ exports.verifyOtp = async (req, res) => {
 
         const isEmailContact = /\S+@\S+\.\S+/.test(contact);
         let otpRecord;
+        let parsedPhone = null;
+        let parsedEmail = null;
 
         if (isEmailContact) {
-            otpRecord = await OTP.findOne({ email: contact, otp });
+            parsedEmail = parseEmail(contact);
+            if (!parsedEmail.ok) {
+                return res.status(400).json({ error: parsedEmail.message });
+            }
+            otpRecord = await OTP.findOne({
+                email: parsedEmail.trimmed,
+                otp,
+            });
         } else {
-            const parsedPhone = parsePhoneNumber(contact);
+            parsedPhone = parsePhoneNumber(contact);
             if (!parsedPhone.ok) {
                 return res.status(400).json({ error: parsedPhone.message });
             }
@@ -215,16 +280,123 @@ exports.verifyOtp = async (req, res) => {
             return res.status(400).json({ error: "Invalid or expired OTP" });
         }
 
+        if (unifiedAuth) {
+            let user = isEmailContact
+                ? await findUserByEmail(parsedEmail.trimmed)
+                : await User.findOne({ phoneNumber: parsedPhone.value });
+
+            if (isDeactivatedByAdmin(user)) {
+                return res.status(403).json({
+                    error: "Your account has been deactivated by an admin.",
+                });
+            }
+
+            if (user) {
+                const loginCheck = assertLoginAllowed(user);
+                if (!loginCheck.ok) {
+                    return res.status(loginCheck.status).json({ error: loginCheck.error });
+                }
+            }
+
+            if (!user && termsAccepted !== true) {
+                return res.status(400).json({
+                    error: "You must accept the terms and conditions",
+                });
+            }
+        }
+
+        await OTP.deleteOne({ _id: otpRecord._id });
+
+        if (unifiedAuth) {
+            let user = isEmailContact
+                ? await findUserByEmail(parsedEmail.trimmed)
+                : await User.findOne({ phoneNumber: parsedPhone.value });
+
+            let isNewUser = false;
+
+            if (!user) {
+                isNewUser = true;
+                if (isEmailContact) {
+                    user = await User.create({
+                        email: parsedEmail.trimmed,
+                        emailLower: parsedEmail.emailLower,
+                        signupMethod: "email",
+                        emailVerified: true,
+                        deviceType: deviceType || null,
+                        fcmToken: fcmToken || null,
+                    });
+                } else {
+                    user = await User.create({
+                        phoneNumber: parsedPhone.value,
+                        signupMethod: "phone",
+                        phoneNumberVerified: true,
+                        deviceType: deviceType || null,
+                        fcmToken: fcmToken || null,
+                    });
+                }
+            } else {
+                if (isEmailContact) {
+                    user.emailVerified = true;
+                } else {
+                    user.phoneNumber = parsedPhone.value;
+                    user.phoneNumberVerified = true;
+                }
+                if (deviceType) {
+                    user.deviceType = deviceType;
+                }
+                if (fcmToken) {
+                    user.fcmToken = fcmToken;
+                }
+                await user.save({ validateBeforeSave: false });
+            }
+
+            const { accessToken, refreshToken } =
+                await generateAccessAndRefreshTokens(user._id);
+            const loggedInUser = await User.findById(user._id).select(
+                "-password -refreshToken",
+            );
+
+            const options = { httpOnly: true, secure: true };
+
+            return res
+                .status(200)
+                .cookie("accessToken", accessToken, options)
+                .cookie("refreshToken", refreshToken, options)
+                .json({
+                    message: isNewUser
+                        ? "User registered successfully"
+                        : "User signed in successfully",
+                    isNewUser,
+                    token: accessToken,
+                    accessToken,
+                    data: {
+                        accessToken,
+                        userInfo: toUserInfo(loggedInUser),
+                    },
+                });
+        }
+
         if (isEmailContact) {
             await User.updateOne(
-                { email: { $regex: new RegExp(`^${String(contact).trim()}$`, "i") } },
+                {
+                    email: {
+                        $regex: new RegExp(
+                            `^${String(parsedEmail?.trimmed ?? contact).trim()}$`,
+                            "i",
+                        ),
+                    },
+                },
                 { $set: { emailVerified: true } },
             );
         }
 
-        await OTP.deleteOne({ _id: otpRecord._id });
         return res.status(200).json({ message: "OTP verified successfully" });
     } catch (error) {
+        if (error.code === 11000) {
+            return res.status(409).json({
+                message: "This contact is already linked to an account",
+            });
+        }
         serverErrorHandler(error, res);
     }
 };

@@ -26,6 +26,11 @@ const {
   sendOtpToVerifyMobileNumber,
   verifyOtpToVerfiyMobileNumber,
 } = require("../controllers/SmsOtp.js")
+const {
+  requestDeleteOtp,
+  confirmDelete,
+  recoverAccount,
+} = require("../controllers/DeleteAccountController.js")
 
 
 const {
@@ -87,6 +92,9 @@ router.post("/sendOtp", sendOtp);
 router.post("/sendOtpToVerifyMobileNumber", verifyJWT, sendOtpToVerifyMobileNumber);
 router.post("/verifyOtpToVerfiyMobileNumber", verifyJWT, verifyOtpToVerfiyMobileNumber);
 router.post("/verifyOtp", verifyOtp);
+router.post("/request-delete-otp", verifyJWT, requestDeleteOtp);
+router.post("/confirm-delete", verifyJWT, confirmDelete);
+router.post("/recover-account", verifyJWT, recoverAccount);
 router.post("/logout", verifyJWT, logout);
 router.post("/resetPassword", resetPassword);
 router.get("/password-settings", verifyJWT, getPasswordSettings);

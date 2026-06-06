@@ -111,6 +111,13 @@ const connectDB = async () => {
       ]);
 
       try {
+        try {
+          await User.collection.dropIndex("phoneNumber_1");
+        } catch (dropError) {
+          if (dropError.code !== 27 && dropError.codeName !== "IndexNotFound") {
+            console.warn("phoneNumber index drop warning:", dropError.message);
+          }
+        }
         await User.syncIndexes();
       } catch (indexError) {
         console.warn("User index sync warning:", indexError.message);

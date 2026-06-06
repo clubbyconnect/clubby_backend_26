@@ -6,6 +6,7 @@ const { parseEmail, parsePhoneNumber } = require("../utils/validators.js");
 const { toUserInfo } = require("../utils/userInfo.js");
 const User = require("../models/User.js");
 const generateAccessAndRefreshTokens = require("../utils/RefreshToken.js")
+const { assertLoginAllowed } = require("../utils/accountDeletion.js");
 
 const excludeField = "-password -refreshToken -UserRating -homelocationChangeCount -lastHomelocationChange -emailChangeCount -lastEmailChange -phoneNumberChangeCount -lastPhoneNumberChange -googleAuthId -blockedUsers -reportCount -refreshToken";
 
@@ -203,6 +204,11 @@ exports.signIn = async (req, res) => {
             return res.status(403).json({ error: "Your account has been deactivated by an admin." });
         }
 
+        const loginCheck = assertLoginAllowed(user);
+        if (!loginCheck.ok) {
+            return res.status(loginCheck.status).json({ error: loginCheck.error });
+        }
+
         // Validate password
         const isPasswordValid = await user.isPasswordCorrect(password);
         if (!isPasswordValid) {
@@ -286,6 +292,19 @@ exports.googleAuth = async (req, res) => {
                 }
                 user.googleAuthId = googleAuthId;
                 if (!user.emailVerified) user.emailVerified = true;
+            }
+        }
+
+        if (user?.deletedAt && user?.deactivatedByAdminId) {
+            return res.status(403).json({
+                error: "Your account has been deactivated by an admin.",
+            });
+        }
+
+        if (user) {
+            const loginCheck = assertLoginAllowed(user);
+            if (!loginCheck.ok) {
+                return res.status(loginCheck.status).json({ error: loginCheck.error });
             }
         }
 
@@ -379,6 +398,19 @@ exports.appleAuth = async (req, res) => {
             }
         }
 
+        if (user?.deletedAt && user?.deactivatedByAdminId) {
+            return res.status(403).json({
+                error: "Your account has been deactivated by an admin.",
+            });
+        }
+
+        if (user) {
+            const loginCheck = assertLoginAllowed(user);
+            if (!loginCheck.ok) {
+                return res.status(loginCheck.status).json({ error: loginCheck.error });
+            }
+        }
+
         if (!user) {
             if (!email) {
                 return res.status(400).json({
@@ -403,11 +435,6 @@ exports.appleAuth = async (req, res) => {
             user = await User.findById(newUser._id).select("-password -refreshToken");
             isNewUser = true;
         } else {
-            if (user.deletedAt && user.deactivatedByAdminId) {
-                return res.status(403).json({
-                    error: "Your account has been deactivated by an admin.",
-                });
-            }
             user.deviceType = deviceType;
             user.fcmToken = fcmToken;
             if (!user.appleAuthId) user.appleAuthId = appleAuthId;

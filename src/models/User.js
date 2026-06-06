@@ -236,12 +236,35 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
-    deletedAt: { type: Date, default: null }
+    deletedAt: { type: Date, default: null },
+    accountStatus: {
+      type: String,
+      enum: ["active", "pending_deletion"],
+      default: "active",
+    },
+    deletionRequestedAt: {
+      type: Date,
+      default: null,
+    },
+    deletionScheduledAt: {
+      type: Date,
+      default: null,
+    },
+    deleteReason: {
+      type: String,
+      default: null,
+    },
   }, { timestamps: true, }
 );
 
 userSchema.index({ userNameLower: 1 }, { unique: true, sparse: true });
-userSchema.index({ phoneNumber: 1 }, { unique: true, sparse: true });
+userSchema.index(
+  { phoneNumber: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { phoneNumber: { $type: "number" } },
+  }
+);
 userSchema.index(
   { emailLower: 1 },
   {
