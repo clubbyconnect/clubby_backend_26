@@ -51,7 +51,7 @@ exports.addToFavourites = async (req, res) => {
 exports.getFilteredFavoriteProducts = async (req, res) => {
   try {
     const userId = req.User._id;
-    const { lat, lon, status, page = 1, limit = 10 } = req.query;
+    const { lat, lon, status, page = 1, limit = 10, post_type } = req.query;
 
     if (!lat || !lon) {
       return res.status(400).json({
@@ -101,8 +101,17 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
     );
 
     const statusMatch = status
-      ? { deletedAt: null, ...buildClubStatusMatch(status) }
+    ? { deletedAt: null, ...buildClubStatusMatch(status) }
+    : post_type === "rapid"
+      ? { deletedAt: null }
       : buildPublicFeedPostMatch();
+    
+    const postTypeMatch =
+      post_type === "rapid"
+        ? { post_type: "rapid" }
+        : post_type === "standard"
+          ? { post_type: { $ne: "rapid" } }
+          : {};
 
     const aggregatePipeline = [
       {
@@ -118,11 +127,12 @@ exports.getFilteredFavoriteProducts = async (req, res) => {
         $match: {
           _id: { $in: favouriteIds },
           ...statusMatch,
+          ...postTypeMatch,
         },
       },
       ...activityPostEnrichmentStages(userIdObjectId),
     ];
-    if (!status) {
+    if (!status && post_type !== "rapid") {
       aggregatePipeline.push({ $match: { "groupInfo.isActive": { $ne: false } } });
     }
 

@@ -126,6 +126,7 @@ function buildActivityPostRow(post, options = {}) {
     price_type: post.price_type,
     offerType: post.offerType,
     expiryAt: post.expiryAt,
+    post_type: post.post_type,
     location:
       post.location ??
       post.store_location?.name ??
@@ -293,6 +294,7 @@ function activityPostEnrichmentStages(userIdObjectId) {
         price_type: 1,
         offerType: 1,
         expiryAt: 1,
+        post_type: 1,
         store_location: 1,
         productImage: 1,
         categoryName: "$categoryDetails.name",

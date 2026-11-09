@@ -122,7 +122,8 @@ router.post("/club-request/action", verifyJWT, ClubRequestController.handleClubR
 
 // GROUP ROUTES
 router.get("/group/member/:postId", verifyJWT, groupMember);
-router.get("/checkUsername", verifyJWT, checkUsername);
+//router.get("/checkUsername", verifyJWT, checkUsername);
+router.get("/checkUsername", checkUsername);
 router.post("/UpdateUserDetails", verifyJWT, upload.single('avatar'), UpdateUserDetails);
 
 

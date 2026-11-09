@@ -3,7 +3,6 @@ const PostModel = require("../models/Post.js");
 const ClubRequest = require("../models/ClubRequest.js");
 const User = require("../models/User.js");
 const Group = require("../models/Group.js");
-const { sendSystemMessage } = require("./MessageController.js");
 const Post = require("../models/Post");
 const { sendPushNotification } = require("../utils/Firebase.js");
 const checkUserFCMAndDevice = require("../utils/FcmCheck.js")
@@ -16,8 +15,9 @@ const {
   REJOIN_WARNING_MESSAGE,
   EXHAUSTED_REJOIN_MESSAGE,
 } = require("../utils/clubRejoin.js");
-const { markUserRejoined, getMembershipAudit } = require("../utils/groupMembership.js");
+const { getMembershipAudit } = require("../utils/groupMembership.js");
 const { getUnavailablePostReason, canManageClubRequests } = require("../utils/postVisibility.js");
+const { processClubRequestAction } = require("../services/clubRequestService.js");
 
 const toPostObjectId = (postId) =>
   mongoose.Types.ObjectId.isValid(postId)
@@ -177,6 +177,7 @@ const ClubRequestController = {
       }
 
       let isRejoinRequest = false;
+      let clubRequestDoc = existingRequest;
 
       if (existingRequest) {
         if (existingRequest.status === "accepted" && group && !isGroupMember(group, requesterId)) {
@@ -189,11 +190,13 @@ const ClubRequestController = {
           existingRequest.status = "pending";
           existingRequest.updatedAt = Date.now();
           await existingRequest.save();
+          clubRequestDoc = existingRequest;
           isRejoinRequest = true;
         } else if (existingRequest.status === "declined") {
           existingRequest.status = "pending";
           existingRequest.updatedAt = Date.now();
           await existingRequest.save();
+          clubRequestDoc = existingRequest;
           isRejoinRequest = true;
         } else if (existingRequest.status === "pending") {
           return res.status(400).json({ error: "You have already sent a join request." });
@@ -203,7 +206,10 @@ const ClubRequestController = {
       }
 
       if (!existingRequest) {
-        await new ClubRequest({ requester: requesterId, postId: postObjectId }).save();
+        clubRequestDoc = await ClubRequest.create({
+          requester: requesterId,
+          postId: postObjectId,
+        });
         if (leftInfo?.isLeft && leftInfo?.canRejoin) {
           isRejoinRequest = true;
         }
@@ -262,6 +268,27 @@ const ClubRequestController = {
       );
       if (!success) {
         console.log("Error adding notification to controller");
+      }
+
+      if (postData.post_type === "rapid" && clubRequestDoc) {
+        const requesterProfile = await User.findById(requesterId)
+          .select("firstName lastName avatar")
+          .lean();
+
+        const requesterName = [requesterProfile?.firstName, requesterProfile?.lastName]
+          .filter(Boolean)
+          .join(" ")
+          .trim() || "User";
+
+        emitToRoom(String(postOwnerId), "rapid_request_incoming", {
+          postId: String(postId),
+          requestId: String(clubRequestDoc._id),
+          requesterId: String(requesterId),
+          requesterName,
+          requesterPhoto: requesterProfile?.avatar ?? "",
+          postTitle: postData.itemName,
+          expiresAt: new Date(postData.expiryAt).toISOString(),
+        });
       }
 
       return res.status(200).json({
@@ -356,180 +383,26 @@ const ClubRequestController = {
   handleClubRequest: async (req, res) => {
     try {
       const { requesterId, postId, status } = req.body;
-      const userId = req.User._id;
 
-      if (!requesterId || !postId || !status) {
-        return res.status(400).json({ error: "requesterId, postId, and status are required." });
-      }
-
-      if (!["accepted", "declined"].includes(status)) {
-        return res.status(400).json({ error: "Invalid status. Must be 'accepted' or 'declined'." });
-      }
-
-      const postData = await PostModel.findById(postId);
-      if (!postData) {
-        return res.status(404).json({ error: "Post Not Found" });
-      }
-
-      const postObjectId = toPostObjectId(postId);
-      const groupForAuth = await Group.findOne({ productId: postObjectId })
-        .select("adminId isActive members")
-        .lean();
-
-      if (!canManageClubRequests(postData, groupForAuth, userId)) {
-        return res.status(403).json({
-          error: "You are not authorized to accept or decline requests for this post.",
-          code: "NOT_POST_OWNER",
-        });
-      }
-
-      const requesterObjectId = new mongoose.Types.ObjectId(requesterId);
-
-      const requester = await User.findById(requesterObjectId);
-      if (!requester) {
-        return res.status(404).json({ error: "Requester Not Found" });
-      }
-
-      const pendingRequest = await ClubRequest.findOne({
-        requester: requesterObjectId,
-        postId: postObjectId,
-        status: "pending",
-      });
-      if (!pendingRequest) {
-        return res.status(404).json({
-          error: "This join request is no longer pending. It may have been cancelled.",
-          code: "REQUEST_NOT_PENDING",
-        });
-      }
-
-      if (pendingRequest.status !== "pending") {
-        return res.status(400).json({
-          error: `This request has already been ${pendingRequest.status}.`,
-        });
-      }
-
-      let groupForAccepted = null;
-      if (status === "accepted") {
-        groupForAccepted = await Group.findOne({ productId: postId });
-        if (!groupForAccepted) {
-          return res.status(404).json({ error: "Group not found for this Post." });
-        }
-
-        const unavailableReason = getUnavailablePostReason(postData, groupForAccepted);
-        if (unavailableReason) {
-          return res.status(403).json({
-            error: unavailableReason.message,
-            code: unavailableReason.code,
-          });
-        }
-
-        if (groupForAccepted.members.length >= postData.clubMembers) {
-          return res.status(400).json({ error: "The group is full. Cannot add more members." });
-        }
-
-        if (isGroupMember(groupForAccepted, requesterObjectId)) {
-          return res.status(400).json({ error: "Requester is already a member of the group." });
-        }
-      }
-
-      pendingRequest.status = status;
-      pendingRequest.updatedAt = Date.now();
-      await pendingRequest.save();
-
-      const postInformation = await Post.findOne({ _id: postId })
-        .select("itemName")
-        .lean();
-
-      if (!postInformation) {
-        return { error: "Post not found" };
-      }
-
-      const itemName = postInformation.itemName;
-
-      if (status === "accepted") {
-        console.log("inside accepted")
-        const group = groupForAccepted;
-
-        markUserRejoined(group, requesterObjectId);
-        group.members.push(requesterObjectId);
-        await group.save();
-        await sendSystemMessage(group._id, `${requester.firstName || "User"} has been added to the group.`);
-
-
-        const result = await checkUserFCMAndDevice(requesterId);
-
-        if (result.status) {
-          console.log("User has FCM Token:", result.fcmToken);
-
-          let message = {
-            token: result.fcmToken,
-            notification: {
-              title: `Your Request for ${itemName} is Accepted! 🎉`,
-              body: `Great news! Your request for ${itemName} has been accepted. Go ahead and seal the deal! 🤝`
-            }
-
-
-          };
-
-          await sendPushNotification(message);
-
-        } else {
-          console.log("User does not have a valid FCM Token or Device Type.");
-        }
-
-        //add notification 
-        await addNotification(
-          `Your Request for ${itemName} is Accepted! 🎉`,
-          `Great news! Your request for ${itemName} has been accepted. You can now chat in the group.`,
-          requesterObjectId,
-          "AccptReq",
-          `clubby://product/${postId}`,
-          postId,
-          "Product",
-        );
-
-
-        return res.status(200).json({ message: "Club request accepted and user added to the group.", group });
-      }
-
-
-
-      const result = await checkUserFCMAndDevice(requesterId);
-
-      if (result.status) {
-        console.log("User has FCM Token:", result.fcmToken);
-
-        let message = {
-          token: result.fcmToken,
-          notification: {
-            title: `Request Declined for ${itemName}`,
-            body: `Unfortunately, your request for ${itemName} was declined. Don't worry—there are plenty of great deals waiting for you! 🔍`
-          }
-
-
-
-        };
-
-        await sendPushNotification(message);
-
-      } else {
-        console.log("User does not have a valid FCM Token or Device Type.");
-      }
-
-      //add notification 
-      await addNotification(
-        `Request Declined for ${itemName}`,
-        `Unfortunately, your request for ${itemName} was declined.`,
-        requesterObjectId,
-        "DecReq",
-        `clubby://product/${postId}`,
+      const result = await processClubRequestAction({
+        actingUserId: req.User._id,
+        requesterId,
         postId,
-        "Product",
-      );
+        status,
+      });
 
+      if (!result.ok) {
+        return res.status(result.statusCode).json({
+          error: result.error,
+          ...(result.code ? { code: result.code } : {}),
+        });
+      }
 
-      return res.status(200).json({ message: "Club request declined successfully." });
+      if (result.status === "accepted") {
+        return res.status(200).json({ message: result.message, group: result.group });
+      }
 
+      return res.status(200).json({ message: result.message });
     } catch (error) {
       console.error("Error handling club request:", error);
       return res.status(500).json({ error: "Internal server error." });

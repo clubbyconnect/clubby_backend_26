@@ -78,6 +78,20 @@ exports.getUserPosts = async (req, res) => {
         message: `Invalid role. Use one of: ${VALID_ACTIVITY_ROLES.join(", ")}`,
       });
     }
+    const postTypeParam = String(req.query.post_type || "").toLowerCase();
+    if (postTypeParam && !["standard", "rapid"].includes(postTypeParam)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid post_type. Use "standard" or "rapid".',
+      });
+    }
+    // $ne so older posts without a post_type still count as normal deals
+    const postTypeMatch =
+      postTypeParam === "rapid"
+        ? { post_type: "rapid" }
+        : postTypeParam === "standard"
+          ? { post_type: { $ne: "rapid" } }
+          : {};
 
     if (status && !VALID_ACTIVITY_STATUSES.includes(status)) {
       return res.status(400).json({
@@ -114,7 +128,8 @@ exports.getUserPosts = async (req, res) => {
         postOwnerId: { $ne: userIdObjectId },
       };
     }
-
+    roleMatch = { ...roleMatch, ...postTypeMatch };
+    console.log("[getUserPosts] post_type:", postTypeParam, "roleMatch:", JSON.stringify(roleMatch));
     const statusMatch = buildClubStatusMatch(status);
 
     const aggregatePipeline =

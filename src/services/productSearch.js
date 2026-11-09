@@ -11,6 +11,152 @@ const {
   buildPublicFeedPostMatch,
 } = require("../utils/postVisibility.js");
 
+function escapeRegex(str) {
+  return String(str).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function executeRapidPostFeed(userId, query, options = {}) {
+  const { lat, lon, radius_meters = 2000, page = 1, limit = 30 } = query;
+  const lng = query.lng ?? lon;
+
+  const latitude = parseFloat(lat);
+  const longitude = parseFloat(lng);
+
+  if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+    return {
+      error: {
+        status: 400,
+        body: {
+          success: false,
+          message: "lat and lng are required when post_type=rapid.",
+        },
+      },
+    };
+  }
+
+  const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 30, 1), 100);
+  const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
+  const skip = (parsedPage - 1) * parsedLimit;
+  const radiusInMeters = Math.max(1, parseFloat(radius_meters) || 2000);
+
+  const userObjectId =
+    userId instanceof mongoose.Types.ObjectId
+      ? userId
+      : new mongoose.Types.ObjectId(userId);
+
+  const now = new Date();
+
+  const userDoc = await User.findById(userId).select("favourites").lean();
+  const favouriteIds = (userDoc?.favourites || []).map((id) =>
+    id instanceof mongoose.Types.ObjectId ? id : new mongoose.Types.ObjectId(id),
+  );
+
+  const excludedPostIds = await getFeedExcludedPostIds(userId, Group);
+
+  const matchStage = {
+    ...buildPublicFeedPostMatch(now),
+    ...buildExcludeOwnPostsMatch(userObjectId),
+    post_type: "rapid",
+  };
+
+  if (excludedPostIds.length > 0) {
+    matchStage._id = { $nin: excludedPostIds };
+  }
+
+  const aggregatePipeline = [
+    {
+      $geoNear: {
+        near: { type: "Point", coordinates: [longitude, latitude] },
+        distanceField: "distance",
+        spherical: true,
+        maxDistance: radiusInMeters,
+        key: "store_location.coordinates",
+        query: matchStage,
+      },
+    },
+    {
+      $lookup: {
+        from: "groups",
+        let: { productId: "$_id" },
+        pipeline: [
+          { $match: { $expr: { $eq: ["$productId", "$$productId"] } } },
+          { $project: { members: 1, isActive: 1 } },
+        ],
+        as: "groupInfo",
+      },
+    },
+    { $unwind: { path: "$groupInfo", preserveNullAndEmptyArrays: true } },
+    { $match: { "groupInfo.isActive": { $ne: false } } },
+    {
+      $addFields: {
+        expires_at: "$expiryAt",
+        minutes_remaining: {
+          $max: [
+            0,
+            { $floor: { $divide: [{ $subtract: ["$expiryAt", now] }, 1000 * 60] } },
+          ],
+        },
+        clubToJoin: {
+          $cond: {
+            if: { $isArray: "$groupInfo.members" },
+            then: { $subtract: ["$clubMembers", { $size: "$groupInfo.members" }] },
+            else: { $subtract: ["$clubMembers", 1] },
+          },
+        },
+      },
+    },
+    { $sort: { distance: 1 } },
+    {
+      $project: {
+        _id: 1,
+        itemName: 1,
+        price: 1,
+        createdAt: 1,
+        productImage: 1,
+        post_type: 1,
+        distance: { $divide: ["$distance", 1000] },
+        clubMembers: 1,
+        clubToJoin: 1,
+        location: { $ifNull: ["$store_location.name", "Unknown"] },
+        isLiked: { $in: ["$_id", favouriteIds] },
+        expires_at: 1,
+        minutes_remaining: 1,
+      },
+    },
+    {
+      $facet: {
+        metadata: [{ $count: "total" }],
+        data: [{ $skip: skip }, { $limit: parsedLimit }],
+      },
+    },
+  ];
+
+  const [facetResult] = await PostModel.aggregate(aggregatePipeline);
+  const totalProducts = facetResult?.metadata?.[0]?.total ?? 0;
+  const totalPages = Math.ceil(totalProducts / parsedLimit) || 1;
+  const products = (facetResult?.data ?? []).map(withProductThumb);
+
+  const pagination = {
+    totalItems: totalProducts,
+    totalPages,
+    currentPage: parsedPage,
+    itemsPerPage: parsedLimit,
+  };
+
+  const etagSource = JSON.stringify({
+    q: query,
+    total: totalProducts,
+    ids: products.map((p) => String(p._id)),
+  });
+  const etag = `"${crypto.createHash("md5").update(etagSource).digest("hex")}"`;
+
+  if (!options.skip304 && options.ifNoneMatch && options.ifNoneMatch === etag) {
+    return { products: [], pagination, etag, notModified: true };
+  }
+
+  return { products, pagination, etag, notModified: false };
+}
+
 async function executeProductSearch(userId, query, options = {}) {
   const {
     productName,
@@ -50,6 +196,13 @@ async function executeProductSearch(userId, query, options = {}) {
     ...buildExcludeOwnPostsMatch(userObjectId),
   };
 
+  const postTypeParam = String(query.post_type || "").toLowerCase();
+  if (postTypeParam === "standard") {
+    matchStage.post_type = { $ne: "rapid" };
+  } else if (postTypeParam === "rapid") {
+    matchStage.post_type = "rapid";
+  }
+
   const excludedPostIds = await getFeedExcludedPostIds(userId, Group);
   if (excludedPostIds.length > 0) {
     matchStage._id = { $nin: excludedPostIds };
@@ -79,7 +232,7 @@ async function executeProductSearch(userId, query, options = {}) {
   }
 
   if (productName) {
-    matchStage.itemName = { $regex: productName, $options: "i" };
+    matchStage.itemName = { $regex: escapeRegex(productName), $options: "i" };
   }
 
   if (offerType) {
@@ -228,6 +381,9 @@ async function executeProductSearch(userId, query, options = {}) {
       clubToJoin: 1,
       location: { $ifNull: ["$store_location.name", "Unknown"] },
       isLiked: { $in: ["$_id", favouriteIds] },
+      expiryAt: 1,
+      post_type: 1,
+      coordinates: "$store_location.coordinates",
     },
   });
 
@@ -278,4 +434,4 @@ async function executeProductSearch(userId, query, options = {}) {
   return { products, pagination, etag, notModified: false };
 }
 
-module.exports = { executeProductSearch };
+module.exports = { executeProductSearch, executeRapidPostFeed };

@@ -77,7 +77,7 @@ const PostController = {
   create: async (req, res) => {
     try {
       const {
-        category, subCategory, itemName, offerType, price, price_type, clubMembers, store_location_latitude, store_location_longitude, additionalInformation, size, productImages: rawProductImages, showroomAddress
+        category, subCategory, itemName, offerType, price, price_type, clubMembers, store_location_latitude, store_location_longitude, additionalInformation, size, productImages: rawProductImages, showroomAddress, post_type, expiry_minutes
       } = req.body;
 
       const categoryName = asTrimmedString(category);
@@ -140,9 +140,27 @@ const PostController = {
         productImageUrls = productImages;
       }
 
-      // Set expiry time (current time + 30 days)
-      const expiryAt = new Date();
-      expiryAt.setDate(expiryAt.getDate() + 30);
+      const resolvedPostType = asTrimmedString(post_type) || "standard";
+      if (!["standard", "rapid"].includes(resolvedPostType)) {
+        return res.status(400).json({ error: 'post_type must be "standard" or "rapid".' });
+      }
+
+      let expiryAt;
+      let storedExpiryMinutes = null;
+
+      if (resolvedPostType === "rapid") {
+        const minutes = parseInt(expiry_minutes, 10);
+        if (Number.isNaN(minutes) || minutes < 2 || minutes > 1440) {
+          return res.status(400).json({
+            error: "expiry_minutes must be between 2 and 1440 for rapid posts.",
+          });
+        }
+        storedExpiryMinutes = minutes;
+        expiryAt = new Date(Date.now() + minutes * 60 * 1000);
+      } else {
+        expiryAt = new Date();
+        expiryAt.setDate(expiryAt.getDate() + 30);
+      }
 
       // Prepare post data
       const postData = {
@@ -161,6 +179,8 @@ const PostController = {
           type: "Point",
           coordinates: [parseFloat(store_location_longitude), parseFloat(store_location_latitude)],
         },
+        post_type: resolvedPostType,
+        expiry_minutes: storedExpiryMinutes,
         expiryAt,
       };
 
@@ -387,7 +407,7 @@ const PostController = {
       productData.isPostOwner = isPostOwner(product, userId);
 
       const group = await Group.findOne({productId: product._id})
-        .populate("members", "firstName lastName userName _id avatar");
+        .populate("members", "firstName lastName userName _id avatar"); 
       if (!canViewInactivePostDetails(product, group, userId)) {
         return res.status(403).json({
           success: false,

@@ -118,6 +118,15 @@ const postSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    post_type: {
+      type: String,
+      enum: ["standard", "rapid"],
+      default: "standard",
+    },
+    expiry_minutes: {
+      type: Number,
+      default: null,
+    },
     expiryAt: {
       type: Date,
       required: true,
@@ -133,6 +142,7 @@ postSchema.index({ category: 1, deletedAt: 1, expiryAt: 1 });
 postSchema.index({ subCategory: 1, deletedAt: 1, expiryAt: 1 });
 postSchema.index({ createdAt: -1 });
 postSchema.index({ category: 1, subCategory: 1, deletedAt: 1, expiryAt: 1 });
+postSchema.index({ post_type: 1, deletedAt: 1, expiryAt: 1 });
 
 const Post = mongoose.models.Post || mongoose.model("Post", postSchema);
 module.exports = Post;

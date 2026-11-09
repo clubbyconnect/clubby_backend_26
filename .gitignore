@@ -40,3 +40,4 @@ bower_components/
 # Ignore specific files or directories
 /path/to/file_or_directory
 .vercel
+.DS_Store

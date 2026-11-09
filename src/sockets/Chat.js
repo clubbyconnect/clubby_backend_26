@@ -3,6 +3,8 @@ const socketIO = require("socket.io");
 const { Server } = require("socket.io");
 const { sendPushNotification } = require('../utils/Firebase.js');
 const Call = require('../models/Call.js');
+const ClubRequest = require('../models/ClubRequest.js');
+const Post = require('../models/Post.js');
 
 let io;
 const activeCalls = new Map(); // Stores userId -> callID
@@ -11,6 +13,14 @@ const callGroups = new Map();  // Stores callID -> [users]
 
 // Keep track of active calls and their participants
 const activeCallRooms = new Map();
+
+function joinUserRoom(socket, userId) {
+  if (!userId) return;
+  const room = String(userId);
+  socket.join(room);
+  socket.data.userId = room;
+  console.log(`Socket ${socket.id} joined user room ${room}`);
+}
 
 const initializeSockets = (server) => {
 
@@ -25,10 +35,75 @@ const initializeSockets = (server) => {
     console.log("New client connected:", socket.id);
 
     socket.on("joinUser", (userId) => {
-      if (!userId) return;
-      const room = String(userId);
-      socket.join(room);
-      console.log(`Socket ${socket.id} joined user room ${room}`);
+      joinUserRoom(socket, userId);
+    });
+
+    socket.on("join_user_room", ({ userId }) => {
+      joinUserRoom(socket, userId);
+    });
+
+    socket.on("rapid_request_response", async (payload, callback) => {
+      try {
+        const { requestId, action } = payload || {};
+        const actingUserId = socket.data.userId;
+
+        if (!actingUserId) {
+          const error = "Join user room first (join_user_room).";
+          callback?.({ ok: false, error });
+          return;
+        }
+        if (!requestId || !["accept", "decline"].includes(action)) {
+          const error = "requestId and action (accept|decline) are required.";
+          callback?.({ ok: false, error });
+          return;
+        }
+
+        const clubRequest = await ClubRequest.findById(requestId).lean();
+        if (!clubRequest || clubRequest.status !== "pending") {
+          const error = "Request not found or not pending.";
+          callback?.({ ok: false, error });
+          return;
+        }
+
+        const post = await Post.findById(clubRequest.postId)
+          .select("post_type postOwnerId")
+          .lean();
+        if (!post || post.post_type !== "rapid") {
+          const error = "Not a rapid post request.";
+          callback?.({ ok: false, error });
+          return;
+        }
+        if (String(post.postOwnerId) !== String(actingUserId)) {
+          const error = "Only the post owner can respond.";
+          callback?.({ ok: false, error });
+          return;
+        }
+
+        const status = action === "accept" ? "accepted" : "declined";
+        const { processClubRequestAction } = require("../services/clubRequestService.js");
+        const result = await processClubRequestAction({
+          actingUserId,
+          requesterId: clubRequest.requester,
+          postId: clubRequest.postId,
+          status,
+        });
+
+        if (!result.ok) {
+          callback?.({ ok: false, error: result.error, code: result.code });
+          return;
+        }
+
+        emitToRoom(String(clubRequest.requester), "rapid_request_result", {
+          requestId: String(requestId),
+          action,
+          postId: String(clubRequest.postId),
+        });
+
+        callback?.({ ok: true, message: result.message });
+      } catch (err) {
+        console.error("rapid_request_response error:", err);
+        callback?.({ ok: false, error: "Internal server error." });
+      }
     });
 
     socket.on('start-call', async ({ groupId, type }) => {
