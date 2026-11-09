@@ -129,7 +129,6 @@ exports.getUserPosts = async (req, res) => {
       };
     }
     roleMatch = { ...roleMatch, ...postTypeMatch };
-    console.log("[getUserPosts] post_type:", postTypeParam, "roleMatch:", JSON.stringify(roleMatch));
     const statusMatch = buildClubStatusMatch(status);
 
     const aggregatePipeline =

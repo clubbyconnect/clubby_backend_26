@@ -650,7 +650,6 @@ exports.leaveGroup = async (req, res) => {
       } else {
         // Deactivate group if no new admin is specified
         const postToUpdate = await Post.findOne({ _id: productObjectId });
-        console.log('Post to be updated is ', postToUpdate, ' productId ', productObjectId);
 
         if (postToUpdate) {
           postToUpdate.clubStatus = 'Inactive';
@@ -709,7 +708,6 @@ exports.isConnected = async (req, res) => {
 
 exports.getGroupMembersAndAdmin = async (req, res) => {
   const { groupId } = req.params; // Get groupId from URL params
-  console.log("groupId ", groupId);
 
   try {
     // Find the group by _id (groupId) and populate adminId and members fields

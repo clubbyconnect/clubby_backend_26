@@ -116,7 +116,6 @@ const initializeSockets = (server) => {
         // }
         if (!existingCall) {
           const call = new Call({ groupId, type });
-          console.log(' call  ', call)
 
           await call.save();
           existingCall = call;
@@ -215,7 +214,6 @@ const initializeSockets = (server) => {
 
     socket.on("sendMessage", (data, callback) => {
       const { groupId, content, fcmTokens } = data.result;
-      console.log('New message to group  ', groupId, ' is ', data.result)
       io.to(groupId).emit("newMessage", data.result);
       console.log(' after io in send message....');
 
@@ -256,7 +254,6 @@ const initializeSockets = (server) => {
 
       // Emit the system message to everyone in the group
       io.to(groupId).emit("newMessage", data);
-      console.log(`System message sent to group ${groupId}:`, content);
     });
 
     // Leave group (no voting)

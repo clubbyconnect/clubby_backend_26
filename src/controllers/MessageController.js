@@ -10,19 +10,10 @@ const { getUserMembership, getMembershipAudit } = require("../utils/groupMembers
 
 
 exports.sendMessage = async (req, res) => {
-    console.log('Request body:', req.body);
-    console.log('req.file ', req.file);
-
     const imageFile = req.files?.image ? req.files.image[0] : null;
     const audioFile = req.files?.audio ? req.files.audio[0] : null;
     const videoFile = req.files?.video ? req.files.video[0] : null;
-
-    console.log('Audio file:', audioFile);
-    console.log('Image file:', imageFile);
-    console.log('Video file:', videoFile);
-
     const { groupId, messageType, messageContent } = req.body;
-    console.log('req.User is ', req.User);
     const userId = req.User._id;
 
     try {
@@ -96,7 +87,6 @@ exports.sendMessage = async (req, res) => {
                 return res.status(500).json({ error: "Failed to upload Audio to Cloudinary" });
             }
 
-            console.log('audio part URL ', cloudinaryResult.secure_url);
             finalMessageContent = cloudinaryResult.secure_url;
         }
 
@@ -191,9 +181,6 @@ exports.sendMessage = async (req, res) => {
                 groupId,
                 'Group',
             );
-            if (!success) {
-                console.log('Error adding message notification for member', memberId);
-            }
         }
 
 

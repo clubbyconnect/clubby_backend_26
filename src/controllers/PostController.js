@@ -471,8 +471,6 @@ const PostController = {
         return res.status(404).json({error: "Post not found."});
       }
 
-      console.log("existingPost", existingPost)
-      console.log("req.user", req.User);
       if (!isPostOwner(existingPost, req.User._id)) {
         return res.status(403).json({
           error: "You do not have permission to delete this post.",
@@ -522,8 +520,6 @@ const PostController = {
 
       // Check if the requester is the current admin
       if (!group.adminId.equals(userId)) {
-        console.log("group.adminId", group.adminId)
-        console.log("userId", userId)
 
         return res.status(403).json({error: "Only the current admin can transfer ownership."});
       }
@@ -746,7 +742,6 @@ const PostController = {
 
       const group = await Group.findOne({productId: existingPost._id});
       if (group) {
-        console.log("group", group)
         await sendSystemMessage(group._id, `Group has been deactivated by admin. Reason: ${note}`);
       }
       return res.status(200).json({

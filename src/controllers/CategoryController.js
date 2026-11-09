@@ -132,9 +132,6 @@ module.exports = {
         updatedImage = image;
       }
 
-      console.log("image", image)
-      console.log("req.file", req.file)
-
       // Update category
       const updatedCategory = await CategoryModel.findByIdAndUpdate(id, {
         name: name.trim(), isPremium: typeof isPremium === "boolean" ? isPremium : isPremium === "true", image: updatedImage

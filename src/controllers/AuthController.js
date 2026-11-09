@@ -496,7 +496,6 @@ exports.facebookAuth = async (req, res) => {
 exports.logout = async (req, res) => {
     try {
         const userId = req.User._id; // Assuming user is authenticated and attached to req
-        console.log('req.user is ', req.User)
         // Find the user and remove deviceType and fcmToken
         const user = await User.findByIdAndUpdate(
             userId,

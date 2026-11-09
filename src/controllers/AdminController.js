@@ -169,9 +169,7 @@ module.exports = {
         return res.status(400).json({error: "New password must be at least 6 characters long."});
       }
       const admin = req.Admin;
-      console.log('admin', admin)
       const isOldPasswordValid = await bcrypt.compare(oldPassword.trim(), admin.password);
-      console.log('isOldPasswordValid', isOldPasswordValid)
       if (!isOldPasswordValid) {
         return res.status(400).json({error: "Old password is incorrect."});
       }

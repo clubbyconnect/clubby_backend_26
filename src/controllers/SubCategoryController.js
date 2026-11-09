@@ -113,7 +113,6 @@ const SubcategoryController = {
 
       // Handle image update
       let newImage = subcategory.image; // Default to existing image
-      console.log("name, ", name)
 
       if (req.file) {
         const uploadedImage = await uploadOnCloudinary(req.file.path);
@@ -122,7 +121,6 @@ const SubcategoryController = {
         newImage = image.trim();
       }
 
-      console.log("newImage", newImage)
       // Check for duplicate subcategory name
       const existingSubcategory = await SubcategoryModel.findOne({
         name: name.trim(), category: categoryId || subcategory.category, _id: { $ne: id }

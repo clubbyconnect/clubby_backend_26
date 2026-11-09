@@ -36,7 +36,6 @@ const sendSms = async (phoneNumber, otp) => {
       flash: "0",
     },
   });
-  console.log("Fast2SMS delete-account OTP response:", response.data);
 };
 
 exports.requestDeleteOtp = async (req, res) => {

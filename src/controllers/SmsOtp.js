@@ -57,7 +57,6 @@ const sendSms = async (phoneNumber, message) => {
                 flash: "0",
             },
         });
-        console.log("Fast2SMS API response:", response.data);
     } catch (error) {
         console.error("Error sending SMS via Fast2SMS:", error);
         throw new Error("Failed to send SMS: " + error.message);

@@ -238,7 +238,6 @@ const ClubRequestController = {
       const result = await checkUserFCMAndDevice(postOwnerId);
 
       if (result.status) {
-        console.log("User has FCM Token:", result.fcmToken);
 
         let message = {
           token: result.fcmToken,

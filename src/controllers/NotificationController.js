@@ -33,7 +33,6 @@ const addNotification = async (name, message, userId, notificationType, deeplink
 const getNotifications = async (req, res) => {
     try {
         const userId = req.User._id;
-        console.log('user id ', userId)
 
         // Fetch notifications sorted by creation date
         const notifications = await Notification.find({ userId }).sort({ createdAt: -1 });
