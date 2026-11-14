@@ -107,6 +107,22 @@ exports.sendOtp = async (req, res) => {
             });
         }
 
+        const testNumber = process.env.TEST_OTP_NUMBER;
+        const testCode = process.env.TEST_OTP_CODE;
+        if (
+            testNumber &&
+            testCode &&
+            parsedPhone &&
+            parsedPhone.digits.slice(-10) === testNumber
+        ) {
+            await OTP.deleteMany(otpLookup);
+            await OTP.create({ ...otpLookup, otp: testCode });
+            return res.status(200).json({
+                success: true,
+                message: "OTP Sent Successfully",
+            });
+        }
+
         const existingOtp = await OTP.findOne(otpLookup);
         if (existingOtp) {
             return res
@@ -377,7 +393,7 @@ exports.verifyOtp = async (req, res) => {
 
         if (isEmailContact) {
             await User.updateOne(
-                {
+                { 
                     email: {
                         $regex: new RegExp(
                             `^${String(parsedEmail?.trimmed ?? contact).trim()}$`,
